@@ -48,7 +48,17 @@ SOFTWARE.
 
 ---
 
-## 3. SillyTavern Local File & API Interoperability Notice
+## 3. SillyTavern & TavernAI Data Format Interoperability Notice
 
-- **Project**: https://github.com/sillytavern/SillyTavern (AGPL-3.0)
-- **Clean-Room Boundary**: Tavern Fusion bundles **zero** SillyTavern source code. It interoperates exclusively with user-owned local data files (`characters/*.png`, `worlds/*.json`, `chats/**/*.jsonl`, `OpenAI Settings/*.json`, `settings.json`) and optional public localhost HTTP endpoints (`127.0.0.1:8000`).
+- **SillyTavern Upstream**: https://github.com/SillyTavern/SillyTavern (AGPL-3.0, maintained by Cohee, RossAscends, Wolfsblvt, and the SillyTavern Community; Docs: https://docs.sillytavern.app/)
+- **TavernAI Progenitor**: https://github.com/TavernAI/TavernAI (maintained by Hum and contributors; original PNG `chara` tEXt chunk and tavern UI paradigm)
+- **Clean-Room Boundary**: Tavern Fusion bundles **zero** SillyTavern or TavernAI source code. All prompt assembly (`OpenAI Settings/*.json`), World Info `selectiveLogic` and `@Depth` splicing, regex post-processing, and `.jsonl` transcript synchronization are independently written from scratch in Python 3.12 and vanilla ES Modules, interoperating strictly with user-owned local data files (`characters/*.png`, `worlds/*.json`, `chats/**/*.jsonl`, `OpenAI Settings/*.json`, `settings.json`) and optional public localhost HTTP endpoints (`127.0.0.1:8000`).
+
+---
+
+## 4. Antigravity IDE / Coding-Agent Tavern Pioneers & LINUX DO Community
+
+- **Antigravity IDE × SillyTavern Bridge Pioneers**:
+  - Inspired by `terva-sh/terva` (https://github.com/terva-sh/terva), the local first-generation `st-antigravity-mcp` (`sillytavern-bridge`) prototype, and community MCP bridges connecting AI coding IDEs with SillyTavern (such as `Chaunyzhang/sillytavern-mcp` and `Inversity/SillyTavern-MCP-Servers-Universal`).
+- **LINUX DO Community (`https://linux.do`)**:
+  - Special thanks to the **LINUX DO (L站)** community for pioneering and sharing best practices on SillyTavern prompt engineering ("Four Dimensional Locks": top-level `system_instruction` epistemic cutoff, `<START>` lexical dialogue convergence, World Info `@Depth` splicing, and regex immersion guards) as well as Google Antigravity IDE plugin/MCP workflows.
