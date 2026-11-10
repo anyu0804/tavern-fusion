@@ -1,5 +1,9 @@
 # Tavern Fusion 3.0 — Antigravity × SillyTavern Native Workbench
 
+> [!WARNING]
+> **早期工程版本声明（Early Engineering Preview）**  
+> 本项目目前处于**非常早期的工程探索版本**，可能还存在较多 Bug 或边缘环境兼容问题。如果你在使用过程中遇到任何故障、或者有想要补充的功能建议，欢迎直接在仓库提交 [**Issues**](https://github.com/anyu0804/tavern-fusion/issues)，我会尽可能持续跟进完善！
+
 **Tavern Fusion 3.0** 是一款面向 **Google Antigravity (AGY)** 构建的原生 SillyTavern 沉浸式角色扮演与世界观编排插件。它在不修改 SillyTavern 核心源码、不开启高权限 `enableServerPlugins`、且**无需额外配置外部第三方大模型 API Key** 的前提下，直接驱动 **Antigravity 内置推理模型** 与本地酒馆数据（`characters/*.png`、`worlds/*.json`、`chats/**/*.jsonl`、`OpenAI Settings/*.json`）双向无损互通，并在 IDE 右侧辅助面板提供常驻可视化的 **`Tavern Stage`** 剧场工作台。
 
 ---
