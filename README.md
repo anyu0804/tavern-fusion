@@ -77,7 +77,50 @@ node scripts/run_py.mjs tests/test_full_suite.py
 
 ---
 
-## 开源协议、致谢与声明
+## 常见问题排查 (Troubleshooting)
+
+1. **Windows 中文系统用户名下宿主 Node 启动器报 `exit status 1`**
+   - 若 Windows 宿主环境的 `~/.gemini/antigravity/bin/agy-node.cmd` 因 LF 换行符与代码页 936（GBK）解析中文路径发生错位，可将 `agy-node.cmd` 换行符转换为 `CRLF` 并使用 `%LOCALAPPDATA%` 纯 ASCII 环境变量路径。
+2. **侧栏面板与工作区数据目录绑定**
+   - 首次安装时传入 `--st-root /path/to/SillyTavern`（或在 `mcp_config.json` 中配置 `ST_USER_DATA_DIR`），插件会将数据根路径持久化记录于 `~/.gemini/antigravity/tavern-fusion/state/plugin_settings.json`，确保 MCP 服务、Lifecycle Hooks 与右侧 `Tavern Stage` 舞台面板共享同一份状态与存档目录。
+
+---
+
+## 合规性、安全边界与免责声明 (Compliance & Disclaimer)
+
+### 1. 宿主平台合规与正当使用边界 (Platform ToS Compliance)
+
+[Tavern Fusion](https://github.com/anyu0804/tavern-fusion) 严格遵循**“数据进官方宿主、算力不出官方客户端”**的原生插件设计原则，不涉及任何第三方客户端逆向或凭证中转：
+
+* **零凭证提取与零外部反代**：本项目完全通过官方客户端内置的插件清单、本地 `stdio` MCP 服务与生命周期钩子运行，**不读取、不提取、不转发**任何 OAuth 登录令牌或会话 Cookie，亦不向外部程序暴露任何推理代理端口，严格遵守 [Google Antigravity 附加服务条款](https://antigravity.google/terms/) 中关于禁止使用第三方软件、包装器或 OAuth 代理访问服务的规定。
+* **内容安全与反越狱（Anti-Jailbreak）要求**：在宿主云端环境中使用本项目进行互动叙事、世界观推演或角色扮演测试时，用户须严格遵守 [Google 通用服务条款](https://policies.google.com/terms?hl=en-US) 与 [Google 生成式 AI 禁止使用政策](https://policies.google.com/terms/generative-ai/use-policy?hl=en-US)；若在宿主内切换使用 Claude 等第三方模型，须同时遵守 [Anthropic 商业条款](https://www.anthropic.com/legal/commercial-terms) 与 [Anthropic 使用政策](https://www-cdn.anthropic.com/files/4zrzovbb/website/6ae2f5bb8675bcd9fac006125817ba1393b396e4.pdf)。
+* **外部预设与角色卡导入警示**：**严禁**在连接云端商业订阅模型时导入包含越狱破限（Jailbreak / DAN / 安全过滤器规避指令）、色情露骨（NSFW / ERP）、极端暴力、仇恨言论、自残诱导或未成年人违法不良信息的预设（`OpenAI Settings/*.json`）及角色卡。[server/st_runtime_compat.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/st_runtime_compat.py) 默认启用 `host_gentle` 安全策略门禁与零容忍正则拦截；`passthrough` 模式仅限用户在自有硬件上对接本地开源模型时测试使用，请勿用于云端商业模型会话。
+
+### 2. 本地数据安全与沙箱隔离 (Local Data & Sandbox Safety)
+
+* **Card-is-Data 零特权原则**：外部导入的角色卡与世界书均被视为不可信纯数据，在解析阶段自动剥离潜在的命令执行钩子与危险扩展字段。
+* **文件系统边界锁定**：所有文件读写均受 [server/fs_safety.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/fs_safety.py) 目录包含校验（`ensure_under_dir`）与生命周期拦截钩子保护，严格限制在用户显式配置的本地 `ST_DATA_ROOT` 目录及本地回环地址（`127.0.0.1`）范围内。
+
+### 3. 开源许可证与洁净室隔离声明 (Open-Source Licensing & Clean-Room Notice)
+
+本项目核心代码基于 [MIT License](https://github.com/anyu0804/tavern-fusion/blob/main/LICENSE) 开源，完整第三方致谢与协议文本详见 [THIRD_PARTY_NOTICES.md](https://github.com/anyu0804/tavern-fusion/blob/main/THIRD_PARTY_NOTICES.md)：
+
+| 关联生态 / 规范 | 上游许可证 / 性质 | 本项目集成与隔离方式 |
+| :--- | :--- | :--- |
+| [SillyTavern](https://github.com/SillyTavern/SillyTavern/blob/release/LICENSE) | AGPL-3.0 | **洁净室（Clean-Room）零源码引用**：未复制、修改或捆绑任何 SillyTavern 前后端源码；仅基于公开文件结构独立使用 Python 标准库与原生 ESM 实现本地 `.jsonl` / 世界书读写及本地 HTTP 同步（[st-ag-sync](https://github.com/anyu0804/tavern-fusion/tree/main/st_web_extension/st-ag-sync) 未静态导入任何 AGPL 内部模块）。 |
+| [Terva (terva-sh/terva)](https://github.com/terva-sh/terva) | MIT | 致谢并沿用其芬兰语叙事专家角色命名体系与上下文分层理念，所有业务代码均在 [Tavern Fusion](https://github.com/anyu0804/tavern-fusion) 内以 Python / ESM 独立重写，并完整保留上游 MIT 版权声明。 |
+| [Character Card Spec V2 / V3](https://github.com/kwaroran/character-card-spec-v3) | 公开格式规范 | 依据公开规范利用 Python 标准库（`struct` / `zlib` / `base64` / `json`）独立实现 PNG `tEXt` / `zTXt` / `iTXt` 双区块无损读写。 |
+
+### 4. 商标声明与免责条款 (Trademark & Liability Disclaimer)
+
+* **非官方关联声明 (Non-Affiliation)**：Tavern Fusion 是由社区独立开发的开源工程项目，**与 Google LLC、Google Antigravity 团队、SillyTavern 官方团队或 Anthropic PBC 不存在任何隶属、合作、授权、赞助或官方背书关系**。文档中提及的 `Google Antigravity`、`SillyTavern`、`Claude` 等产品或项目名称仅用于客观说明技术兼容性与运行环境，相关商标及名称权利均归其各自所有者所有。
+* **使用风险自担 (Use at Your Own Risk)**：本软件按 [MIT License](https://github.com/anyu0804/tavern-fusion/blob/main/LICENSE) 规定的“原样（AS IS）”提供，不附带任何明示或暗示担保。使用者须自行确保所加载的角色卡、世界书、提示词预设及对话内容符合所在地法律法规及所接入模型服务商的服务条款；因用户导入违规内容、修改安全门禁配置或不当使用第三方服务而导致的账号受限、配额冻结或数据损失，项目作者与贡献者概不承担责任。
+
+*Non-Affiliation Disclaimer: Tavern Fusion is an independent, community-driven open-source project and is not affiliated with, endorsed by, or sponsored by Google LLC, the SillyTavern project, or Anthropic PBC. All product names and trademarks mentioned in this repository are the property of their respective owners and are used solely to describe interoperability.*
+
+---
+
+## 开源协议与社区致谢
 
 - 本仓库原创插件代码、Sidecar 前端、脚本与架构文档采用 [MIT License](./LICENSE) 开源（`Copyright (c) 2026 安钰 (AnYu)`）。
 - 架构与戏剧专家组设计参考并致谢以下开源项目（完整许可声明与上游 `LICENSE` 原文见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)）：
@@ -87,14 +130,3 @@ node scripts/run_py.mjs tests/test_full_suite.py
   - [`TavernAI/TavernAI`](https://github.com/TavernAI/TavernAI) — 致敬初代酒馆开创的 PNG `tEXt`（`chara`）角色卡元数据内嵌范式。
   - [`kwaroran/character-card-spec-v3`](https://github.com/kwaroran/character-card-spec-v3) — 遵循 Character Card V2（`chara`）与 V3（`ccv3`）开放规范。
 - 社区致谢：本项目认可并致谢 [LINUX DO 社区](https://linux.do/)（[https://linux.do](https://linux.do)），感谢社区佬友在 AI Agent 工程实践与工具链上的交流分享与严谨审阅。
-
-> **声明**：本项目为独立的非官方社区开源插件与工具集，与 Google LLC 及 SillyTavern 官方团队无任何隶属、授权或背书关系。文中提及的 Google、Antigravity、Gemini、SillyTavern、TavernAI 等名称仅用于说明兼容环境与数据格式，相关商标归各自所有者所有。
-
----
-
-## 常见问题排查 (Troubleshooting)
-
-1. **Windows 中文系统用户名下宿主 Node 启动器报 `exit status 1`**
-   - 若 Windows 宿主环境的 `~/.gemini/antigravity/bin/agy-node.cmd` 因 LF 换行符与代码页 936（GBK）解析中文路径发生错位，可将 `agy-node.cmd` 换行符转换为 `CRLF` 并使用 `%LOCALAPPDATA%` 纯 ASCII 环境变量路径。
-2. **侧栏面板与工作区数据目录绑定**
-   - 首次安装时传入 `--st-root /path/to/SillyTavern`（或在 `mcp_config.json` 中配置 `ST_USER_DATA_DIR`），插件会将数据根路径持久化记录于 `~/.gemini/antigravity/tavern-fusion/state/plugin_settings.json`，确保 MCP 服务、Lifecycle Hooks 与右侧 `Tavern Stage` 舞台面板共享同一份状态与存档目录。
