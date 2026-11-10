@@ -20,7 +20,7 @@
   "st-pre-tool-chokepoint": {
     "PreToolUse": [
       {
-        "matcher": ".*st_.*|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
+        "matcher": "(^|.*[-_.:/])st_[a-z_]+$|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
         "hooks": [
           {
             "type": "command",

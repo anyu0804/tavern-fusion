@@ -29,7 +29,7 @@ from server.mcp_server import TavernFusionRuntime
 from server.st_runtime_compat import evaluate_policy_compliance
 
 RP_SLASH_RE = re.compile(
-    r"^\s*/rp(?:\s+([^\s-]+))?(?:\s+--(play|chat))?(?:\s+(.*))?$",
+    r"^\s*/rp(?:\s+((?!--)\S+))?(?:\s+--(play|chat))?(?:\s+(.*))?$",
     re.IGNORECASE | re.DOTALL,
 )
 RP_EXIT_ARGS = frozenset({"off", "stop", "exit", "quit", "end", "close"})

@@ -285,13 +285,15 @@ def get_active_persona(st_data_root: str | Path, persona_override: str | None = 
         return {"name": persona_override, "description": "", "avatar_key": ""}
 
     user_avatar = str(settings.get("user_avatar", ""))
-    user_name = str(settings.get("name1") or personas.get(user_avatar) or "旅行者")
-    desc_entry = descriptions.get(user_avatar, {})
-    desc = (
-        desc_entry.get("description", "")
-        if isinstance(desc_entry, dict)
-        else str(power_user.get("persona_description", ""))
+    user_name = str(
+        personas.get(user_avatar) or settings.get("username") or settings.get("name1") or "旅行者"
     )
+    desc_entry = descriptions.get(user_avatar)
+    if isinstance(desc_entry, dict) and desc_entry.get("description"):
+        desc = str(desc_entry["description"])
+    else:
+        # Fall back to the legacy single-persona field when no per-avatar entry exists.
+        desc = str(power_user.get("persona_description", ""))
     return {"name": user_name, "description": desc, "avatar_key": user_avatar}
 
 
