@@ -221,11 +221,13 @@ class TavernFusionRuntime:
         worlds_dir = self.st_data_root / "worlds"
         if not book_names and worlds_dir.exists():
             settings = load_st_settings(self.st_data_root)
-            selected_global = (
-                settings.get("world_info", {}).get("globalSelect", [])
-                if isinstance(settings.get("world_info"), dict)
-                else []
-            )
+            # SillyTavern stores this at `world_info_settings.world_info.globalSelect`;
+            # top-level `world_info.globalSelect` is kept as a fallback for older mock data.
+            wi_settings = settings.get("world_info_settings")
+            wi_block = wi_settings.get("world_info") if isinstance(wi_settings, dict) else None
+            if not isinstance(wi_block, dict):
+                wi_block = settings.get("world_info") if isinstance(settings.get("world_info"), dict) else {}
+            selected_global = wi_block.get("globalSelect", []) or []
             if selected_global:
                 book_names.extend(selected_global)
             else:
@@ -437,7 +439,9 @@ class TavernFusionRuntime:
                     self.st_data_root,
                     character_name=char_name,
                     user_name=persona["name"],
-                    greeting_text=card_v3["data"].get("first_mes", ""),
+                    greeting_text=resolve_st_macros(
+                        str(card_v3["data"].get("first_mes", "")), char_name, persona["name"]
+                    ),
                 )
                 chat_path = Path(created["chat_path"])
 
@@ -758,7 +762,16 @@ class TavernFusionRuntime:
         if scope == "global":
             settings_path = self.st_data_root / "settings.json"
             settings = load_st_settings(self.st_data_root)
-            g_vars = settings.setdefault("variables", {}).setdefault("global", {})
+            if op in ("set", "inc", "del") and settings_path.exists() and not settings:
+                # `load_st_settings` returns {} on a parse error; writing back would wipe the user's settings.json.
+                raise ValueError("settings.json exists but could not be parsed; refusing to overwrite it.")
+            # SillyTavern keeps global variables at `extension_settings.variables.global`.
+            ext_settings = settings.setdefault("extension_settings", {})
+            g_vars = ext_settings.setdefault("variables", {}).setdefault("global", {})
+            legacy = settings.get("variables")
+            if isinstance(legacy, dict) and isinstance(legacy.get("global"), dict):
+                for lk, lv in legacy["global"].items():
+                    g_vars.setdefault(lk, lv)
             if op == "get":
                 return {"scope": "global", "key": key, "value": g_vars.get(key)}
             if op == "set":
