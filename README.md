@@ -77,77 +77,18 @@ node scripts/run_py.mjs tests/test_full_suite.py
 
 ---
 
-## 致谢、灵感来源与标准引用 (Acknowledgments & Citations)
+## 开源协议、致谢与声明
 
-### 1. LINUX DO（L站）社区致谢
-本项目在构思与打磨过程中，深受 [**LINUX DO (linux.do)**](https://linux.do) 社区开源互助氛围的启发。谨依 L 站开源分享与致谢规范，向社区及各位佬友致以诚挚谢意：
-- **酒馆提示词工程与「四重维度锁」沉淀**：感谢 L 站酒馆（SillyTavern）专区佬友们在 Gemini / Claude 模型驯服、原生 `system_instruction` 认知切断、`<START>` 对话样本词表收敛、世界书 `@Depth` 临界深度锁喉，以及前端 Regex 防出戏物理清洗等实践上的无私分享——本项目的「四重维度锁」与「维度调音台（Dimension Mixer）」正是将这些社区民间智慧工程化、可视化的结晶。
-- **反重力（Antigravity）生态折腾与共创**：感谢 L 站反重力板块佬友们在 Google Antigravity IDE 扩展体系、MCP 工具链、Sidecar 面板及多模型协同玩法上的早期探路与经验沉淀。
-- *“真诚、友善、团结、专业，共建你我引以为荣之社区。”* 欢迎各位 L 站佬友体验、拍砖、提 Issue 或 PR；若在社区二创、打包或分享，烦请保留本节上游与社区致谢说明。
+- 本仓库原创插件代码、Sidecar 前端、脚本与架构文档采用 [MIT License](./LICENSE) 开源（`Copyright (c) 2026 安钰 (AnYu)`）。
+- 架构与戏剧专家组设计参考并致谢以下开源项目（完整许可声明与上游 `LICENSE` 原文见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)）：
+  - [`terva-sh/terva`](https://github.com/terva-sh/terva)（[terva.sh](https://terva.sh/)）— `Copyright (c) Drew Short, Patric Eckhart`（MIT License）。本项目的五位芬兰语戏剧专家子代理命名（`Kertoja`、`Kartoittaja`、`Seppä`、`Toimittaja`、`Dramaturgi`）、`--play` / `--chat` 双模交互契约、`--dump-prompt` 注入帧透视、`Card-is-Data` 安全边界及 Card Doctor 静态体检理念参考自 Terva。
+- 酒馆数据格式与生态标准引用：
+  - [`SillyTavern/SillyTavern`](https://github.com/SillyTavern/SillyTavern)（[官方文档](https://docs.sillytavern.app/)，AGPL-3.0）— 本项目的角色卡、世界书（4 种 `selectiveLogic` 门控与 `@Depth` 深度注入）、`OpenAI Settings` 提示词装配栈、Regex 后置清洗与 `.jsonl` 聊天记录读写器均为基于公开数据格式规范的全新洁净室（Clean-Room）独立实现，**不包含、不分发任何受 AGPL-3.0 约束的 SillyTavern 源码副本**。
+  - [`TavernAI/TavernAI`](https://github.com/TavernAI/TavernAI) — 致敬初代酒馆开创的 PNG `tEXt`（`chara`）角色卡元数据内嵌范式。
+  - [`kwaroran/character-card-spec-v3`](https://github.com/kwaroran/character-card-spec-v3) — 遵循 Character Card V2（`chara`）与 V3（`ccv3`）开放规范。
+- 社区致谢：本项目认可并致谢 [LINUX DO 社区](https://linux.do/)（[https://linux.do](https://linux.do)），感谢社区佬友在 AI Agent 工程实践与工具链上的交流分享与严谨审阅。
 
-### 2. 反重力 IDE / Coding Agent 酒馆先驱项目致谢
-本项目从“在反重力 IDE 内嵌运行酒馆”的早期构想走向完整工作台，参考并致敬了以下先驱项目与原型：
-- **[`terva-sh/terva`](https://github.com/terva-sh/terva)（[terva.sh](https://terva.sh/)，MIT License，作者 Drew Short & Patric Eckhart）**  
-  将 Coding Agent Harness / IDE 与 SillyTavern 角色卡（`--card`）、世界书引擎同构融合的开创性项目。本项目的五位芬兰语戏剧专家子代理命名（`Kertoja`、`Kartoittaja`、`Seppä`、`Toimittaja`、`Dramaturgi`）、`--play` / `--chat` 双模契约、`--dump-prompt` 注入帧透视、`Card-is-Data` 零特权边界以及 Card Doctor 体检理念均直接致敬 Terva。
-- **反重力 IDE × 酒馆 MCP 桥接探索（`st-antigravity-mcp` / `sillytavern-bridge` 及社区同路项目）**  
-  本项目的第一代原型脱胎于面向 Google Antigravity IDE 的轻量级 MCP 桥接探索（`st-antigravity-mcp`），并参考了社区将 Coding IDE（Antigravity / Cursor / Claude Code）通过 MCP 与本地酒馆数据目录直连的开源实践（如 [`Chaunyzhang/sillytavern-mcp`](https://github.com/Chaunyzhang/sillytavern-mcp)、[`Inversity/SillyTavern-MCP-Servers-Universal`](https://github.com/Inversity/SillyTavern-MCP-Servers-Universal) 等），最终演进为自带右侧常驻 `Tavern Stage` 舞台与「维度调音台」的 **Tavern Fusion 3.0**。
-
-### 3. SillyTavern 与 TavernAI 标准引用格式 (Standard Upstream Attribution)
-本项目作为与酒馆生态数据格式深度互通的伴生插件，向酒馆生态的缔造者与维护者致敬。在文档、衍生项目或技术报告中引用酒馆上游生态与数据规范时，遵循以下标准引用格式：
-
-- **SillyTavern（现行主流前端与高级提示词编排标准）**
-  - **官方仓库**：[https://github.com/SillyTavern/SillyTavern](https://github.com/SillyTavern/SillyTavern)
-  - **官方文档**：[https://docs.sillytavern.app/](https://docs.sillytavern.app/)
-  - **核心维护团队**：Cohee, RossAscends, Wolfsblvt, and the SillyTavern Community
-  - **开源协议与洁净室边界**：上游采用 `AGPL-3.0` 协议。**Tavern Fusion 3.0 采用 100% 洁净室（Clean-Room）独立实现（Python 3.12 + 原生 ES Module），不包含、不分发任何受 AGPL-3.0 约束的 SillyTavern 源码副本**，仅通过公开的文件规范读写用户本地的 `characters/*.png`、`worlds/*.json`、`chats/**/*.jsonl` 与 `OpenAI Settings/*.json`。
-- **TavernAI（初代酒馆鼻祖与 PNG 角色卡范式奠基者）**
-  - **官方仓库**：[https://github.com/TavernAI/TavernAI](https://github.com/TavernAI/TavernAI)
-  - **致敬说明**：致敬 Hum 及早期贡献者开创的 PNG `tEXt`（`chara`）块内嵌角色元数据与经典酒馆交互范式。
-- **Character Card V2 / V3 开放规范**
-  - **规范仓库**：[https://github.com/kwaroran/character-card-spec-v3](https://github.com/kwaroran/character-card-spec-v3)（`chara_card_v2` / `chara_card_v3` 双区块无损读写标准）。
-
-<details>
-<summary>📄 <b>展开查看标准 BibTeX 引用格式（SillyTavern / TavernAI / Terva / Tavern Fusion）</b></summary>
-
-```bibtex
-@software{sillytavern,
-  author       = {Cohee and RossAscends and Wolfsblvt and {SillyTavern Contributors}},
-  title        = {{SillyTavern}: LLM Frontend for Power Users},
-  url          = {https://github.com/SillyTavern/SillyTavern},
-  note         = {Documentation: https://docs.sillytavern.app/},
-  license      = {AGPL-3.0}
-}
-
-@software{tavernai,
-  author       = {Hum and {TavernAI Contributors}},
-  title        = {{TavernAI}: Atmospheric Adventure Chat for AI Language Models},
-  url          = {https://github.com/TavernAI/TavernAI}
-}
-
-@software{terva,
-  author       = {Short, Drew and Eckhart, Patric},
-  title        = {{Terva}: Coding Agent Harness with Character Card and Lore Engine},
-  url          = {https://github.com/terva-sh/terva},
-  license      = {MIT}
-}
-
-@software{tavern_fusion,
-  author       = {AnYu (安钰)},
-  title        = {{Tavern Fusion 3.0}: Native SillyTavern Workbench and Dimension Mixer for Google Antigravity},
-  year         = {2026},
-  url          = {https://github.com/anyu0804/tavern-fusion},
-  license      = {MIT}
-}
-```
-</details>
-
-完整第三方许可声明与洁净室合规说明见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
-
----
-
-## License
-
-Released under the [MIT License](./LICENSE). Copyright (c) 2026 安钰 (AnYu).
+> **声明**：本项目为独立的非官方社区开源插件与工具集，与 Google LLC 及 SillyTavern 官方团队无任何隶属、授权或背书关系。文中提及的 Google、Antigravity、Gemini、SillyTavern、TavernAI 等名称仅用于说明兼容环境与数据格式，相关商标归各自所有者所有。
 
 ---
 
