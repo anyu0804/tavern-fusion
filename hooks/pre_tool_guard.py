@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import sys
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -31,6 +32,32 @@ FILE_MUTATION_TOOLS = frozenset({
     "replace_file_content",
     "multi_replace_file_content",
 })
+
+# Exact Tavern Fusion MCP tool names. The host may prefix MCP tools with a server
+# namespace (e.g. `mcp_st-mcp_st_commit_turn`), so names are matched as a suffix
+# after a separator instead of a bare `"st_" in name` substring check, which also
+# matched unrelated tools such as `list_dir`.
+ST_TOOL_NAMES = frozenset({
+    "st_session_bootstrap",
+    "st_commit_turn",
+    "st_publish_stage_suggestions",
+    "st_compile_stage_widget",
+    "st_dump_prompt_frame",
+    "st_read_card",
+    "st_build_export_card",
+    "st_lint_card_and_lore",
+    "st_query_lorebook",
+    "st_evolve_lore_entry",
+    "st_manage_chat_branch",
+    "st_stage_floor_op",
+    "st_switch_profile",
+    "st_manage_variables",
+})
+_ST_TOOL_RE = re.compile(r"(?:^|[_\-.:/])(" + "|".join(sorted(ST_TOOL_NAMES)) + r")$")
+
+
+def is_tavern_tool(tool_name: str) -> bool:
+    return bool(_ST_TOOL_RE.search(tool_name))
 
 
 def main() -> None:
@@ -102,7 +129,7 @@ def main() -> None:
             return
 
     # 2. Validate & allow Tavern Fusion MCP tool calls (`*st_*`)
-    if "st_" in tool_name:
+    if is_tavern_tool(tool_name):
         for path_key in ("output_filename", "lorebook_name", "chat_file", "card_filename"):
             val = str(tool_args.get(path_key, ""))
             if ".." in val:
