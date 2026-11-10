@@ -1,0 +1,9 @@
+{
+  "name": "tavern_stage",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tavern Fusion 3.0 Right-Pane Roleplay Workbench Sidecar",
+  "license": "MIT",
+  "author": "安钰 (AnYu)"
+}

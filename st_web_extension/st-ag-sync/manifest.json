@@ -1,0 +1,11 @@
+{
+  "display_name": "Antigravity Fusion Live Sync",
+  "loading_order": 50,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "安钰 (AnYu)",
+  "version": "3.0.0",
+  "homePage": "https://sillytavern.app"
+}

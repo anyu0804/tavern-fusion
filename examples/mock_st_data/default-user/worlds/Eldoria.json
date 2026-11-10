@@ -1,0 +1,33 @@
+{
+  "entries": {
+    "0": {
+      "uid": 0,
+      "key": ["艾尔多利亚", "Eldoria", "星陨钟塔"],
+      "keysecondary": [],
+      "comment": "艾尔多利亚边境概览",
+      "content": "艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。",
+      "constant": true,
+      "selective": false,
+      "order": 90,
+      "position": 0,
+      "disable": false
+    },
+    "1": {
+      "uid": 1,
+      "key": ["苍银秘仪", "魔力枯竭", "mana", "星界裂隙"],
+      "keysecondary": ["封印完好"],
+      "selectiveLogic": 2,
+      "comment": "苍银秘仪与星界回响",
+      "content": "当施法者过度汲取星界裂隙中的秘银辉光时，指尖会浮现细微的霜蓝色结晶，必须以温热的琥珀茶缓和。",
+      "constant": false,
+      "vectorized": true,
+      "selective": true,
+      "order": 110,
+      "position": 4,
+      "depth": 2,
+      "sticky": 2,
+      "cooldown": 1,
+      "disable": false
+    }
+  }
+}

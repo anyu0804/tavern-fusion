@@ -1,0 +1,33 @@
+{
+  "username": "旅行者",
+  "user_avatar": "user-default.png",
+  "power_user": {
+    "personas": {
+      "user-default.png": "旅行者"
+    },
+    "persona_descriptions": {
+      "user-default.png": {
+        "description": "一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。",
+        "position": 0
+      }
+    },
+    "regex_scripts": [
+      {
+        "scriptName": "Strip Reasoning Blocks",
+        "findRegex": "/<think>[\\s\\S]*?<\\/think>\\s*/gi",
+        "replaceString": "",
+        "disabled": false,
+        "markdownOnly": false,
+        "promptOnly": false
+      }
+    ]
+  },
+  "world_info": {
+    "globalSelect": ["Eldoria"]
+  },
+  "variables": {
+    "global": {
+      "world_era": "星陨纪第四年"
+    }
+  }
+}

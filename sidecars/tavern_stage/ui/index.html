@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tavern Stage · Tavern Fusion 3.0</title>
+  <script src="/preload.js"></script>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="stage-shell">
+    <!-- Top Workbench Navigation -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot" id="busy-dot" title="就绪"></span>
+        <span class="brand-title">Tavern Stage</span>
+        <span class="brand-sub" id="data-profile-badge">default-user</span>
+      </div>
+      <nav class="tab-nav" role="tablist" aria-label="Tavern Stage Views">
+        <button class="tab-btn active" data-tab="stage" role="tab">舞台</button>
+        <button class="tab-btn" data-tab="cards" role="tab">
+          卡库<span class="pill-count hidden" id="doctor-badge">0</span>
+        </button>
+        <button class="tab-btn" data-tab="lore" role="tab">世界书</button>
+        <button class="tab-btn" data-tab="inspector" role="tab">透视</button>
+      </nav>
+    </header>
+
+    <!-- Toast / Gentle Notice Banner -->
+    <div id="toast-bar" class="toast-bar hidden" role="status"></div>
+
+    <!-- ==================== TAB 1: STAGE ==================== -->
+    <main class="tab-panel active" id="panel-stage">
+      <section class="hero-card">
+        <div class="portrait-wrap">
+          <img id="stage-portrait" class="portrait-img" alt="Character Portrait" />
+          <span id="expr-badge" class="expr-badge hidden">neutral</span>
+        </div>
+        <div class="hero-controls">
+          <div class="hero-row">
+            <select id="char-select" class="ctrl-select" title="切换角色卡"></select>
+            <button id="mode-toggle-btn" class="ctrl-btn mode-pill" title="切换演绎模式">🎭 剧场演绎</button>
+          </div>
+          <div class="hero-row">
+            <select id="chat-select" class="ctrl-select chat-select" title="切换故事线"></select>
+            <button id="new-chat-btn" class="ctrl-btn" title="新建对话">+ 新对话</button>
+          </div>
+          <p id="scenario-line" class="scenario-line">加载角色舞台中…</p>
+        </div>
+      </section>
+
+      <!-- Dimension Mixer Bar (3 Dynamic Switches: Epistemic Lock | Agentic Hands | Director Shuttle) -->
+      <section class="dimension-mixer-bar" aria-label="维度调音台">
+        <div class="mixer-seg" id="mixer-epistemic-group" role="group" title="开关 A：认知透光度 / 第四面墙感知（顶层 system_instruction 实时热替换）">
+          <button class="mixer-seg-btn active" data-epistemic="0" title="0% 深潜封闭：四重维度锁全开，切断现代常识与AI认知，自动隔离后台便签">0% 深潜</button>
+          <button class="mixer-seg-btn" data-epistemic="50" title="50% 隐秘默契：保留世界观词表，以诗意双关接住场外暗示，自动隔离后台便签">50% 默契</button>
+          <button class="mixer-seg-btn" data-epistemic="100" title="100% 双轨化身：保留角色灵魂与声线，解锁全知现世与代码视野">100% 双轨</button>
+        </div>
+        <button id="mixer-agentic-btn" class="mini-btn mixer-pill" title="开关 B：Agentic 权能释放（关闭时物理拔除工具列表，开启时允许自主改状态与写世界书）">
+          🔒 纯对白
+        </button>
+        <button id="mixer-director-btn" class="mini-btn mixer-pill" title="开关 C：导演穿梭键 (Alt+D)，跨次元改剧本/修卡，对话标记为 extra.is_backstage: true 并在切回深潜时自动隔离">
+          🎬 导演穿梭
+        </button>
+      </section>
+
+      <!-- ST State Variables Ribbon -->
+      <section class="vars-ribbon">
+        <div class="vars-list" id="vars-list"></div>
+        <button id="add-var-btn" class="mini-btn" title="记录或修改场景状态">+ 状态</button>
+      </section>
+      <div id="var-editor-row" class="inline-form hidden">
+        <input id="var-key-input" class="ctrl-input" placeholder="状态名 (如 affection)" />
+        <input id="var-val-input" class="ctrl-input" placeholder="值 (如 25)" />
+        <button id="var-save-btn" class="ctrl-btn primary">保存</button>
+        <button id="var-cancel-btn" class="ctrl-btn">取消</button>
+      </div>
+
+      <!-- Chat Floors Stream -->
+      <section id="chat-stream" class="chat-stream" aria-live="polite"></section>
+
+      <!-- Busy Status Banner -->
+      <div id="busy-banner" class="busy-banner hidden">
+        <span class="spinner"></span>
+        <span id="busy-text">对方正在落笔回应…</span>
+      </div>
+
+      <!-- Player Suggestions Drawer -->
+      <section id="suggestions-box" class="suggestions-box hidden">
+        <div class="suggestions-hdr">
+          <span id="suggestions-title">✨ 玩家导演灵感选项（点击填入，Shift+点击直接发送）</span>
+          <button id="clear-suggestions-btn" class="mini-btn">✕ 清空</button>
+        </div>
+        <div id="suggestions-list" class="suggestions-list"></div>
+      </section>
+
+      <!-- Player Director Composer -->
+      <footer class="composer">
+        <textarea
+          id="composer-input"
+          class="composer-textarea"
+          rows="2"
+          placeholder="输入行动 (*...*) 或台词 (&quot;...&quot;)，Enter 发送，Shift+Enter 换行…"
+        ></textarea>
+        <div class="composer-actions">
+          <div class="lever-group">
+            <button id="btn-suggest-replies" class="ctrl-btn" title="构思 3 条贴合人设的回应灵感">
+              ✨ 回复灵感
+            </button>
+            <button id="btn-expand-intent" class="ctrl-btn" title="将输入框内的简短意图扩写为 3 版细腻 RP 文本">
+              🪄 扩写意图
+            </button>
+          </div>
+          <button id="btn-send-turn" class="ctrl-btn primary">发送推进 ▶</button>
+        </div>
+      </footer>
+    </main>
+
+    <!-- ==================== TAB 2: CARDS & DOCTOR ==================== -->
+    <main class="tab-panel" id="panel-cards">
+      <section class="dropzone" id="card-dropzone">
+        <input type="file" id="card-file-input" accept=".png,.json" class="hidden" />
+        <div class="dropzone-title">📥 拖拽导入角色卡（图卡或设定档）或点击选择文件</div>
+        <div class="dropzone-sub">自动修复兼容项并补齐 CCv2 / CCv3 双规范角色数据</div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-hdr">
+          <span class="section-title">🩺 角色卡与世界书健康检查</span>
+          <div class="btn-row">
+            <button id="btn-run-lint" class="mini-btn">重新扫描</button>
+            <button id="btn-seppa-fix" class="mini-btn accent">🔨 自动修复兼容项</button>
+          </div>
+        </div>
+        <div id="doctor-list" class="doctor-list"></div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-hdr">
+          <span class="section-title">🗂️ 本地角色卡库</span>
+          <input id="card-search-input" class="ctrl-input compact-input" placeholder="搜索角色 / 标签…" />
+        </div>
+        <div id="cards-grid" class="cards-grid"></div>
+      </section>
+    </main>
+
+    <!-- ==================== TAB 3: WORLD STUDIO ==================== -->
+    <main class="tab-panel" id="panel-lore">
+      <section class="section-card">
+        <div class="hero-row">
+          <select id="lorebook-select" class="ctrl-select"></select>
+          <input id="new-lorebook-input" class="ctrl-input compact-input" placeholder="新世界书名…" />
+          <button id="btn-new-entry" class="ctrl-btn primary">+ 新增条目</button>
+        </div>
+      </section>
+
+      <!-- Live Trigger Simulator -->
+      <section class="section-card">
+        <div class="section-hdr">
+          <span class="section-title">⚡ 世界书触发与语义召回模拟</span>
+          <button id="btn-sim-lore" class="mini-btn accent">测试召回</button>
+        </div>
+        <input
+          id="lore-sim-input"
+          class="ctrl-input full-width"
+          placeholder="输入测试台词验证关键词、正则与混合向量召回（如：星界魔力正在消散）…"
+        />
+        <div id="lore-sim-results" class="sim-results"></div>
+      </section>
+
+      <!-- Entry Editor -->
+      <section id="lore-editor-card" class="section-card hidden">
+        <div class="section-hdr">
+          <span class="section-title" id="lore-editor-title">编辑世界书条目</span>
+          <button id="btn-close-lore-editor" class="mini-btn">收起</button>
+        </div>
+        <input type="hidden" id="le-uid" />
+        <div class="form-grid">
+          <label>标题备注<input id="le-comment" class="ctrl-input" placeholder="条目名称" /></label>
+          <label>主触发词 (逗号分隔)<input id="le-keys" class="ctrl-input" placeholder="魔法, 星界, /mana/i" /></label>
+          <label>次级门控词 (逗号分隔)<input id="le-keys-sec" class="ctrl-input" placeholder="可选次级词" /></label>
+          <label>次级逻辑
+            <select id="le-sec-logic" class="ctrl-select">
+              <option value="0">AND ANY (0)</option>
+              <option value="1">NOT ALL (1)</option>
+              <option value="2">NOT ANY (2)</option>
+              <option value="3">AND ALL (3)</option>
+            </select>
+          </label>
+          <label>插入位置
+            <select id="le-position" class="ctrl-select">
+              <option value="before_char">角色定义前 (before_char)</option>
+              <option value="after_char">角色定义后 (after_char)</option>
+              <option value="at_depth">按对话深度注入 (@D at_depth)</option>
+            </select>
+          </label>
+          <label>深度 (@D) / 权重 (Order)
+            <div class="hero-row">
+              <input id="le-depth" type="number" class="ctrl-input" value="4" min="0" max="50" />
+              <input id="le-order" type="number" class="ctrl-input" value="100" />
+            </div>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label><input type="checkbox" id="le-selective" /> 启用次级门控 (selective)</label>
+          <label><input type="checkbox" id="le-constant" /> 常驻激活 (constant)</label>
+          <label><input type="checkbox" id="le-enabled" checked /> 启用条目</label>
+        </div>
+        <textarea id="le-content" class="composer-textarea" rows="4" placeholder="世界观设定正文…"></textarea>
+        <div class="btn-row end">
+          <button id="btn-delete-lore" class="ctrl-btn danger">删除条目</button>
+          <button id="btn-save-lore" class="ctrl-btn primary">保存词条</button>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-hdr">
+          <span class="section-title">📚 条目列表</span>
+          <span id="lore-count-label" class="muted-label">0 条</span>
+        </div>
+        <div id="lore-entries-list" class="lore-list"></div>
+      </section>
+    </main>
+
+    <!-- ==================== TAB 4: INSPECTOR & SETTINGS ==================== -->
+    <main class="tab-panel" id="panel-inspector">
+      <section class="section-card">
+        <div class="section-hdr">
+          <span class="section-title">🧊 上下文前缀稳定度监测</span>
+          <span id="cache-ratio-label" class="badge-ok">0% Static</span>
+        </div>
+        <div class="meter-track">
+          <div id="cache-meter-bar" class="meter-fill" style="width: 0%"></div>
+        </div>
+        <div id="token-stats-line" class="muted-label">Static: 0 tok · Dynamic: 0 tok · Lore: 0/2048 tok</div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-hdr">
+          <span class="section-title">⚙️ 文风预设、Author's Note 与内容边界</span>
+          <button id="btn-save-config" class="ctrl-btn primary">保存配置</button>
+        </div>
+        <div class="form-grid">
+          <label>文风与提示词预设
+            <select id="cfg-preset-select" class="ctrl-select"></select>
+          </label>
+          <label>内容边界与叙事尺度
+            <select id="cfg-policy-select" class="ctrl-select">
+              <option value="host_gentle">文学留白引导（默认）</option>
+              <option value="strict_block">严格边界拦截</option>
+              <option value="passthrough">自由叙事（仅守底线）</option>
+            </select>
+          </label>
+          <label>Author's Note 注入深度 (@D)
+            <input id="cfg-an-depth" type="number" class="ctrl-input" min="0" max="30" value="4" />
+          </label>
+        </div>
+        <label class="block-label">当前对话 Author's Note
+          <textarea id="cfg-an-text" class="composer-textarea" rows="2" placeholder="例如：[文风提示：保持克制的哥特奇幻张力，注重环境感官细节]"></textarea>
+        </label>
+      </section>
+
+      <section class="section-card">
+        <div class="section-hdr">
+          <span class="section-title">🔬 上下文装配与世界书透视</span>
+        </div>
+        <pre id="dump-report-pre" class="dump-pre">暂无透视详情</pre>
+      </section>
+    </main>
+  </div>
+
+  <script defer src="/app.js"></script>
+</body>
+</html>

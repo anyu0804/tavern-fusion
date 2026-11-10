@@ -1,0 +1,15 @@
+{
+  "name": "tavern-fusion",
+  "displayName": "Tavern Fusion",
+  "version": "3.0.0",
+  "description": "Native SillyTavern Character Card V2/V3, hybrid Lorebook engine, Card Doctor, JSONL sync, and permanent Tavern Stage Sidecar workbench inside Antigravity.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "/rp Seraphina --play 载入林间圣域角色存档并联动右侧酒馆舞台",
+    "/dump-prompt 检视当前回合的世界书激活路径、@D 深度插槽与前缀缓存命中率",
+    "/card-forge 召唤 Seppä 铸卡子代理运行 Card Doctor 体检或无损导出 CCv3 角色卡"
+  ],
+  "author": {
+    "name": "安钰 (AnYu)"
+  }
+}

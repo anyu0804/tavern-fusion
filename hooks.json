@@ -1,0 +1,43 @@
+{
+  "st-session-init": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node ./scripts/run_py.mjs ./hooks/session_init.py",
+        "timeout": 10
+      }
+    ]
+  },
+  "st-pre-invocation-interceptor": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node ./scripts/run_py.mjs ./hooks/pre_invocation_gate.py",
+        "timeout": 15
+      }
+    ]
+  },
+  "st-pre-tool-chokepoint": {
+    "PreToolUse": [
+      {
+        "matcher": ".*st_.*|write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./scripts/run_py.mjs ./hooks/pre_tool_guard.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "st-stop-sync-guarantor": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ./scripts/run_py.mjs ./hooks/stop_persistence_check.py",
+        "timeout": 10
+      }
+    ]
+  }
+}

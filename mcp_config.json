@@ -1,0 +1,40 @@
+{
+  "mcpServers": {
+    "st-mcp": {
+      "command": "node",
+      "args": [
+        "${PLUGIN_ROOT}/scripts/run_py.mjs",
+        "${PLUGIN_ROOT}/server/mcp_server.py"
+      ],
+      "env": {
+        "ST_DATA_ROOT": "${ST_USER_DATA_DIR}",
+        "ST_WEB_URL": "http://127.0.0.1:8000",
+        "PYTHONIOENCODING": "utf-8"
+      },
+      "timeoutSeconds": 60,
+      "variables": [
+        {
+          "name": "ST_USER_DATA_DIR",
+          "title": "SillyTavern User Data Directory",
+          "description": "本地 SillyTavern 用户数据目录路径（留空则自动探测工作区或读取状态记忆中的 SillyTavern/data/default-user）"
+        }
+      ],
+      "tools": {
+        "st_session_bootstrap": { "eager": true },
+        "st_commit_turn": { "eager": true },
+        "st_publish_stage_suggestions": { "eager": true },
+        "st_compile_stage_widget": { "eager": false },
+        "st_dump_prompt_frame": { "eager": false },
+        "st_read_card": { "eager": false },
+        "st_build_export_card": { "eager": false },
+        "st_lint_card_and_lore": { "eager": false },
+        "st_query_lorebook": { "eager": false },
+        "st_evolve_lore_entry": { "eager": false },
+        "st_manage_chat_branch": { "eager": false },
+        "st_stage_floor_op": { "eager": false },
+        "st_switch_profile": { "eager": false },
+        "st_manage_variables": { "eager": false }
+      }
+    }
+  }
+}
