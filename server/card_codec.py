@@ -550,7 +550,12 @@ def lint_character_card(card_bundle: dict[str, Any]) -> list[dict[str, Any]]:
     combined_fields = "\n".join(
         str(data.get(k, "")) for k in ("description", "personality", "scenario", "first_mes", "mes_example", "system_prompt")
     )
-    if re.search(r"<BOT>|<USER>|\{\{char\}|\{char\}\}", combined_fields, flags=re.IGNORECASE):
+    # Lookarounds keep valid `{{char}}` / `{{user}}` from matching the half-brace patterns.
+    if re.search(
+        r"<BOT>|<USER>|(?<!\{)\{(?:char|user)\}\}|\{\{(?:char|user)\}(?!\})|(?<!\{)\{(?:char|user)\}(?!\})",
+        combined_fields,
+        flags=re.IGNORECASE,
+    ):
         issues.append({
             "code": "BROKEN_LEGACY_MACRO",
             "severity": "warning",
