@@ -12,6 +12,7 @@ import json
 import sys
 from typing import Any, Callable
 
+from .. import __version__
 from ..runtime.context import RuntimeContext
 from ..tools import MCP_TOOL_SCHEMAS, TOOL_REGISTRY, ToolSpec
 
@@ -46,7 +47,7 @@ class StdioMCPServer:
                 "result": {
                     "protocolVersion": client_proto,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.3-preview"},
+                    "serverInfo": {"name": "st-antigravity-mcp", "version": __version__},
                 },
             }
 

@@ -22,8 +22,9 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from hooks.session_init import discover_st_data_from_workspaces
-from server.runtime.context import RuntimeContext
 from server.policy import evaluate_policy_compliance
+from server.runtime.context import RuntimeContext
+from server.tools import TOOL_NAMES
 
 FILE_MUTATION_TOOLS = frozenset({
     "write_file",
@@ -33,26 +34,11 @@ FILE_MUTATION_TOOLS = frozenset({
     "multi_replace_file_content",
 })
 
-# Exact Tavern Fusion MCP tool names. The host may prefix MCP tools with a server
-# namespace (e.g. `mcp_st-mcp_st_commit_turn`), so names are matched as a suffix
-# after a separator instead of a bare `"st_" in name` substring check, which also
-# matched unrelated tools such as `list_dir`.
-ST_TOOL_NAMES = frozenset({
-    "st_session_bootstrap",
-    "st_commit_turn",
-    "st_publish_stage_suggestions",
-    "st_compile_stage_widget",
-    "st_dump_prompt_frame",
-    "st_read_card",
-    "st_build_export_card",
-    "st_lint_card_and_lore",
-    "st_query_lorebook",
-    "st_evolve_lore_entry",
-    "st_manage_chat_branch",
-    "st_stage_floor_op",
-    "st_switch_profile",
-    "st_manage_variables",
-})
+# Exact Tavern Fusion MCP tool names derived from the canonical `server.tools` registry.
+# The host may prefix MCP tools with a server namespace (e.g. `mcp_st-mcp_st_commit_turn`),
+# so names are matched as a suffix after a separator instead of a bare `"st_" in name`
+# substring check, which also matched unrelated tools such as `list_dir`.
+ST_TOOL_NAMES = frozenset(TOOL_NAMES)
 _ST_TOOL_RE = re.compile(r"(?:^|[_\-.:/])(" + "|".join(sorted(ST_TOOL_NAMES)) + r")$")
 
 

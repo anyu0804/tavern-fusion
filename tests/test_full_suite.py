@@ -1683,5 +1683,152 @@ export class SidecarApp {
             srv.shutdown()
             srv.server_close()
 
+    def test_14_post_v31_review_regressions(self) -> None:
+        """Covers post-v3.1 review fixes: locked global vars RMW, actionable required-arg errors,
+        non-numeric epistemic_level in PreInvocation, registry-backed ST_TOOL_NAMES with light hook imports,
+        case-insensitive filename ordering, and version metadata consistency."""
+        from concurrent.futures import ThreadPoolExecutor
+        import server
+        from hooks import pre_tool_guard
+        from server.card_codec import read_character_card, write_character_card_png
+        from server.mcp_server import StdioMCPServer, TavernFusionRuntime
+        from server.tools import TOOL_NAMES, TOOL_REGISTRY
+
+        with tempfile.TemporaryDirectory(prefix="tf_v31_fixes_") as td:
+            root = Path(td)
+            st_root = root / "data" / "default-user"
+            shutil.copytree(PLUGIN_ROOT / "examples" / "mock_st_data" / "default-user", st_root)
+            state_dir = root / "state"
+
+            # 1. Concurrent global variable writes must never lose updates (settings.json read inside lock)
+            rt = TavernFusionRuntime(st_data_root=st_root, state_dir=state_dir)
+            try:
+                rt.tool_st_manage_variables({"scope": "global", "op": "set", "key": "counter", "value": 0})
+
+                def _global_worker(idx: int) -> None:
+                    rt.tool_st_manage_variables({"scope": "global", "op": "set", "key": f"worker_{idx}", "value": idx})
+                    rt.tool_st_manage_variables({"scope": "global", "op": "inc", "key": "counter", "value": 1})
+
+                with ThreadPoolExecutor(max_workers=8) as pool:
+                    list(pool.map(_global_worker, range(8)))
+
+                final_globals = rt.tool_st_manage_variables({"scope": "global", "op": "list"})["variables"]
+                for idx in range(8):
+                    self.assertEqual(final_globals.get(f"worker_{idx}"), idx)
+                self.assertEqual(final_globals.get("counter"), 8.0)
+
+                # 2. Missing required arguments produce actionable errors on both direct runtime calls and MCP RPC
+                with self.assertRaises(ValueError) as cm:
+                    rt.tool_st_commit_turn({})
+                self.assertIn("Missing required argument for `st_commit_turn`", str(cm.exception))
+                self.assertIn("'char_mes' (string)", str(cm.exception))
+                self.assertIn("Accepted parameters:", str(cm.exception))
+
+                mcp = StdioMCPServer(rt)
+                rpc_err = mcp.handle_rpc({
+                    "jsonrpc": "2.0",
+                    "id": 99,
+                    "method": "tools/call",
+                    "params": {"name": "st_build_export_card", "arguments": {"card_v3_json": None}},
+                })
+                err_txt = rpc_err["result"]["content"][0]["text"]
+                self.assertTrue(rpc_err["result"]["isError"])
+                self.assertIn("Missing required arguments for `st_build_export_card`", err_txt)
+                self.assertIn("'card_v3_json' (object)", err_txt)
+                self.assertIn("'output_filename' (string)", err_txt)
+
+                # 3. Case-insensitive `(name.lower(), name)` ordering on cards & default lorebooks
+                for fname, cname in (("Zeta_Bard.png", "Bard Zeta"), ("alpha_Bard.png", "Bard Alpha")):
+                    write_character_card_png(
+                        {
+                            "spec": "chara_card_v3",
+                            "spec_version": "3.0",
+                            "data": {
+                                "name": cname,
+                                "description": "Adult bard, 30 years old.",
+                                "personality": "calm",
+                                "scenario": "stage",
+                                "first_mes": "Hi",
+                                "mes_example": "",
+                            },
+                        },
+                        st_root / "characters" / fname,
+                    )
+                matched = rt.find_character_card_path("bard")
+                self.assertEqual(matched.name, "alpha_Bard.png")
+
+                # Clear globalSelect so collect_merged_lore_entries falls back to top-5 sorted worlds
+                (st_root / "settings.json").write_text(json.dumps({}), encoding="utf-8")
+                for w_name in ("ZzzWorld", "aaaWorld", "BbbWorld", "cccWorld", "DddWorld", "eeeWorld"):
+                    (st_root / "worlds" / f"{w_name}.json").write_text(
+                        json.dumps({"entries": {"0": {"uid": 0, "key": ["tok"], "content": w_name, "constant": True}}}),
+                        encoding="utf-8",
+                    )
+                bare_card = read_character_card(st_root / "characters" / "alpha_Bard.png")["card"]
+                bare_card["data"]["extensions"] = {"world": ""}
+                picked_books = [e.source_book for e in rt.collect_merged_lore_entries(bare_card)]
+                self.assertIn("aaaWorld", picked_books)
+                self.assertNotIn("ZzzWorld", picked_books)
+
+                # 4. PreInvocation hook tolerates non-numeric `epistemic_level` without skipping lore assembly
+                rt.tool_st_session_bootstrap({
+                    "character_name": "Seraphina",
+                    "mode": "play",
+                    "rp_conv_id": "conv-bad-epi",
+                    "activate_rp": True,
+                })
+                rt.update_active_session({"epistemic_level": "50%"})
+            finally:
+                rt.close()
+
+            hook_env = dict(os.environ, PLUGIN_STATE_DIR=str(state_dir), ST_DATA_ROOT=str(st_root))
+            pre_inv = subprocess.run(
+                [sys.executable, str(PLUGIN_ROOT / "hooks" / "pre_invocation_gate.py")],
+                input=json.dumps({
+                    "conversationId": "conv-bad-epi",
+                    "workspacePaths": [str(root)],
+                    "lastUserInput": "星界裂隙情况如何？",
+                    "invocationNum": 0,
+                }),
+                text=True,
+                capture_output=True,
+                env=hook_env,
+                check=True,
+            )
+            inj = json.loads(pre_inv.stdout)["injectSteps"][0]["ephemeralMessage"]
+            self.assertNotIn("Lore assembly skipped", inj)
+            self.assertIn("0%_DEEP_IMMERSION", inj)
+
+            # 5. Registry-backed ST_TOOL_NAMES & fast-path hook import isolation (zero lore_engine/card_codec import)
+            self.assertEqual(pre_tool_guard.ST_TOOL_NAMES, frozenset(TOOL_NAMES))
+            self.assertEqual(tuple(TOOL_REGISTRY), TOOL_NAMES)
+
+            for hook_file, payload in (
+                ("pre_tool_guard.py", {"conversationId": "other", "workspacePaths": [], "toolCall": {"name": "read_file", "args": {}}}),
+                ("session_init.py", {"conversationId": "other", "workspacePaths": []}),
+                ("pre_invocation_gate.py", {"conversationId": "other", "workspacePaths": [], "lastUserInput": "hi", "invocationNum": 0}),
+                ("stop_persistence_check.py", {"conversationId": "other", "workspacePaths": [], "terminationReason": "NO_TOOL_CALL"}),
+            ):
+                probe = subprocess.run(
+                    [sys.executable, "-X", "importtime", str(PLUGIN_ROOT / "hooks" / hook_file)],
+                    input=json.dumps(payload),
+                    text=True,
+                    capture_output=True,
+                    env=hook_env,
+                    check=True,
+                )
+                for heavy_mod in ("server.mcp_server", "server.lore_engine", "server.prompt.frame", "server.tools.stage"):
+                    self.assertNotIn(heavy_mod, probe.stderr, f"{hook_file} unexpectedly imported {heavy_mod}")
+
+            # 6. Version consistency across all manifests, server __version__, stdio serverInfo, and session_init
+            expected_ver = server.__version__
+            plugin_ver = json.loads((PLUGIN_ROOT / "plugin.json").read_text(encoding="utf-8"))["version"]
+            sidecar_ver = json.loads((PLUGIN_ROOT / "sidecars" / "tavern_stage" / "package.json").read_text(encoding="utf-8"))["version"]
+            ext_ver = json.loads((PLUGIN_ROOT / "st_web_extension" / "st-ag-sync" / "manifest.json").read_text(encoding="utf-8"))["version"]
+            self.assertEqual(plugin_ver, expected_ver)
+            self.assertEqual(sidecar_ver, expected_ver)
+            self.assertEqual(ext_ver, expected_ver)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

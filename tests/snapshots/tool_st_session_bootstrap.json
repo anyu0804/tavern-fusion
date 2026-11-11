@@ -227,7 +227,7 @@
       "result": {
         "content": [
           {
-            "text": "Error executing st_session_bootstrap: 'character_name'",
+            "text": "Error executing st_session_bootstrap: Missing required argument for `st_session_bootstrap`: 'character_name' (string). Accepted parameters: [character_name, mode, new_chat, chat_file, greeting_index, persona_name, preset_name, lorebooks].",
             "type": "text"
           }
         ],

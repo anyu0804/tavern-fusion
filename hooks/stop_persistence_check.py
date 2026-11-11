@@ -216,6 +216,7 @@ def main() -> None:
                         sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
                         return
                     except Exception as first_err:
+                        first_err_msg = str(first_err)
                         # One transient retry (e.g. momentary `.jsonl` lock contention).
                         # Never silently drop the turn: keep the pending flag so the next
                         # Stop hook can retry, and store the full payload as a recovery
@@ -227,12 +228,14 @@ def main() -> None:
                             sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
                             return
                         except Exception as retry_err:
+                            retry_err_msg = str(retry_err)
+
                             def _record_persistence_failure(cur: dict) -> dict:
                                 failures = int(cur.get("persistence_failure_count", 0)) + 1
                                 cur["persistence_failure_count"] = failures
                                 cur["last_persistence_error"] = {
-                                    "error": str(retry_err),
-                                    "first_error": str(first_err),
+                                    "error": retry_err_msg,
+                                    "first_error": first_err_msg,
                                     "turn_mode": turn_mode,
                                     "ts": time.time(),
                                     "attempts": failures,

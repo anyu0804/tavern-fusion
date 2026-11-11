@@ -60,7 +60,7 @@ def st_query_lorebook(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
     target_files = (
         [ensure_under_dir(worlds_dir / (b if b.endswith(".json") else f"{b}.json"), worlds_dir) for b in book_names]
         if book_names
-        else sorted(worlds_dir.glob("*.json"))
+        else sorted(worlds_dir.glob("*.json"), key=lambda item: (item.name.lower(), item.name))
     )
     for p in target_files:
         if p.exists():

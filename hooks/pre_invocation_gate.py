@@ -51,6 +51,13 @@ def _run_tool(ctx: RuntimeContext, name: str, args: dict) -> dict:
     return call_tool(ctx, name, args)
 
 
+def _normalize_epistemic(raw_level: object) -> int:
+    """Normalizes `epistemic_level` (0 / 50 / 100) lazily so non-RP paths import zero prompt code."""
+    from server.prompt.epistemic import normalize_epistemic_level
+
+    return normalize_epistemic_level(raw_level)
+
+
 def main() -> None:
     raw_in = sys.stdin.read().strip()
     payload = json.loads(raw_in) if raw_in else {}
@@ -248,7 +255,7 @@ def main() -> None:
             and not is_bootstrap_turn
         )
         agentic_hands = bool(session.get("agentic_hands", False))
-        epistemic_level = int(session.get("epistemic_level", 0))
+        epistemic_level = _normalize_epistemic(session.get("epistemic_level", 0))
 
         already_bootstrapped_here = (
             bool(conv_id)

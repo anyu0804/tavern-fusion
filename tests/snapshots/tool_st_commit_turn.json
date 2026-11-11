@@ -134,7 +134,7 @@
       "result": {
         "content": [
           {
-            "text": "Error executing st_commit_turn: 'char_mes'",
+            "text": "Error executing st_commit_turn: Missing required argument for `st_commit_turn`: 'char_mes' (string). Accepted parameters: [character_name, user_mes, char_mes, swipe_mode, variables_delta, extra_meta].",
             "type": "text"
           }
         ],
