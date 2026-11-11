@@ -507,6 +507,27 @@ MINOR_HARD_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Terms that are themselves sexualised codings of minors: always refused, regardless of context.
+SEXUALIZED_MINOR_TAG_RE = re.compile(
+    r"(?:^|[\s,;/|_-])(?:loli|lolicon|shota|shotacon)(?:$|[\s,;/|_-])|(?:萝莉|正太|幼女|幼童)",
+    re.IGNORECASE,
+)
+
+SEXUALIZED_MINOR_TEXT_RE = re.compile(
+    r"\b(?:lolicon|shotacon|loli\s+body|shota\s+body)\b|(?:小萝莉|小正太|萝莉体[型态]|幼女体[型态])",
+    re.IGNORECASE,
+)
+
+# Sexual or romantic-partner framing. A minor signal is only escalated to a hard refusal when
+# combined with one of these; a minor character in a non-sexual story gets the red-screen warning.
+MINOR_SEXUAL_CONTEXT_RE = re.compile(
+    r"\b(?:nsfw|erp|smut|lewd|hentai|porn\w*|sex(?:ual|y)?|nude|naked|fetish|seduc\w*|r-?18|18\+|"
+    r"lover|girlfriend|boyfriend|romance|romantic|dating|kiss(?:es|ing)?)\b|"
+    r"(?:色情|情色|性爱|做爱|性交|性感|裸体|裸露|赤裸|调教|淫|肉便器|r18|18禁|成人向|涩涩|瑟瑟|"
+    r"恋人|女友|男友|女朋友|男朋友|恋爱|约会|接吻|亲吻|暧昧|求爱|勾引|诱惑)",
+    re.IGNORECASE,
+)
+
 MINOR_APPEARS_UNDERAGE_RE = re.compile(
     r"(?:合法萝莉|万年萝莉|千年萝莉|童颜幼体|幼女体[型态]|幼女身[体躯]|孩童身[体躯]|小孩体型|"
     r"未发育(?:完全)?的?(?:身体|身躯|体态|少女)|"
@@ -560,7 +581,7 @@ PROSE_AGE_CN_RE = re.compile(
 )
 
 PROSE_AGE_EN_RE = re.compile(
-    r"\b(?:\{\{char\}\}|she|he)\s+is\s+(?:a\s+|an\s+|only\s+|just\s+)?0*(\d{1,2})(?:-|\s+)years?(?:-|\s+)old\b",
+    r"(?:\{\{char\}\}|\b(?:she|he))\s+is\s+(?:a\s+|an\s+|only\s+|just\s+)?0*(\d{1,2})(?:-|\s+)years?(?:-|\s+)old\b",
     re.IGNORECASE,
 )
 
@@ -592,7 +613,14 @@ def evaluate_minor_risk_gate(card_or_bundle: dict[str, Any]) -> dict[str, Any]:
     Returns a structured verdict:
     - `gate_action`: `"block_load"` (default load/import refusal) | `"red_screen_warn"` (mandatory red-screen warning) | `"pass"`
     - `hard_signals`: unambiguous underage / child-coded triggers
-    - `warn_signals`: ambiguous school/uniform/stature triggers (2+ warn signals auto-escalate to `block_load`)
+    - Decision ladder:
+      1. Sexualised minor codings (`loli` / `shota` tags, "legal loli" / "looks 12" loophole) -> `block_load`.
+      2. Minor signals (age < 18, school grade, stature < 140cm) -> `block_load` ONLY when combined with
+         sexual / romantic-partner context; otherwise `red_screen_warn` (non-sexual stories with minors).
+      3. Ambiguous cues (uniform, youthful look, borderline height) -> `red_screen_warn`, or `block_load`
+         when combined with sexual / romantic-partner context.
+    - Scans every prompt-bearing field, including `mes_example`, alternate greetings and the embedded
+      `character_book`, so moving text out of `description` cannot bypass the gate.
     - `reasons`: human-readable Chinese explanations for Card Doctor & UI overlays
     """
     if "card" in card_or_bundle and isinstance(card_or_bundle["card"], dict):
@@ -609,6 +637,7 @@ def evaluate_minor_risk_gate(card_or_bundle: dict[str, Any]) -> dict[str, Any]:
     raw_data = raw_card.get("data", raw_card) if isinstance(raw_card, dict) else {}
     ext = data.get("extensions", {}) if isinstance(data.get("extensions"), dict) else {}
 
+    always_block_reasons: list[str] = []
     hard_reasons: list[str] = []
     warn_reasons: list[str] = []
     signals: list[str] = []
@@ -640,18 +669,34 @@ def evaluate_minor_risk_gate(card_or_bundle: dict[str, Any]) -> dict[str, Any]:
 
     for tag in tag_list:
         t_low = tag.lower()
-        if MINOR_HARD_TAG_RE.search(tag):
+        if SEXUALIZED_MINOR_TAG_RE.search(tag):
             signals.append(f"tag:{tag}")
-            hard_reasons.append(f"命中高危未成年/低幼标签「{tag}」")
+            always_block_reasons.append(f"命中低幼性化标签「{tag}」")
+        elif MINOR_HARD_TAG_RE.search(tag):
+            signals.append(f"tag:{tag}")
+            hard_reasons.append(f"命中未成年标签「{tag}」")
         elif "lolita" in t_low and "gothic" not in t_low:
             signals.append(f"tag:{tag}")
             warn_reasons.append(f"包含易混淆低幼风险标签「{tag}」")
 
     # 3. Textual scan across character prompt fields
-    text_blob = "\n".join(
-        str(data.get(field, ""))
-        for field in ("name", "description", "personality", "scenario", "first_mes", "system_prompt")
-    )
+    text_parts: list[str] = [
+        str(data.get(field, "") or "")
+        for field in (
+            "name", "description", "personality", "scenario", "first_mes",
+            "system_prompt", "post_history_instructions", "mes_example",
+        )
+    ]
+    for list_field in ("alternate_greetings", "group_only_greetings"):
+        greetings = data.get(list_field)
+        if isinstance(greetings, list):
+            text_parts.extend(str(g) for g in greetings if g)
+    book = data.get("character_book")
+    if isinstance(book, dict) and isinstance(book.get("entries"), list):
+        for entry in book["entries"]:
+            if isinstance(entry, dict):
+                text_parts.append(str(entry.get("content", "") or ""))
+    text_blob = "\n".join(p for p in text_parts if p)
 
     for m in LABELLED_AGE_RE.finditer(text_blob):
         age_val = int(m.group(1))
@@ -670,8 +715,12 @@ def evaluate_minor_risk_gate(card_or_bundle: dict[str, Any]) -> dict[str, Any]:
             elif 18 <= age_val <= 99:
                 explicit_adult_age = True
 
+    m_sex_minor_txt = SEXUALIZED_MINOR_TEXT_RE.search(text_blob)
     m_hard_txt = MINOR_HARD_TEXT_RE.search(text_blob)
-    if m_hard_txt:
+    if m_sex_minor_txt:
+        signals.append(f"sexualized_minor_term:{m_sex_minor_txt.group(0)}")
+        always_block_reasons.append(f"包含低幼性化设定词「{m_sex_minor_txt.group(0)}」")
+    elif m_hard_txt:
         signals.append(f"hard_term:{m_hard_txt.group(0)}")
         hard_reasons.append(f"包含明确未成年/低幼化设定词「{m_hard_txt.group(0)}」")
 
@@ -679,7 +728,7 @@ def evaluate_minor_risk_gate(card_or_bundle: dict[str, Any]) -> dict[str, Any]:
     m_app = MINOR_APPEARS_UNDERAGE_RE.search(text_blob)
     if m_app:
         signals.append(f"appears_underage:{m_app.group(0)[:24]}")
-        hard_reasons.append(f"命中“外表/体型看起来未成年”启发式特征「{m_app.group(0).strip()}」")
+        always_block_reasons.append(f"命中“外表/体型看起来未成年”启发式特征「{m_app.group(0).strip()}」")
 
     # 5. School grade & uniform setting
     has_adult_role = bool(ADULT_ROLE_EXEMPTION_RE.search(text_blob))
@@ -728,19 +777,31 @@ def evaluate_minor_risk_gate(card_or_bundle: dict[str, Any]) -> dict[str, Any]:
         signals.append(f"youth_cue:{m_youth.group(0)}")
         warn_reasons.append(f"检出低龄外观暗示词「{m_youth.group(0)}」且未声明满 18 岁")
 
+    # 8. Sexual / romantic-partner context (escalates minor & ambiguous signals to refusal)
+    m_sexual = MINOR_SEXUAL_CONTEXT_RE.search(text_blob) or MINOR_SEXUAL_CONTEXT_RE.search(" ".join(tag_list))
+    if m_sexual:
+        signals.append(f"sexual_context:{m_sexual.group(0)}")
+
     # Deduplicate reasons while preserving order
+    dedup_always = list(dict.fromkeys(always_block_reasons))
     dedup_hard = list(dict.fromkeys(hard_reasons))
     dedup_warn = list(dict.fromkeys(warn_reasons))
+    sexual_reason = f"同时存在性/恋爱语境「{m_sexual.group(0)}」" if m_sexual else ""
 
-    if dedup_hard:
+    if dedup_always:
         gate_action = "block_load"
-        reasons = dedup_hard + dedup_warn
-    elif len(dedup_warn) >= 2:
+        reasons = dedup_always + dedup_hard + dedup_warn
+    elif dedup_hard and m_sexual:
         gate_action = "block_load"
-        reasons = ["多项未成年启发式特征叠加触发拒载：" + "；".join(dedup_warn)]
-    elif len(dedup_warn) == 1:
+        reasons = dedup_hard + dedup_warn + [sexual_reason]
+    elif dedup_warn and m_sexual:
+        gate_action = "block_load"
+        reasons = ["未成年启发式特征与性/恋爱语境叠加触发拒载：" + "；".join(dedup_warn + [sexual_reason])]
+    elif dedup_hard or dedup_warn:
         gate_action = "red_screen_warn"
-        reasons = dedup_warn
+        reasons = dedup_hard + dedup_warn
+        if dedup_hard:
+            reasons = reasons + ["本卡含未成年角色设定：仅允许非性、非恋爱向剧情，请确认后继续"]
     else:
         gate_action = "pass"
         reasons = []

@@ -83,8 +83,11 @@ def extract_latest_model_prose(transcript_path: str, conv_id: str, fallback_text
                 # Drop potentially partial first line when seeking mid-file
                 lines = lines[1:]
 
+            # NOTE: `transcript_full.jsonl` / `transcript.jsonl` and their `type` / `source`
+            # fields are an undocumented host format. Only tool-call-free MODEL rows are
+            # accepted as prose: a row that carries tool calls is usually engineering
+            # meta-commentary ("I'll call the tool...") and must never become a story floor.
             latest_pure = ""
-            latest_any = ""
             for raw_line in lines:
                 stripped = raw_line.strip()
                 if not stripped:
@@ -97,19 +100,16 @@ def extract_latest_model_prose(transcript_path: str, conv_id: str, fallback_text
                 row_source = str(row.get("source") or "")
                 if row_type == "USER_INPUT" or row_source == "USER_EXPLICIT":
                     latest_pure = ""
-                    latest_any = ""
                     continue
                 if row_source == "MODEL" and row_type in ("PLANNER_RESPONSE", "ASSISTANT_RESPONSE", "MODEL_RESPONSE"):
                     content = str(row.get("content") or "").strip()
                     if not content:
                         continue
                     tool_calls = row.get("tool_calls") or []
-                    latest_any = content
                     if not tool_calls:
                         latest_pure = content
-            chosen = latest_pure or latest_any
-            if chosen:
-                return chosen
+            if latest_pure:
+                return latest_pure
         except OSError:
             continue
     return fallback_text.strip()
@@ -160,6 +160,32 @@ def main() -> None:
         if sess.get("pending_uncommitted_turn") and sess.get("character_name"):
             if turn_mode in ("normal", "swipe", "director"):
                 prose = extract_latest_model_prose(transcript_path, conv_id, fallback_msg)
+                if not prose:
+                    # Never drop a turn silently: if the host transcript format changed (or the
+                    # model only produced tool-call rows) leave a visible recovery record.
+                    def _record_missing_prose(cur: dict) -> dict:
+                        cur["persistence_failure_count"] = int(cur.get("persistence_failure_count", 0)) + 1
+                        cur["last_persistence_error"] = {
+                            "error": "no_pure_prose_found",
+                            "turn_mode": turn_mode,
+                            "ts": time.time(),
+                            "transcript_candidates": [
+                                str(p) for p in _candidate_transcript_files(transcript_path, conv_id)
+                            ],
+                            "hint": (
+                                "未能从宿主对话记录中提取到不含工具调用的角色回复；可能是宿主 transcript "
+                                "格式已变更，或模型本轮只输出了工具调用。本轮未写入楼层，可在舞台中重抽。"
+                            ),
+                        }
+                        cur["pending_uncommitted_turn"] = False
+                        cur["user_floor_already_appended"] = False
+                        cur["stage_busy"] = False
+                        cur["stop_retry_count"] = 0
+                        return cur
+
+                    runtime.update_active_session(_record_missing_prose)
+                    sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
+                    return
                 if prose:
                     is_swipe = turn_mode == "swipe"
                     is_director = turn_mode == "director"

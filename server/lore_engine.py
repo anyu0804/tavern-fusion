@@ -28,6 +28,7 @@ import urllib.error
 import urllib.request
 
 from .fs_safety import atomic_write_json
+from .net_utils import open_url
 
 SelectiveLogic = Literal["AND_ANY", "AND_ALL", "NOT_ANY", "NOT_ALL"]
 PositionType = Literal[
@@ -231,7 +232,7 @@ def try_external_embedding(text: str) -> list[float] | None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=1.5) as resp:
+        with open_url(req, timeout=1.5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if isinstance(data.get("data"), list) and data["data"]:
                 return [float(x) for x in data["data"][0].get("embedding", [])]

@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import random
 import re
 import shutil
 import threading
@@ -24,6 +25,7 @@ import urllib.request
 import uuid
 
 from .fs_safety import atomic_write_text, ensure_under_dir, sanitize_filename_stem
+from .net_utils import open_url
 
 try:
     import fcntl  # Unix / macOS
@@ -95,7 +97,9 @@ def exclusive_file_lock(lock_target: Path, timeout_sec: float = 5.0) -> Iterator
             except OSError:
                 if time.monotonic() >= deadline:
                     raise TimeoutError(f"Timed out acquiring lock on {lock_path.name}")
-                time.sleep(0.025)
+                # Jittered back-off avoids lock-step retries between the MCP server, hooks
+                # and the sidecar (msvcrt.locking has no blocking-with-timeout mode).
+                time.sleep(0.015 + random.random() * 0.035)
         yield
     finally:
         try:
@@ -131,7 +135,7 @@ def notify_st_web_bridge(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=0.25) as resp:
+        with open_url(req, timeout=0.25) as resp:
             return 200 <= resp.status < 300
     except (urllib.error.URLError, TimeoutError, OSError):
         return False
@@ -239,6 +243,13 @@ def write_jsonl_chat_atomic(
     """Atomically writes `(header, messages)` to `.jsonl` under exclusive lock + `fsync`."""
     path = Path(chat_path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Rotate SillyTavern's `chat_metadata.integrity` slug on every external write. ST's
+    # `/api/chats/save` rejects a save whose slug no longer matches the file
+    # (`{"error": "integrity"}`), so a stale ST tab holding the old chat in memory gets an
+    # explicit overwrite prompt instead of silently erasing floors written here.
+    header = dict(header)
+    header["chat_metadata"] = dict(header.get("chat_metadata") or {})
+    header["chat_metadata"]["integrity"] = str(uuid.uuid4())
     lines = [json.dumps(header, ensure_ascii=False)]
     for msg in messages:
         lines.append(json.dumps(msg, ensure_ascii=False))
