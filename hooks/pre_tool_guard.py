@@ -23,7 +23,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from hooks.session_init import discover_st_data_from_workspaces
 from server.mcp_server import TavernFusionRuntime
-from server.st_runtime_compat import evaluate_policy_compliance
+from server.policy import evaluate_policy_compliance
 
 FILE_MUTATION_TOOLS = frozenset({
     "write_file",

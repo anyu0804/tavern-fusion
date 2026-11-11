@@ -24,7 +24,6 @@ if str(ROOT_DIR) not in sys.path:
 
 from server.card_codec import (
     detect_message_emotion,
-    evaluate_minor_risk_gate,
     lint_character_card,
     list_character_expressions,
     read_character_card,
@@ -51,15 +50,14 @@ from server.lore_engine import (
     load_lorebook_file,
     parse_lorebook_dict,
 )
+from server.policy import evaluate_minor_risk_gate, evaluate_policy_compliance, resolve_policy_mode
 from server.st_runtime_compat import (
     compile_st_prompt_frame,
-    evaluate_policy_compliance,
     get_active_persona,
     list_openai_presets,
     load_openai_preset,
     load_st_settings,
     normalize_epistemic_level,
-    resolve_policy_mode,
     resolve_st_macros,
     run_regex_pipeline,
 )

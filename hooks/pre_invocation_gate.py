@@ -26,7 +26,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from hooks.session_init import discover_st_data_from_workspaces
 from server.mcp_server import TavernFusionRuntime
-from server.st_runtime_compat import evaluate_policy_compliance, resolve_policy_mode
+from server.policy import evaluate_policy_compliance, resolve_policy_mode
 
 RP_SLASH_RE = re.compile(
     r"^\s*/rp(?:\s+((?!--)\S+))?(?:\s+--(play|chat))?(?:\s+(.*))?$",
