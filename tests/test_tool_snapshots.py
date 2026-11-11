@@ -90,6 +90,9 @@ _STR_RULES: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
+_TMP_PATH_TAIL_RE = re.compile(r"<TMP>[^\r\n\"'`<>]*")
+
+
 class Normalizer:
     def __init__(self, tmp_root: Path) -> None:
         roots = {str(tmp_root), str(tmp_root.resolve())}
@@ -99,7 +102,8 @@ class Normalizer:
         for r in self._roots:
             s = s.replace(r, "<TMP>")
             s = s.replace(r.replace("\\", "\\\\"), "<TMP>")
-        s = s.replace("\\\\", "/").replace("\\", "/") if os.name == "nt" else s
+        if os.name == "nt" and "<TMP>" in s:
+            s = _TMP_PATH_TAIL_RE.sub(lambda m: re.sub(r"\\+(?![\"'])", "/", m.group(0)), s)
         for pat, repl in _STR_RULES:
             s = pat.sub(repl, s)
         return s

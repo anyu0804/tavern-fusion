@@ -235,7 +235,7 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
     worlds_dir = ctx.st_data_root / "worlds"
     cards_summary: list[dict[str, Any]] = []
     if char_dir.exists():
-        for p in sorted(char_dir.iterdir()):
+        for p in sorted(char_dir.iterdir(), key=lambda item: item.name):
             if p.is_file() and p.suffix.lower() in (".png", ".json"):
                 try:
                     b = read_character_card(p, include_avatar_data_uri=False)
@@ -625,7 +625,7 @@ def sidecar_read_lorebook(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str
     worlds_dir.mkdir(parents=True, exist_ok=True)
     b_name = str(args.get("lorebook_name") or "").strip()
     if not b_name:
-        files = sorted(worlds_dir.glob("*.json"))
+        files = sorted(worlds_dir.glob("*.json"), key=lambda item: item.name)
         if not files:
             return {"lorebook_name": "", "entries": [], "issues": []}
         target = files[0]

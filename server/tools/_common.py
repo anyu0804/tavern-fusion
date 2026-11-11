@@ -43,7 +43,7 @@ def find_character_card_path(ctx: RuntimeContext, character_query: str) -> Path:
             return ensure_under_dir(prefixed, char_dir)
 
     q_low = q_clean.lower()
-    for p in sorted(char_dir.iterdir()):
+    for p in sorted(char_dir.iterdir(), key=lambda item: item.name):
         if p.is_file() and p.suffix.lower() in (".png", ".json"):
             if q_low in p.stem.lower():
                 return p
@@ -89,7 +89,7 @@ def collect_merged_lore_entries(
         if selected_global:
             book_names.extend(selected_global)
         else:
-            book_names.extend(p.stem for p in sorted(worlds_dir.glob("*.json"))[:5])
+            book_names.extend(p.stem for p in sorted(worlds_dir.glob("*.json"), key=lambda item: item.name)[:5])
 
     for b_name in book_names:
         fname = b_name if b_name.endswith(".json") else f"{b_name}.json"
@@ -157,7 +157,7 @@ def validate_contained_path(
         ctx.st_data_root.resolve(),
         Path.cwd().resolve(),
     ]
-    if not cand.is_absolute():
+    if not cand.is_absolute() and not cand.root:
         base = (ctx.state_dir / default_subdir).resolve() if default_subdir else ctx.state_dir.resolve()
         base.mkdir(parents=True, exist_ok=True)
         return ensure_under_dir(base / cand, base)
