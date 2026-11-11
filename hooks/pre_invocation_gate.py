@@ -223,6 +223,7 @@ def main() -> None:
             return
 
         char_name = str(session["character_name"])
+        char_ref = str(session.get("card_file") or char_name)
         is_suggestion_only = effective_raw_input.startswith(("[STAGE_SUGGEST_REPLIES]", "[STAGE_EXPAND_INTENT]"))
         is_swipe_reroll = effective_raw_input.startswith("[STAGE_SWIPE_REROLL]")
         is_kartoittaja = effective_raw_input.startswith("[STAGE_KARTOITTAJA_BRANCHES]")
@@ -239,12 +240,12 @@ def main() -> None:
         already_bootstrapped_here = (
             bool(conv_id)
             and session.get("bootstrapped_conv_id") == conv_id
-            and session.get("bootstrapped_char") == char_name
+            and session.get("bootstrapped_char") == char_ref
             and not is_bootstrap_turn
         )
 
         frame_info = runtime.tool_st_dump_prompt_frame({
-            "character_name": char_name,
+            "character_name": char_ref,
             "user_input": effective_user_input,
             "mode": session.get("mode", "play"),
             "compact_agent_delta": already_bootstrapped_here,
@@ -258,7 +259,7 @@ def main() -> None:
             session["rp_conv_id"] = conv_id
             if not already_bootstrapped_here:
                 session["bootstrapped_conv_id"] = conv_id
-                session["bootstrapped_char"] = char_name
+                session["bootstrapped_char"] = char_ref
 
         if is_suggestion_only:
             session["pending_uncommitted_turn"] = False

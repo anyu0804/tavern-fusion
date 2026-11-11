@@ -360,8 +360,9 @@ function computeDiskEtag(dataRoot) {
       if (sess.chat_path) {
         h.update(`chat=${statStamp(sess.chat_path)}|`);
       }
-      if (sess.character_name) {
-        const safeStem = String(sess.character_name).replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff ]/g, '').trim();
+      const chatKey = sess.avatar_stem || sess.character_name;
+      if (chatKey) {
+        const safeStem = String(chatKey).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
         h.update(`cdir=${dirStamp(join(dataRoot, 'chats', safeStem))}|`);
       }
     } catch {

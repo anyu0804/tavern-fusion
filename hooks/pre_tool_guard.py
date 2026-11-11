@@ -130,9 +130,16 @@ def main() -> None:
 
     # 2. Validate & allow Tavern Fusion MCP tool calls (`*st_*`)
     if is_tavern_tool(tool_name):
-        for path_key in ("output_filename", "lorebook_name", "chat_file", "card_filename"):
+        for path_key in (
+            "output_filename",
+            "lorebook_name",
+            "chat_file",
+            "card_filename",
+            "output_html_path",
+            "portrait_image_path",
+        ):
             val = str(tool_args.get(path_key, ""))
-            if ".." in val:
+            if ".." in Path(val.replace("\\", "/")).parts or ".." in val:
                 sys.stdout.write(
                     json.dumps({
                         "decision": "deny",

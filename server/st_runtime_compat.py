@@ -490,6 +490,51 @@ def format_lexical_dialogue_examples(
     return header + "\n" + "\n".join(formatted_blocks), len(formatted_blocks)
 
 
+_JS_REPL_TOKEN_RE = re.compile(r"\$(?:\$|&|`|'|(\d{1,2})|<([^>]+)>)")
+
+
+def _apply_js_regex_replacement(match: re.Match[str], repl: str) -> str:
+    """Applies JavaScript `String.prototype.replace` substitution tokens (`$1`, `$&`, `$$`, `$<name>`)."""
+    if "$" not in repl:
+        return repl
+    num_groups = match.re.groups
+
+    def _sub_token(tok: re.Match[str]) -> str:
+        raw = tok.group(0)
+        if raw == "$$":
+            return "$"
+        if raw == "$&":
+            return match.group(0)
+        if raw == "$`":
+            return match.string[: match.start()]
+        if raw == "$'":
+            return match.string[match.end() :]
+        digits = tok.group(1)
+        if digits is not None:
+            idx = int(digits)
+            if 1 <= idx <= num_groups:
+                val = match.group(idx)
+                return "" if val is None else val
+            if len(digits) == 2:
+                idx1 = int(digits[0])
+                if 1 <= idx1 <= num_groups:
+                    val1 = match.group(idx1)
+                    return ("" if val1 is None else val1) + digits[1]
+            return raw
+        gname = tok.group(2)
+        if gname is not None:
+            if not match.re.groupindex:
+                return ""
+            try:
+                val_n = match.group(gname)
+                return "" if val_n is None else val_n
+            except IndexError:
+                return ""
+        return raw
+
+    return _JS_REPL_TOKEN_RE.sub(_sub_token, repl)
+
+
 def run_regex_pipeline(
     text: str,
     st_data_root: str | Path | None = None,
@@ -542,7 +587,7 @@ def run_regex_pipeline(
         else:
             expr = raw_pat
         try:
-            cleaned = re.sub(expr, repl, cleaned, flags=flags)
+            cleaned = re.sub(expr, lambda m, r=repl: _apply_js_regex_replacement(m, r), cleaned, flags=flags)
         except re.error:
             continue
 

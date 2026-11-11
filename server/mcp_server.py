@@ -32,6 +32,8 @@ from server.card_codec import (
 from server.chat_sync import (
     append_turn_to_chat,
     create_new_chat_session,
+    exclusive_file_lock,
+    get_character_chat_dir,
     list_chat_files,
     list_groups,
     manage_chat_branch,
@@ -243,6 +245,72 @@ class TavernFusionRuntime:
                 entries.extend(load_lorebook_file(b_path, source_tier=tier))
         return entries
 
+    def _resolve_card_and_identity(
+        self,
+        char_query: str,
+        session: dict[str, Any] | None = None,
+        *,
+        include_avatar_data_uri: bool = False,
+    ) -> tuple[Path, dict[str, Any], str, str]:
+        """Resolves `(card_path, card_bundle, char_name, avatar_stem)`.
+
+        When `char_query` refers to the currently bound character in `session` and
+        `session["card_file"]` exists on disk, prefers that exact PNG file so cards
+        whose filename differs from `data.name` stay deterministically paired.
+        """
+        q_clean = str(char_query).strip()
+        card_path: Path | None = None
+        if session:
+            sess_file = str(session.get("card_file") or "").strip()
+            sess_char = str(session.get("character_name") or "").strip()
+            sess_stem = str(session.get("avatar_stem") or "").strip()
+            if sess_file and q_clean in (sess_char, sess_file, sess_stem):
+                cand = (self.st_data_root / "characters" / sess_file).resolve()
+                if cand.exists() and cand.is_file():
+                    card_path = ensure_under_dir(cand, self.st_data_root / "characters")
+        if card_path is None:
+            card_path = self.find_character_card_path(q_clean)
+        bundle = read_character_card(card_path, include_avatar_data_uri=include_avatar_data_uri)
+        char_name = str(bundle["card"]["data"]["name"])
+        avatar_stem = card_path.stem
+        return card_path, bundle, char_name, avatar_stem
+
+    def _validate_contained_path(
+        self,
+        raw_path: str | Path,
+        *,
+        default_subdir: str | None = None,
+        allowed_suffixes: tuple[str, ...] = (),
+        label: str = "path",
+    ) -> Path:
+        raw_str = str(raw_path).strip()
+        if not raw_str:
+            raise ValueError(f"{label} cannot be empty.")
+        cand = Path(raw_str)
+        if ".." in cand.parts:
+            raise ValueError(f"Path traversal ('..') is forbidden in {label}.")
+        if allowed_suffixes and cand.suffix.lower() not in allowed_suffixes:
+            raise ValueError(f"{label} must have one of suffixes {allowed_suffixes}, got '{cand.suffix}'.")
+
+        allowed_roots = [
+            self.state_dir.resolve(),
+            self.st_data_root.resolve(),
+            Path.cwd().resolve(),
+        ]
+        if not cand.is_absolute():
+            base = (self.state_dir / default_subdir).resolve() if default_subdir else self.state_dir.resolve()
+            base.mkdir(parents=True, exist_ok=True)
+            return ensure_under_dir(base / cand, base)
+
+        resolved = cand.resolve()
+        for root in allowed_roots:
+            if resolved.is_relative_to(root):
+                return resolved
+        raise ValueError(
+            f"Path containment violation: {label} '{resolved.name}' must reside inside "
+            "plugin state_dir, SillyTavern data root, or the current workspace."
+        )
+
     # ------------------------------------------------------------------
     # 14 Core MCP Tool Implementations
     # ------------------------------------------------------------------
@@ -252,15 +320,14 @@ class TavernFusionRuntime:
         force_new = bool(args.get("new_chat", False))
         greeting_idx = int(args.get("greeting_index", 0))
 
-        card_path = self.find_character_card_path(char_query)
-        card_bundle = read_character_card(card_path, include_avatar_data_uri=False)
+        prev = self.load_active_session()
+        card_path, card_bundle, char_name, avatar_stem = self._resolve_card_and_identity(char_query, prev)
         card_v3 = card_bundle["card"]
-        char_name = card_v3["data"]["name"]
 
         persona = get_active_persona(self.st_data_root, args.get("persona_name"))
         preset = load_openai_preset(self.st_data_root, args.get("preset_name"))
 
-        existing_chats = list_chat_files(self.st_data_root, char_name)
+        existing_chats = list_chat_files(self.st_data_root, avatar_stem, legacy_character_name=char_name)
         requested_chat = str(args.get("chat_file", "")).strip()
         chosen_existing = None
         if requested_chat and existing_chats:
@@ -292,18 +359,20 @@ class TavernFusionRuntime:
                 greeting_text=raw_first,
                 alternate_greetings=alt_greets,
                 greeting_index=greeting_idx,
+                avatar_stem=avatar_stem,
             )
             active_chat_path = Path(created["chat_path"])
             seeded_new = True
 
         header, messages = read_jsonl_chat(active_chat_path)
-        prev = self.load_active_session()
         rp_conv_id = str(args.get("rp_conv_id") or "").strip()
         activate_rp = bool(args.get("activate_rp", True))
         session_state = {
             "active": activate_rp,
             "rp_conv_id": rp_conv_id,
             "character_name": char_name,
+            "card_file": card_path.name,
+            "avatar_stem": avatar_stem,
             "card_path": str(card_path),
             "chat_path": str(active_chat_path),
             "persona_name": persona["name"],
@@ -323,11 +392,14 @@ class TavernFusionRuntime:
         if (self.st_data_root / "characters").exists() and "mock_st_data" not in str(self.st_data_root):
             self.save_plugin_settings({"last_st_data_root": str(self.st_data_root)})
 
-        expressions = list_character_expressions(self.st_data_root, char_name)
+        expressions = list_character_expressions(self.st_data_root, avatar_stem) or list_character_expressions(
+            self.st_data_root, char_name
+        )
         return {
             "status": "active",
             "character_name": char_name,
             "card_file": card_path.name,
+            "avatar_stem": avatar_stem,
             "detected_card_spec": card_bundle["detected_chunk"],
             "mode": f"--{mode}",
             "resumed_existing_chat": not seeded_new,
@@ -344,7 +416,7 @@ class TavernFusionRuntime:
 
     def tool_st_dump_prompt_frame(self, args: dict[str, Any]) -> dict[str, Any]:
         session = self.load_active_session()
-        char_query = str(args.get("character_name") or session.get("character_name") or "").strip()
+        char_query = str(args.get("character_name") or session.get("card_file") or session.get("character_name") or "").strip()
         if not char_query:
             raise ValueError("No character_name specified and no active session found.")
         user_input = str(args.get("user_input", ""))
@@ -359,15 +431,19 @@ class TavernFusionRuntime:
         director_mode = bool(args.get("director_mode", session.get("director_mode", False)))
         quarantine_backstage = (epistemic_level < 100) and (not director_mode)
 
-        card_path = self.find_character_card_path(char_query)
-        card_v3 = read_character_card(card_path, include_avatar_data_uri=False)["card"]
-        char_name = card_v3["data"]["name"]
+        card_path, card_bundle, char_name, avatar_stem = self._resolve_card_and_identity(char_query, session)
+        card_v3 = card_bundle["card"]
 
         chat_path_str = session.get("chat_path")
-        if chat_path_str and Path(chat_path_str).exists() and session.get("character_name") == char_name:
+        if (
+            chat_path_str
+            and Path(chat_path_str).exists()
+            and session.get("character_name") == char_name
+            and session.get("avatar_stem", avatar_stem) == avatar_stem
+        ):
             header, messages = read_jsonl_chat(chat_path_str)
         else:
-            chats = list_chat_files(self.st_data_root, char_name)
+            chats = list_chat_files(self.st_data_root, avatar_stem, legacy_character_name=char_name)
             if chats:
                 header, messages = read_jsonl_chat(chats[0])
             else:
@@ -420,20 +496,24 @@ class TavernFusionRuntime:
 
     def tool_st_commit_turn(self, args: dict[str, Any]) -> dict[str, Any]:
         session = self.load_active_session()
-        char_query = str(args.get("character_name") or session.get("character_name") or "").strip()
+        char_query = str(args.get("character_name") or session.get("card_file") or session.get("character_name") or "").strip()
         if not char_query:
             raise ValueError("character_name is required to commit a turn.")
 
-        card_path = self.find_character_card_path(char_query)
-        card_v3 = read_character_card(card_path, include_avatar_data_uri=False)["card"]
-        char_name = card_v3["data"]["name"]
+        card_path, card_bundle, char_name, avatar_stem = self._resolve_card_and_identity(char_query, session)
+        card_v3 = card_bundle["card"]
         persona = get_active_persona(self.st_data_root, session.get("persona_name"))
 
         chat_path_str = session.get("chat_path")
-        if chat_path_str and Path(chat_path_str).exists() and session.get("character_name") == char_name:
+        if (
+            chat_path_str
+            and Path(chat_path_str).exists()
+            and session.get("character_name") == char_name
+            and session.get("avatar_stem", avatar_stem) == avatar_stem
+        ):
             chat_path = Path(chat_path_str)
         else:
-            existing = list_chat_files(self.st_data_root, char_name)
+            existing = list_chat_files(self.st_data_root, avatar_stem, legacy_character_name=char_name)
             if existing:
                 chat_path = existing[0]
             else:
@@ -444,6 +524,7 @@ class TavernFusionRuntime:
                     greeting_text=resolve_st_macros(
                         str(card_v3["data"].get("first_mes", "")), char_name, persona["name"]
                     ),
+                    avatar_stem=avatar_stem,
                 )
                 chat_path = Path(created["chat_path"])
 
@@ -489,7 +570,9 @@ class TavernFusionRuntime:
             quarantine_backstage=(epistemic_level < 100 and not is_backstage),
         )
 
-        expr_list = list_character_expressions(self.st_data_root, char_name)
+        expr_list = list_character_expressions(self.st_data_root, avatar_stem) or list_character_expressions(
+            self.st_data_root, char_name
+        )
         detected_expr = detect_message_emotion(cleaned_char, expr_list)
         if detected_expr:
             extra_meta["expression"] = detected_expr
@@ -509,6 +592,9 @@ class TavernFusionRuntime:
 
         session["active"] = True
         session["character_name"] = char_name
+        session["card_file"] = card_path.name
+        session["avatar_stem"] = avatar_stem
+        session["card_path"] = str(card_path)
         session["chat_path"] = str(chat_path)
         session["last_committed_at"] = time.time()
         session["last_turn_hash"] = commit_res["turn_hash"]
@@ -555,7 +641,12 @@ class TavernFusionRuntime:
         char_dir = (self.st_data_root / "characters").resolve()
         char_dir.mkdir(parents=True, exist_ok=True)
         out_path = ensure_under_dir(char_dir / out_name, char_dir)
-        portrait_path = args.get("portrait_image_path")
+        raw_portrait = args.get("portrait_image_path")
+        portrait_path = (
+            self._validate_contained_path(raw_portrait, label="portrait_image_path")
+            if raw_portrait
+            else None
+        )
         return write_character_card_png(
             card_payload=card_json,
             output_png_path=out_path,
@@ -645,10 +736,10 @@ class TavernFusionRuntime:
         return evolve_lorebook_file(lore_path, op, payload)  # type: ignore[arg-type]
 
     def tool_st_manage_chat_branch(self, args: dict[str, Any]) -> dict[str, Any]:
+        sess = self.load_active_session()
         char_query = str(args["character_name"]).strip()
-        card_path = self.find_character_card_path(char_query)
-        card_v3 = read_character_card(card_path, include_avatar_data_uri=False)["card"]
-        char_name = card_v3["data"]["name"]
+        card_path, card_bundle, char_name, avatar_stem = self._resolve_card_and_identity(char_query, sess)
+        card_v3 = card_bundle["card"]
         action = str(args["action"])
         target_id = int(args.get("target_id", 0))
 
@@ -664,18 +755,22 @@ class TavernFusionRuntime:
                     for g in (card_v3["data"].get("alternate_greetings") or [])
                 ],
                 greeting_index=target_id,
+                avatar_stem=avatar_stem,
             )
-            sess = self.load_active_session()
-            if sess.get("character_name") == char_name:
+            if sess.get("character_name") == char_name and sess.get("avatar_stem", avatar_stem) == avatar_stem:
                 sess["chat_path"] = created["chat_path"]
                 self.save_active_session(sess)
             return created
 
-        sess = self.load_active_session()
-        if sess.get("character_name") == char_name and sess.get("chat_path") and Path(sess["chat_path"]).exists():
+        if (
+            sess.get("character_name") == char_name
+            and sess.get("avatar_stem", avatar_stem) == avatar_stem
+            and sess.get("chat_path")
+            and Path(sess["chat_path"]).exists()
+        ):
             chat_target = Path(sess["chat_path"])
         else:
-            chats = list_chat_files(self.st_data_root, char_name)
+            chats = list_chat_files(self.st_data_root, avatar_stem, legacy_character_name=char_name)
             if not chats:
                 raise FileNotFoundError(f"No existing chats found for {char_name}.")
             chat_target = chats[0]
@@ -684,20 +779,32 @@ class TavernFusionRuntime:
     def tool_st_stage_floor_op(self, args: dict[str, Any]) -> dict[str, Any]:
         """Executes in-place Stage floor operations (edit, delete, switch_swipe, prune_swipes, fork_from_floor)."""
         sess = self.load_active_session()
-        char_q = str(args.get("character_name") or sess.get("character_name") or "").strip()
+        char_q = str(args.get("character_name") or sess.get("card_file") or sess.get("character_name") or "").strip()
         if not char_q:
             raise ValueError("character_name is required for floor operations.")
-        card_path = self.find_character_card_path(char_q)
-        char_name = read_character_card(card_path, include_avatar_data_uri=False)["card"]["data"]["name"]
+        card_path, _, char_name, avatar_stem = self._resolve_card_and_identity(char_q, sess)
 
         chat_file = str(args.get("chat_file") or "").strip()
         if chat_file:
-            c_dir = ensure_under_dir(self.st_data_root / "chats" / sanitize_filename_stem(char_name), self.st_data_root)
-            chat_path = ensure_under_dir(c_dir / chat_file, c_dir)
-        elif sess.get("character_name") == char_name and sess.get("chat_path") and Path(sess["chat_path"]).exists():
+            if ".." in Path(chat_file).parts or Path(chat_file).name != chat_file:
+                raise ValueError("Invalid chat_file name.")
+            primary_dir = get_character_chat_dir(self.st_data_root, avatar_stem)
+            cand_primary = ensure_under_dir(primary_dir / chat_file, primary_dir)
+            if cand_primary.exists():
+                chat_path = cand_primary
+            else:
+                legacy_dir = get_character_chat_dir(self.st_data_root, char_name)
+                cand_legacy = ensure_under_dir(legacy_dir / chat_file, legacy_dir)
+                chat_path = cand_legacy if cand_legacy.exists() else cand_primary
+        elif (
+            sess.get("character_name") == char_name
+            and sess.get("avatar_stem", avatar_stem) == avatar_stem
+            and sess.get("chat_path")
+            and Path(sess["chat_path"]).exists()
+        ):
             chat_path = Path(sess["chat_path"])
         else:
-            chats = list_chat_files(self.st_data_root, char_name)
+            chats = list_chat_files(self.st_data_root, avatar_stem, legacy_character_name=char_name)
             if not chats:
                 raise FileNotFoundError(f"No chat log found for {char_name}.")
             chat_path = chats[0]
@@ -716,6 +823,8 @@ class TavernFusionRuntime:
         if args["operation"] == "fork_from_floor" and args.get("activate_fork", True):
             sess["chat_path"] = res["branch_path"]
             sess["character_name"] = char_name
+            sess["card_file"] = card_path.name
+            sess["avatar_stem"] = avatar_stem
             self.save_active_session(sess)
         return res
 
@@ -744,13 +853,15 @@ class TavernFusionRuntime:
 
         chat_path = session.get("chat_path")
         if chat_path and Path(chat_path).exists() and ("authors_note" in args or "an_depth" in args):
-            header, messages = read_jsonl_chat(chat_path)
-            meta = header.setdefault("chat_metadata", {})
-            if "authors_note" in args:
-                meta["note_prompt"] = str(args["authors_note"])
-            if "an_depth" in args:
-                meta["note_depth"] = int(args["an_depth"])
-            write_jsonl_chat_atomic(chat_path, header, messages)
+            c_path_obj = Path(chat_path)
+            with exclusive_file_lock(c_path_obj):
+                header, messages = read_jsonl_chat(c_path_obj)
+                meta = header.setdefault("chat_metadata", {})
+                if "authors_note" in args:
+                    meta["note_prompt"] = str(args["authors_note"])
+                if "an_depth" in args:
+                    meta["note_depth"] = int(args["an_depth"])
+                write_jsonl_chat_atomic(c_path_obj, header, messages)
 
         self.save_active_session(session)
         return {"updated_session": session, "plugin_settings": self.load_plugin_settings()}
@@ -790,41 +901,60 @@ class TavernFusionRuntime:
         chat_path = session.get("chat_path")
         if not chat_path or not Path(chat_path).exists():
             raise ValueError("No active chat session to read/write chat-scoped variables.")
-        header, messages = read_jsonl_chat(chat_path)
-        c_vars = header.setdefault("chat_metadata", {}).setdefault("variables", {})
-        if op == "get":
-            return {"scope": "chat", "key": key, "value": c_vars.get(key)}
-        if op == "set":
-            c_vars[key] = val
-        elif op == "inc":
-            num = float(c_vars.get(key, 0)) + float(val or 1)
-            c_vars[key] = int(num) if num.is_integer() else num
-        elif op == "del":
-            c_vars.pop(key, None)
-        if op in ("set", "inc", "del"):
-            write_jsonl_chat_atomic(chat_path, header, messages)
-        return {"scope": "chat", "variables": c_vars}
+        c_path_obj = Path(chat_path)
+        with exclusive_file_lock(c_path_obj):
+            header, messages = read_jsonl_chat(c_path_obj)
+            c_vars = header.setdefault("chat_metadata", {}).setdefault("variables", {})
+            if op == "get":
+                return {"scope": "chat", "key": key, "value": c_vars.get(key)}
+            if op == "set":
+                c_vars[key] = val
+            elif op == "inc":
+                num = float(c_vars.get(key, 0)) + float(val or 1)
+                c_vars[key] = int(num) if num.is_integer() else num
+            elif op == "del":
+                c_vars.pop(key, None)
+            if op in ("set", "inc", "del"):
+                write_jsonl_chat_atomic(c_path_obj, header, messages)
+            return {"scope": "chat", "variables": dict(c_vars)}
 
     def tool_st_compile_stage_widget(self, args: dict[str, Any]) -> dict[str, Any]:
         session = self.load_active_session()
-        char_query = str(args.get("character_name") or session.get("character_name") or "").strip()
+        char_query = str(args.get("character_name") or session.get("card_file") or session.get("character_name") or "").strip()
         if not char_query:
             raise ValueError("character_name is required to compile the Stage widget.")
         placement = str(args.get("placement", "standalone"))
-        out_html = args.get("output_html_path")
+        raw_out_html = args.get("output_html_path")
+        safe_out_html = (
+            self._validate_contained_path(
+                raw_out_html,
+                default_subdir="widgets",
+                allowed_suffixes=(".html", ".htm"),
+                label="output_html_path",
+            )
+            if raw_out_html is not None and str(raw_out_html).strip() != ""
+            else None
+        )
 
-        card_path = self.find_character_card_path(char_query)
-        bundle = read_character_card(card_path, include_avatar_data_uri=True)
+        card_path, bundle, char_name, avatar_stem = self._resolve_card_and_identity(
+            char_query,
+            session,
+            include_avatar_data_uri=True,
+        )
         card_v3 = bundle["card"]
-        char_name = card_v3["data"]["name"]
 
         chat_path_str = session.get("chat_path")
-        if chat_path_str and Path(chat_path_str).exists() and session.get("character_name") == char_name:
+        if (
+            chat_path_str
+            and Path(chat_path_str).exists()
+            and session.get("character_name") == char_name
+            and session.get("avatar_stem", avatar_stem) == avatar_stem
+        ):
             chat_p = Path(chat_path_str)
             chat_file_name = chat_p.name
             header, messages = read_jsonl_chat(chat_p)
         else:
-            chats = list_chat_files(self.st_data_root, char_name)
+            chats = list_chat_files(self.st_data_root, avatar_stem, legacy_character_name=char_name)
             if chats:
                 chat_file_name = chats[0].name
                 header, messages = read_jsonl_chat(chats[0])
@@ -832,7 +962,7 @@ class TavernFusionRuntime:
                 chat_file_name = "unsaved_preview.jsonl"
                 header, messages = {"chat_metadata": {"variables": {}}}, []
 
-        dump_info = self.tool_st_dump_prompt_frame({"character_name": char_name})
+        dump_info = self.tool_st_dump_prompt_frame({"character_name": card_path.name})
         return compile_stage_widget_html(
             character_card=card_v3,
             avatar_data_uri=bundle["avatar_data_uri"],
@@ -843,7 +973,7 @@ class TavernFusionRuntime:
             chat_file_name=chat_file_name,
             placement=placement,
             mode=str(session.get("mode", "play")),
-            output_html_path=out_html,
+            output_html_path=safe_out_html,
         )
 
     # ------------------------------------------------------------------
@@ -935,12 +1065,15 @@ class TavernFusionRuntime:
 
         if active_char:
             try:
-                c_path = self.find_character_card_path(active_char)
+                c_query = str(session.get("card_file") or active_char)
+                c_path, c_bundle, resolved_char, avatar_stem = self._resolve_card_and_identity(c_query, session)
+                active_char = resolved_char
                 active_card_file = c_path.name
-                c_bundle = read_character_card(c_path, include_avatar_data_uri=False)
                 active_card_data = c_bundle["card"]["data"]
-                expressions = list_character_expressions(self.st_data_root, active_char)
-                all_chats = list_chat_files(self.st_data_root, active_char)
+                expressions = list_character_expressions(self.st_data_root, avatar_stem) or list_character_expressions(
+                    self.st_data_root, active_char
+                )
+                all_chats = list_chat_files(self.st_data_root, avatar_stem, legacy_character_name=active_char)
                 for cp in all_chats[:20]:
                     chat_files_info.append({
                         "file": cp.name,
@@ -965,8 +1098,8 @@ class TavernFusionRuntime:
                 elif expressions:
                     current_expression = "neutral" if "neutral" in expressions else expressions[0]
 
-                dump_data = self.tool_st_dump_prompt_frame({"character_name": active_char})
-                doctor_data = self.tool_st_lint_card_and_lore({"character_name": active_char})
+                dump_data = self.tool_st_dump_prompt_frame({"character_name": active_card_file})
+                doctor_data = self.tool_st_lint_card_and_lore({"character_name": active_card_file})
             except Exception as err:
                 dump_data = {"dump_report": f"Inspector error: {err}", "active_lore": [], "prefix_cache_ratio_pct": 0}
 
@@ -1475,7 +1608,7 @@ class StdioMCPServer:
                 "result": {
                     "protocolVersion": client_proto,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.0"},
+                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.1"},
                 },
             }
 
@@ -1483,19 +1616,9 @@ class StdioMCPServer:
             return {"jsonrpc": "2.0", "id": req_id, "result": {}}
 
         if method == "tools/list":
-            # Switch B (Physical Tool Unplugging): When in an active pure-theater RP turn
-            # (`agentic_hands=False` and `director_mode=False`), return an empty tool list so
-            # tool schemas never dilute the model's literary attention or trigger mid-scene tool calls.
-            sess = self.runtime.load_active_session()
-            in_pure_theater_turn = (
-                bool(sess.get("active"))
-                and bool(sess.get("pending_uncommitted_turn"))
-                and sess.get("pending_turn_mode", "normal") in ("normal", "swipe")
-                and not bool(sess.get("agentic_hands", False))
-                and not bool(sess.get("director_mode", False))
-            )
-            if in_pure_theater_turn:
-                return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": []}}
+            # Always return the full tool catalog so parallel engineering conversations
+            # never lose tool visibility; Switch B tool blocking is enforced per-conversation
+            # via `rp_conv_id == conversationId` in `hooks/pre_tool_guard.py`.
             return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": MCP_TOOL_SCHEMAS}}
 
         if method == "resources/list":

@@ -279,7 +279,68 @@ class SQLiteLoreVectorCache:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dense_embeddings (
+                model_key TEXT NOT NULL,
+                text_digest TEXT NOT NULL,
+                vec_json TEXT NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY (model_key, text_digest)
+            )
+            """
+        )
         conn.commit()
+
+    def get_or_fetch_dense(self, text: str) -> tuple[list[float] | None, bool]:
+        """Returns `(dense_vector, endpoint_failed)` using SQLite cache when `TAVERN_EMBEDDING_URL` is set."""
+        embed_url = os.environ.get("TAVERN_EMBEDDING_URL", "").strip()
+        if not embed_url or not text.strip():
+            return None, False
+        model = os.environ.get("TAVERN_EMBEDDING_MODEL", "nomic-embed-text").strip()
+        model_key = f"{embed_url}|{model}"
+        digest = _stable_text_digest(text[:2000])
+
+        if self._mem_conn is not None:
+            return self._query_or_fetch_dense(self._mem_conn, model_key, digest, text)
+
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
+        try:
+            return self._query_or_fetch_dense(conn, model_key, digest, text)
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _query_or_fetch_dense(
+        conn: sqlite3.Connection,
+        model_key: str,
+        digest: str,
+        text: str,
+    ) -> tuple[list[float] | None, bool]:
+        cur = conn.execute(
+            "SELECT vec_json FROM dense_embeddings WHERE model_key = ? AND text_digest = ?",
+            (model_key, digest),
+        )
+        row = cur.fetchone()
+        if row:
+            return json.loads(row[0]), False
+
+        fetched = try_external_embedding(text)
+        if fetched is None:
+            return None, True
+
+        conn.execute(
+            """
+            INSERT INTO dense_embeddings (model_key, text_digest, vec_json, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(model_key, text_digest) DO UPDATE SET
+                vec_json = excluded.vec_json,
+                updated_at = excluded.updated_at
+            """,
+            (model_key, digest, json.dumps(fetched), time.time()),
+        )
+        conn.commit()
+        return fetched, False
 
     def get_or_compute(self, entry: NormalizedLoreEntry) -> dict[str, float]:
         combined = " ".join(entry.keys + entry.keys_secondary + [entry.comment, entry.content])
@@ -597,7 +658,10 @@ class HybridLoreEngine:
 
         sem_query_text = " ".join(m.get("mes", "") for m in working_messages[-2:])
         query_vec = build_feature_vector(sem_query_text)
-        dense_query = try_external_embedding(sem_query_text) if sem_query_text.strip() else None
+        dense_query: list[float] | None = None
+        dense_endpoint_failed = False
+        if sem_query_text.strip():
+            dense_query, dense_endpoint_failed = self.vector_cache.get_or_fetch_dense(sem_query_text)
 
         candidates: dict[tuple[str, int], tuple[int, float, int, NormalizedLoreEntry, str]] = {}
 
@@ -633,9 +697,13 @@ class HybridLoreEngine:
 
             if e.vectorized and (query_vec or dense_query):
                 sim = 0.0
-                if dense_query is not None:
-                    dense_entry = try_external_embedding(" ".join(e.keys + [e.comment, e.content]))
-                    if dense_entry is not None:
+                if dense_query is not None and not dense_endpoint_failed:
+                    dense_entry, failed_now = self.vector_cache.get_or_fetch_dense(
+                        " ".join(e.keys + [e.comment, e.content])
+                    )
+                    if failed_now:
+                        dense_endpoint_failed = True
+                    elif dense_entry is not None:
                         sim = cosine_dense(dense_query, dense_entry)
                 if sim <= 0.0 and query_vec:
                     entry_vec = self.vector_cache.get_or_compute(e)

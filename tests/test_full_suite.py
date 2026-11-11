@@ -353,7 +353,7 @@ class TavernFusionFullTestSuite(unittest.TestCase):
 
             s_out = run_hook("session_init.py", {"workspacePaths": [str(tdir)], "conversationId": "conv-eng"})
             sys_msg = s_out["injectSteps"][0]["systemMessage"]["systemMessage"]
-            self.assertIn("Tavern Fusion v3.0 Ready", sys_msg)
+            self.assertIn("Tavern Fusion v3.0", sys_msg)
             self.assertIn("Standard engineering mode", sys_msg)
 
             # 2. PreInvocation Turn 1 (`/rp Seraphina`) -> binds `rp_conv_id = conv-alpha` + `frame="bootstrap"`
@@ -795,9 +795,9 @@ class TavernFusionFullTestSuite(unittest.TestCase):
                 self.assertNotIn("导演指令", dump_after_quarantine["ephemeral_frame"])
                 self.assertIn("QuarantinedBackstageFloors=2", dump_after_quarantine["ephemeral_frame"])
 
-                # 5. Switch B (Physical Tool Unplugging):
-                #    When `agentic_hands=False` during an active uncommitted normal RP turn,
-                #    both `StdioMCPServer.handle_rpc(tools/list)` returns `[]` and `pre_tool_guard.py` denies tool calls!
+                # 5. Switch B (Per-Conversation Hook Tool Gate without Cross-Session `tools/list` Disappearance):
+                #    `tools/list` MUST remain populated (14 tools) so parallel engineering chats never lose tools,
+                #    while `pre_tool_guard.py` blocks tool calls strictly inside `conv-mixer` when `agentic_hands=False`!
                 from server.mcp_server import StdioMCPServer
 
                 rt.handle_sidecar_op(
@@ -805,13 +805,277 @@ class TavernFusionFullTestSuite(unittest.TestCase):
                     {"action_kind": "send_turn", "user_text": "继续校准星盘", "rp_conv_id": "conv-mixer"},
                 )
                 mcp_srv = StdioMCPServer(rt)
-                unplugged_tools = mcp_srv.handle_rpc({"jsonrpc": "2.0", "id": 10, "method": "tools/list"})
-                self.assertEqual(unplugged_tools["result"]["tools"], [])
+                listed_tools = mcp_srv.handle_rpc({"jsonrpc": "2.0", "id": 10, "method": "tools/list"})
+                self.assertEqual(len(listed_tools["result"]["tools"]), 14)
 
-                # Turning `agentic_hands=True` immediately restores the tool list!
+                env_guard = {
+                    **os.environ,
+                    "ST_DATA_ROOT": str(st_root),
+                    "PLUGIN_STATE_DIR": str(state_dir),
+                }
+
+                def run_pre_tool(conv_id_val: str, tool_name_val: str) -> dict:
+                    out_p = subprocess.run(
+                        ["node", str(PLUGIN_ROOT / "scripts" / "run_py.mjs"), str(PLUGIN_ROOT / "hooks" / "pre_tool_guard.py")],
+                        cwd=str(PLUGIN_ROOT),
+                        input=json.dumps({
+                            "conversationId": conv_id_val,
+                            "toolCall": {"name": tool_name_val, "args": {}},
+                        }).encode("utf-8"),
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        env=env_guard,
+                        timeout=15,
+                        check=True,
+                    )
+                    return json.loads(out_p.stdout.decode("utf-8").strip())
+
+                # Bound RP conversation (`conv-mixer`) is denied when `agentic_hands=False`
+                self.assertEqual(run_pre_tool("conv-mixer", "st_manage_variables")["decision"], "deny")
+                # Parallel unrelated conversation (`conv-other`) stays allowed!
+                self.assertEqual(run_pre_tool("conv-other", "st_manage_variables")["decision"], "allow")
+
+                # Turning `agentic_hands=True` immediately allows tool calls in `conv-mixer`!
                 rt.tool_st_switch_profile({"agentic_hands": True})
-                plugged_tools = mcp_srv.handle_rpc({"jsonrpc": "2.0", "id": 11, "method": "tools/list"})
-                self.assertEqual(len(plugged_tools["result"]["tools"]), 14)
+                self.assertEqual(run_pre_tool("conv-mixer", "st_manage_variables")["decision"], "allow")
+            finally:
+                rt.close()
+
+    def test_09_st_compat_security_and_concurrency_regressions(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        import threading
+        from server.st_runtime_compat import get_active_persona, run_regex_pipeline
+        from server.chat_sync import append_turn_to_chat, stage_floor_operation
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tdir = Path(tmp)
+            st_root = make_sandbox_st_root(tdir)
+            state_dir = tdir / "state"
+
+            # 1. Realistic SillyTavern `settings.json` paths:
+            #    - `username` + `power_user.persona_description` fallback when `persona_descriptions` has no avatar key
+            #    - `world_info_settings.world_info.globalSelect`
+            #    - `extension_settings.variables.global`
+            extra_world = {
+                "entries": {
+                    "0": {
+                        "uid": 0,
+                        "key": ["银月古卷"],
+                        "comment": "GlobalSelectedBook",
+                        "content": "银月古卷记载着潮汐逆行的征兆。",
+                        "constant": True,
+                    }
+                }
+            }
+            (st_root / "worlds" / "ZetaSelected.json").write_text(
+                json.dumps(extra_world, ensure_ascii=False), encoding="utf-8"
+            )
+            for idx in range(6):
+                (st_root / "worlds" / f"AlphaFiller{idx}.json").write_text(
+                    json.dumps({"entries": {}}, ensure_ascii=False), encoding="utf-8"
+                )
+            real_st_settings = {
+                "username": "星界旅人",
+                "user_avatar": "user-default.png",
+                "power_user": {
+                    "personas": {},
+                    "persona_descriptions": {},
+                    "persona_description": "身披灰斗篷的巡星学者。",
+                },
+                "world_info_settings": {
+                    "world_info": {
+                        "globalSelect": ["ZetaSelected"],
+                    }
+                },
+                "extension_settings": {
+                    "variables": {
+                        "global": {"chapter": "III"},
+                    },
+                    "regex": [
+                        {
+                            "scriptName": "JS capture group test",
+                            "findRegex": "/\\[badge:(\\w+)\\]/gi",
+                            "replaceString": "<$1|$&|$$>",
+                            "disabled": False,
+                            "markdownOnly": False,
+                        }
+                    ],
+                },
+            }
+            (st_root / "settings.json").write_text(
+                json.dumps(real_st_settings, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+
+            persona = get_active_persona(st_root)
+            self.assertEqual(persona["name"], "星界旅人")
+            self.assertEqual(persona["description"], "身披灰斗篷的巡星学者。")
+
+            # 2. JS `$1` / `$&` / `$$` replacement in `run_regex_pipeline`
+            reg_out = run_regex_pipeline("获得纹章 [badge:Silver]！", st_data_root=st_root, epistemic_level=100)
+            self.assertEqual(reg_out, "获得纹章 <Silver|[badge:Silver]|$>！")
+
+            # 3. Card whose filename stem (`default_Lyra_chub99.png`) differs from `data.name` (`Jean-Luc`)
+            #    MUST store and read chats under `chats/default_Lyra_chub99/`, matching SillyTavern!
+            custom_card = {
+                "spec": "chara_card_v3",
+                "spec_version": "3.0",
+                "data": {
+                    "name": "Jean-Luc",
+                    "description": "{{char}} guards the northern observatory alongside {{user}}.",
+                    "personality": "Calm",
+                    "scenario": "Observatory deck",
+                    "first_mes": "Greetings from {{char}} to {{user}}.",
+                    "mes_example": "<START>\n{{user}}: \"Status?\"\n{{char}}: *Nods.* \"Clear skies.\"",
+                    "system_prompt": "{{original}}",
+                },
+            }
+            custom_png = st_root / "characters" / "default_Lyra_chub99.png"
+            write_character_card_png(custom_card, custom_png)
+
+            # Valid `{{char}}` / `{{user}}` MUST NOT trigger false-positive `BROKEN_LEGACY_MACRO`
+            healthy_issues = lint_character_card(read_character_card(custom_png))
+            self.assertNotIn("BROKEN_LEGACY_MACRO", {i["code"] for i in healthy_issues})
+
+            rt = TavernFusionRuntime(st_data_root=st_root, state_dir=state_dir)
+            try:
+                # Verify `world_info_settings.world_info.globalSelect` picks `ZetaSelected` (not alphabetical `AlphaFiller*`)
+                merged_entries = rt.collect_merged_lore_entries(read_character_card(custom_png)["card"])
+                self.assertIn("ZetaSelected", {e.source_book for e in merged_entries})
+                self.assertNotIn("AlphaFiller0", {e.source_book for e in merged_entries})
+
+                # Bootstrap by `data.name` (`Jean-Luc`) -> resolves `default_Lyra_chub99.png` -> writes `chats/default_Lyra_chub99/`
+                boot = rt.tool_st_session_bootstrap({"character_name": "Jean-Luc", "mode": "play", "new_chat": True})
+                self.assertEqual(boot["card_file"], "default_Lyra_chub99.png")
+                self.assertEqual(boot["avatar_stem"], "default_Lyra_chub99")
+                expected_chat_dir = st_root / "chats" / "default_Lyra_chub99"
+                self.assertTrue((expected_chat_dir / boot["chat_file"]).exists())
+                self.assertFalse((st_root / "chats" / "Jean-Luc").exists())
+
+                # Global variable read/write under `extension_settings.variables.global`
+                g_get = rt.tool_st_manage_variables({"scope": "global", "op": "get", "key": "chapter"})
+                self.assertEqual(g_get["value"], "III")
+                rt.tool_st_manage_variables({"scope": "global", "op": "set", "key": "chapter", "value": "IV"})
+                persisted_settings = json.loads((st_root / "settings.json").read_text(encoding="utf-8"))
+                self.assertEqual(persisted_settings["extension_settings"]["variables"]["global"]["chapter"], "IV")
+
+                # Corrupt `settings.json` MUST refuse global variable overwrite
+                (st_root / "settings.json").write_text("{broken json", encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    rt.tool_st_manage_variables({"scope": "global", "op": "set", "key": "x", "value": 1})
+                # Restore valid settings
+                (st_root / "settings.json").write_text(
+                    json.dumps(persisted_settings, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+
+                # 4. Path containment on `st_compile_stage_widget.output_html_path`
+                ok_widget = rt.tool_st_compile_stage_widget({
+                    "character_name": "Jean-Luc",
+                    "output_html_path": "preview_stage.html",
+                })
+                self.assertTrue(Path(ok_widget["output_html_path"]).is_relative_to(state_dir.resolve()))
+                with tempfile.TemporaryDirectory() as outside_tmp:
+                    outside_file = Path(outside_tmp) / "escaped.html"
+                    with self.assertRaises(ValueError):
+                        rt.tool_st_compile_stage_widget({
+                            "character_name": "Jean-Luc",
+                            "output_html_path": str(outside_file),
+                        })
+                with self.assertRaises(ValueError):
+                    rt.tool_st_compile_stage_widget({
+                        "character_name": "Jean-Luc",
+                        "output_html_path": "../escaped.html",
+                    })
+
+                # 5. Concurrent RMW floor appends + `.lock` file retention (no unlink race, zero lost updates)
+                chat_file_path = expected_chat_dir / boot["chat_file"]
+
+                def _worker(idx: int) -> None:
+                    stage_floor_operation(
+                        chat_path=chat_file_path,
+                        character_name="Jean-Luc",
+                        operation="append_user_floor",
+                        new_text=f"Concurrent message #{idx}",
+                        user_name="星界旅人",
+                    )
+
+                with ThreadPoolExecutor(max_workers=8) as pool:
+                    list(pool.map(_worker, range(8)))
+
+                _, conc_msgs = read_jsonl_chat(chat_file_path)
+                self.assertEqual(len(conc_msgs), 1 + 8)
+                self.assertTrue(chat_file_path.with_suffix(".jsonl.lock").exists())
+
+                # 6. Malformed JSONL line MUST raise `ValueError` instead of silently dropping & deleting floors
+                corrupt_chat = expected_chat_dir / "corrupt_test.jsonl"
+                raw_orig = (
+                    json.dumps({"user_name": "U", "character_name": "Jean-Luc", "chat_metadata": {}}) + "\n"
+                    + "{corrupted middle line\n"
+                    + json.dumps({"name": "Jean-Luc", "is_user": False, "mes": "Important floor"}) + "\n"
+                )
+                corrupt_chat.write_text(raw_orig, encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    read_jsonl_chat(corrupt_chat)
+                with self.assertRaises(ValueError):
+                    append_turn_to_chat(corrupt_chat, "Jean-Luc", "U", "hello", "world")
+                self.assertEqual(corrupt_chat.read_text(encoding="utf-8"), raw_orig)
+
+                # 7. Dense embedding SQLite cache (`TAVERN_EMBEDDING_URL`): 0 duplicate HTTP calls on Turn 2
+                req_counter = {"count": 0}
+
+                class _EmbedHandler(BaseHTTPRequestHandler):
+                    def do_POST(self) -> None:  # noqa: N802
+                        length = int(self.headers.get("Content-Length", "0"))
+                        _ = self.rfile.read(length)
+                        req_counter["count"] += 1
+                        body = json.dumps({"data": [{"embedding": [0.6, 0.8, 0.0]}]}).encode("utf-8")
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+
+                    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+                        return
+
+                srv = HTTPServer(("127.0.0.1", 0), _EmbedHandler)
+                th = threading.Thread(target=srv.serve_forever, daemon=True)
+                th.start()
+                old_emb = os.environ.get("TAVERN_EMBEDDING_URL")
+                try:
+                    os.environ["TAVERN_EMBEDDING_URL"] = f"http://127.0.0.1:{srv.server_port}/v1/embeddings"
+                    lore_entries = load_lorebook_file(st_root / "worlds" / "Eldoria.json")
+                    rt.lore_engine.evaluate_and_splice(lore_entries, [], latest_user_input="completely_unmatched_phrase_alpha")
+                    first_calls = req_counter["count"]
+                    self.assertGreater(first_calls, 0)
+                    # Second call with identical inputs MUST hit SQLite cache with ZERO HTTP requests!
+                    rt.lore_engine.evaluate_and_splice(lore_entries, [], latest_user_input="completely_unmatched_phrase_alpha")
+                    self.assertEqual(req_counter["count"], first_calls)
+                finally:
+                    if old_emb is None:
+                        os.environ.pop("TAVERN_EMBEDDING_URL", None)
+                    else:
+                        os.environ["TAVERN_EMBEDDING_URL"] = old_emb
+                    srv.shutdown()
+                    srv.server_close()
+
+                # 8. Verify `py_resolver.mjs` Windows `C:\...\WindowsApps\python3.exe` detection & `/rp Jean-Luc` hook
+                node_probe = subprocess.run(
+                    [
+                        "node",
+                        "--input-type=module",
+                        "-e",
+                        (
+                            "import { parsePythonProbeOutput } from './scripts/py_resolver.mjs';"
+                            "const stub = parsePythonProbeOutput('3.12:C:\\\\Users\\\\demo\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\python3.exe');"
+                            "const real = parsePythonProbeOutput('3.12:C:\\\\Python312\\\\python.exe');"
+                            "if (stub !== null || !real || real.executable !== 'C:\\\\Python312\\\\python.exe') process.exit(1);"
+                        ),
+                    ],
+                    cwd=str(PLUGIN_ROOT),
+                    check=False,
+                )
+                self.assertEqual(node_probe.returncode, 0)
             finally:
                 rt.close()
 

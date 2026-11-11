@@ -78,7 +78,7 @@ def main() -> None:
         )
 
         msg = (
-            f"[Tavern Fusion v3.0 Ready] Data profile: `{runtime.st_data_root.name}` "
+            f"[Tavern Fusion v3.0.1 Ready] Data profile: `{runtime.st_data_root.name}` "
             f"(cards={card_count}, lorebooks={world_names or ['none']}, st_web_8000={'online' if web_online else 'offline'}). "
             f"{mode_note}"
         )

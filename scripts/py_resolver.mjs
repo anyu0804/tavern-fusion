@@ -12,6 +12,22 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const PLUGIN_ROOT = resolve(__dirname, '..');
 
+export function parsePythonProbeOutput(rawOut) {
+  const out = String(rawOut || '').trim();
+  if (!out) return null;
+  const sepIdx = out.indexOf(':');
+  if (sepIdx === -1) return null;
+  const ver = out.slice(0, sepIdx);
+  const exePath = out.slice(sepIdx + 1);
+  if (exePath.toLowerCase().includes('windowsapps')) return null;
+  const [maj, min] = ver.split('.').map(Number);
+  if (!Number.isFinite(maj) || !Number.isFinite(min)) return null;
+  if (maj > 3 || (maj === 3 && min >= 10)) {
+    return { version: ver, executable: exePath };
+  }
+  return null;
+}
+
 function isWorkingPython(cmd, prefixArgs = []) {
   try {
     const out = execFileSync(
@@ -19,11 +35,7 @@ function isWorkingPython(cmd, prefixArgs = []) {
       [...prefixArgs, '-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}:{sys.executable}")'],
       { encoding: 'utf-8', timeout: 4000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }
     ).trim();
-    if (!out) return false;
-    const [ver, exePath = ''] = out.split(':', 2);
-    if (exePath.toLowerCase().includes('windowsapps')) return false;
-    const [maj, min] = ver.split('.').map(Number);
-    return maj > 3 || (maj === 3 && min >= 10);
+    return Boolean(parsePythonProbeOutput(out));
   } catch {
     return false;
   }

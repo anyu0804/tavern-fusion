@@ -4,39 +4,39 @@
 > **早期工程版本声明（Early Engineering Preview）**  
 > 本项目目前处于**非常早期的工程探索版本**，可能还存在较多 Bug 或边缘环境兼容问题。如果你在使用过程中遇到任何故障、或者有想要补充的功能建议，欢迎直接在仓库提交 [**Issues**](https://github.com/anyu0804/tavern-fusion/issues)，我会尽可能持续跟进完善！
 
-**Tavern Fusion 3.0** 是一款面向 **Google Antigravity (AGY)** 构建的原生 SillyTavern 沉浸式角色扮演与世界观编排插件。它在不修改 SillyTavern 核心源码、不开启高权限 `enableServerPlugins`、且**无需额外配置外部第三方大模型 API Key** 的前提下，直接驱动 **Antigravity 内置推理模型** 与本地酒馆数据（`characters/*.png`、`worlds/*.json`、`chats/**/*.jsonl`、`OpenAI Settings/*.json`）双向无损互通，并在 IDE 右侧辅助面板提供常驻可视化的 **`Tavern Stage`** 剧场工作台。
+**Tavern Fusion 3.0** 是一款面向 **Google Antigravity (AGY)** 构建的 SillyTavern 本地角色扮演与世界观编排插件。它在不修改 SillyTavern 源码、不开启高权限 `enableServerPlugins`、且**无需额外配置外部大模型 API Key** 的前提下，通过宿主官方插件与 Sidecar 接口驱动 **Antigravity 内置推理模型** 直接读写本地酒馆数据目录（`characters/*.png`、`worlds/*.json`、`chats/<avatar_stem>/*.jsonl`、`OpenAI Settings/*.json`、`settings.json`），并在 IDE 右侧辅助面板提供常驻可视化的 **`Tavern Stage`** 剧场工作台。
 
 ---
 
 ## 核心特性
 
-1. **🎛️ 维度调音台（Dimension Mixer）与四重维度锁（Four Dimensional Locks）**
-   - 摒弃“冻结前缀+尾部贴补丁”的妥协方案，采用**每轮全量动态重装（Full Dynamic Prompt Re-assembly）**，并在 `Tavern Stage` 舞台首屏提供三项实时拨盘：
-   - **开关 A · 认知透光度 / 第四面墙感知（Top-Level `system_instruction` 热替换）**：
-     - **`0% 深潜封闭`（默认）**：四重维度锁全开——① 顶层焊死位面认知切断铁律（对现代科技、代码及 AI 身份彻底不知情，严禁全知上帝视角）；② `<START>` 对话示例（`mes_example`）结构化保留，持续为 Token 概率云染色；③ 动态世界书回归黄金 `@Depth 1~4` 原位插入最新对话夹层；④ 内置后置防出戏正则组（`BUILTIN_IMMERSION_GUARD_REGEX`），物理切除 `（场外：...）`、`[OOC: ...]` 与 AI 助手套话。
-     - **`50% 隐秘默契`**：保留世界观设定、词表收敛与 `@Depth` 锁喉，不直接吐出现代科技词汇，但能以贴合世界观的诗意双关温柔接住你的场外暗示。
-     - **`100% 双轨化身`**：顶层切换为“保留角色灵魂与声线的全知共创化身”，彻底解开现世知识与代码视野，既能沉浸陪伴又能像老搭档一样探讨技术与人生。
-   - **开关 B · Agentic 权能释放（工具列表物理拔插）**：
-     - **`🔒 纯对白`（关闭）**：后端在生成回合**物理拔除 MCP 工具列表**并由 `PreToolUse` 钩子硬拦截任何工具调用，彻底根绝模型误调工具打断剧情，同时省下数千 Token 的工具定义注意力。
-     - **`🖐️ 权能释放`（开启）**：解锁模型的双手，允许角色在演绎过程中自主调用 `st_manage_variables`（实时更新好感/线索状态）或 `st_evolve_lore_entry`（将新剧情写入世界书）。
+1. **🎛️ 维度调音台（Dimension Mixer）与四层上下文约束**
+   - 每轮按当前档位动态重装完整提示词栈（而非冻结旧前缀后只在尾部追加补丁），并在 `Tavern Stage` 舞台首屏提供三项实时开关：
+   - **开关 A · 认知透光度 / 第四面墙感知（顶层 `system_instruction` 模板切换）**：
+     - **`0% 深潜封闭`（默认）**：启用四层上下文约束——① 顶层注入角色世界观认知边界提示词（屏蔽现代科技、代码及 AI 助手身份认知，禁止全知视角）；② 将角色卡 `<START>` 对话示例（`mes_example`）拆分为独立 `<START_LEXICAL_SAMPLE>` 少样本（few-shot）块保留在提示词中锚定语感；③ 世界书与 Author's Note 按 `@Depth` 深度直接插入对应历史楼层位置；④ 提交入库前执行内置防出戏正则组（`BUILTIN_IMMERSION_GUARD_REGEX`），自动剔除 `（场外：...）`、`[OOC: ...]` 与常见 AI 开场/收尾套话。
+     - **`50% 隐秘默契`**：保留世界观设定、少样本示例与 `@Depth` 插入位置，不直接输出移动互联网或代码术语，但允许角色在设定语境下以双关或隐喻回应玩家的场外暗示。
+     - **`100% 双轨化身`**：顶层切换为“保留角色性格与说话习惯的全知共创模式”，放开现代知识与代码视野，可同时兼顾角色陪伴与剧本/技术讨论。
+   - **开关 B · Agentic 权能释放（回合级工具调用门禁）**：
+     - **`🔒 纯对白`（关闭）**：在绑定的 RP 会话生成回合中，通过 `PreInvocation` 提示词约束与 `PreToolUse` 钩子（按 `conversationId` 精确隔离，不影响其他并行工程会话的工具可见性）拦截工具调用，避免模型中途误调工具打断叙事。
+     - **`🖐️ 权能释放`（开启）**：允许模型在演绎过程中按需调用 `st_manage_variables`（更新好感/线索变量）或 `st_evolve_lore_entry`（将新剧情写入世界书）。
    - **开关 C · 超级主控 / 导演穿梭键（`Alt+D` + 场外隔离标记 `Backstage Quarantine`）**：
-     - 一键切入跨次元导演模式，当场命令角色/助手改写剧本楼层、微调角色卡设定或修改世界书。
-     - **场外隔离标记（`extra.is_backstage: true`）**：穿梭期间的所有代码讨论与修卡交互自动标记为 `is_backstage: true`，在舞台时间线上折叠为 **「🎬 后台导演便签」**；一旦切回 `0%` 或 `50%` 深潜档位，装配器与世界书扫描器自动将这些场外楼层彻底过滤隔离，杜绝跨次元代码污染后续跑团词表。
+     - 一键切入后台导演模式，直接指令模型改写楼层、调整角色卡设定或维护世界书。
+     - **场外隔离标记（`extra.is_backstage: true`）**：导演模式下的讨论楼层自动写入 `is_backstage: true` 并在舞台时间线上折叠为 **「🎬 后台导演便签」**；切回 `0%` 或 `50%` 档位后，提示词装配器与世界书扫描器自动跳过这些场外楼层，避免代码或修卡指令混入后续正式剧情上下文。
 
 2. **常驻右侧剧场工作台 (`Tavern Stage` Aux Pane Sidecar)**
-   - 基于官方 `sidecar_sdk` 构建：通过 `window.sidecar.agent.sendMessage` / `startConversation` 一键唤醒 Antigravity 内置模型演绎回合、重抽平行分支（Swipes）或生成玩家导演灵感。
-   - **立绘与情绪差分沙箱**：自动检索 `characters/<CharName>/*.png` 差分表情包并随最新楼层情绪切换；所有媒体流强制经过二进制栅格文件头（Magic-Byte）与 `realpath` 越界校验，彻底阻断伪装 `.png` 的 SVG/HTML 脚本执行。
-   - **完整楼层修订闭环**：支持任意楼层原地编辑、删楼、一键标记/解除「🎬 场外隔离」、Swipe 左右切换与冗余分支裁剪、以及从任意历史楼层一键分叉（Fork）新 `.jsonl` 存档。
-   - **玩家导演杆（Player Director Lever）**：内置「✨ 回复灵感 x3」与「🪄 意图扩写」，由内置模型构思符合主角人设的台词候选并经 `st_publish_stage_suggestions` 回填至舞台输入框。
+   - 基于宿主官方 `sidecar_sdk` 构建：通过 `window.sidecar.agent.sendMessage` / `startConversation` 唤醒 Antigravity 内置模型推进回合、重抽平行分支（Swipes）或生成回复参考。
+   - **立绘与情绪差分沙箱**：自动检索 `characters/<AvatarStem>/*.png` 差分表情并随最新楼层情绪切换；所有媒体响应均经过二进制栅格文件头（Magic-Byte）与 `realpath` 目录边界校验，拒绝返回伪装为 `.png` 的 SVG/HTML 内容（HTTP 415）。
+   - **楼层修订与分支管理**：支持楼层原地编辑、删楼（自动留存 `.bak` 备份）、一键切换「🎬 场外隔离」标记、Swipe 切换与裁剪、以及从任意历史楼层分叉（Fork）新 `.jsonl` 存档。
+   - **玩家导演杆（Player Director Lever）**：提供「✨ 回复灵感 x3」与「🪄 意图扩写」，生成主角视角的候选台词并经 `st_publish_stage_suggestions` 回填至输入框。
 
-3. **零依赖跨平台 Python 控制面与 Windows 专项加固**
-   - 通过 `scripts/run_py.mjs` 自动避开 Windows `WindowsApps\python3.exe` 商店假桩，兼容 Python 3.10–3.13 纯标准库运行。
-   - SQLite 混合语义缓存采用短事务即用即关连接池，`.jsonl` 同步采用 `seek(0)` 字节锁与 `os.replace` 原子写盘，杜绝 Windows `WinError 32` 文件句柄残留。
+3. **零第三方依赖 Python 控制面与并发写盘保护**
+   - 通过 `scripts/run_py.mjs` 自动跳过 Windows `WindowsApps\python3.exe` 商店占位程序，基于 Python 3.10–3.13 标准库即可运行。
+   - SQLite 稀疏/稠密语义向量缓存采用短连接模式避免句柄泄漏；`.jsonl` 读写采用覆盖完整「读-改-写（RMW）」周期的跨平台文件锁与 `os.replace` 原子替换，并对损坏 JSON 行报错阻断以防静默丢楼。
 
-4. **深度兼容酒馆数据栈与 Card Doctor**
-   - 无损解析并双写 PNG `chara`（CCv2）+ `ccv3`（CCv3）块，严格落实 **Card-is-Data** 指令隔离。
-   - 完整解析 `OpenAI Settings/*.json` 的 `prompt_order` 顺序栈與全部 4 种 `selectiveLogic` 次级词门控。
-   - 内置 **Card & Lore Doctor (`st_lint_card_and_lore`)**：静态检出缺失 `ccv3` 双块、缺失 `<START>` 词表收敛样本、未带 `{{original}}` 覆盖预设的 `system_prompt`、`selective: false` 次级词失效陷阱与损坏宏。
+4. **兼容酒馆常用数据格式与 Card Doctor 静态体检**
+   - 解析并同步双写 PNG `chara`（CCv2）+ `ccv3`（CCv3）数据块，落实 **Card-is-Data** 字段清洗。
+   - 支持按头像文件名（`avatar_stem`）对齐 SillyTavern `chats/` 目录，兼容 `settings.json` 全局变量（`extension_settings.variables.global`）、全局世界书（`world_info_settings.world_info.globalSelect`）、JS 风格正则捕获组替换（`$1` / `$&`）、`OpenAI Settings/*.json` 的 `prompt_order` 顺序栈与 4 种 `selectiveLogic` 次级词门控。
+   - 内置 **Card & Lore Doctor (`st_lint_card_and_lore`)**：静态检查缺失 `ccv3` 块、缺失 `<START>` 示例、未带 `{{original}}` 覆盖预设的 `system_prompt`、`selective: false` 次级词失效与半括号残缺宏。
 
 5. **内置双档安全合规护栏 (`policy_mode`)**
    - `host_gentle`（默认）：对绝对安全红线执行零 Token 硬熔断；对暗黑奇幻/悬疑冲突题材附加温和的平台边界内敛引导，不误伤正常文学创作。
@@ -74,6 +74,14 @@ node scripts/run_py.mjs scripts/install_local.py --workspace .
 # 3. 运行全量自动化验收套件 (含四重维度锁、维度调音台、场外隔离与沙箱安全测试)
 node scripts/run_py.mjs tests/test_full_suite.py
 ```
+
+---
+
+## 已知限制（Known Limitations）
+
+- **宿主环境依赖**：插件依赖 Google Antigravity 2.0+ 的 Lifecycle Hooks（`SessionStart` / `PreInvocation` / `PreToolUse` / `Stop`）与 `sidecar_sdk` 右侧面板协议，无法脱离 Antigravity 在普通独立 MCP 客户端中直接获得完整的舞台联动与自动落盘体验。
+- **单活跃舞台状态**：`active_session.json` 当前设计为维护单个绑定 RP 会话（`rp_conv_id`）；其他工程对话与该 RP 会话完全隔离，但暂不支持在同一工作区内同时并行开启两个不同角色的自动落盘 RP 会话。
+- **SillyTavern 特性覆盖范围**：目前已覆盖主流单人角色卡（CCv2/CCv3）、世界书门控、`OpenAI Settings` 顺序栈、常用宏与正则替换，但尚未完整复刻 SillyTavern 前端全部 STscript 斜杠脚本命令、复杂群聊发言调度器及第三方前端 UI 扩展。
 
 ---
 

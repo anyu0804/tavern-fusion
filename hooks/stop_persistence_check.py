@@ -146,7 +146,7 @@ def main() -> None:
                     already_appended = bool(sess.get("user_floor_already_appended", False))
                     try:
                         runtime.tool_st_commit_turn({
-                            "character_name": str(sess["character_name"]),
+                            "character_name": str(sess.get("card_file") or sess["character_name"]),
                             "user_mes": None if (is_swipe or already_appended) else sess.get("last_user_input"),
                             "char_mes": prose,
                             "swipe_mode": is_swipe,
