@@ -23,14 +23,14 @@ from ..chat_sync import (
 )
 from ..fs_safety import atomic_write_json, ensure_under_dir
 from ..policy import evaluate_policy_compliance
-from ..runtime.context import RuntimeContext
-from ..st_runtime_compat import (
+from ..prompt import (
     get_active_persona,
     load_st_settings,
     normalize_epistemic_level,
     resolve_st_macros,
     run_regex_pipeline,
 )
+from ..runtime.context import RuntimeContext
 from ._common import collect_merged_lore_entries, resolve_card_and_identity
 
 # MCP input schemas (verbatim from the pre-refactor MCP_TOOL_SCHEMAS list)

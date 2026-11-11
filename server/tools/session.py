@@ -17,15 +17,15 @@ from ..chat_sync import (
     write_jsonl_chat_atomic,
 )
 from ..policy import evaluate_minor_risk_gate
-from ..runtime.context import RuntimeContext
-from ..runtime.notice import FIRST_RUN_NOTICE, FIRST_RUN_NOTICE_VERSION
-from ..st_runtime_compat import (
+from ..prompt import (
     compile_st_prompt_frame,
     get_active_persona,
     load_openai_preset,
     normalize_epistemic_level,
     resolve_st_macros,
 )
+from ..runtime.context import RuntimeContext
+from ..runtime.notice import FIRST_RUN_NOTICE, FIRST_RUN_NOTICE_VERSION
 from ._common import collect_merged_lore_entries, resolve_card_and_identity
 
 # MCP input schemas (verbatim from the pre-refactor MCP_TOOL_SCHEMAS list)

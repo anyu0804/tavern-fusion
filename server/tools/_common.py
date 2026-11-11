@@ -14,10 +14,10 @@ from ..lore_engine import (
     load_lorebook_file,
     parse_lorebook_dict,
 )
-from ..runtime.context import RuntimeContext
-from ..st_runtime_compat import (
+from ..prompt import (
     load_st_settings,
 )
+from ..runtime.context import RuntimeContext
 
 
 def find_character_card_path(ctx: RuntimeContext, character_query: str) -> Path:

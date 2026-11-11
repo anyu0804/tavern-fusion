@@ -33,14 +33,14 @@ from ..lore_engine import (
     load_lorebook_file,
 )
 from ..policy import evaluate_minor_risk_gate, evaluate_policy_compliance
-from ..runtime.context import RuntimeContext
-from ..runtime.notice import FIRST_RUN_NOTICE, FIRST_RUN_NOTICE_VERSION
-from ..st_runtime_compat import (
+from ..prompt import (
     get_active_persona,
     list_openai_presets,
     load_openai_preset,
     normalize_epistemic_level,
 )
+from ..runtime.context import RuntimeContext
+from ..runtime.notice import FIRST_RUN_NOTICE, FIRST_RUN_NOTICE_VERSION
 from ..widget_compiler import compile_stage_widget_html
 from ._common import (
     find_character_card_path,
