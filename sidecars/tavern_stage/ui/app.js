@@ -77,6 +77,7 @@ async function callOp(op, args = {}) {
 function mediaUrl(params) {
   const q = new URLSearchParams(params);
   if (activeWorkspaceUri) q.set('workspaceUri', activeWorkspaceUri);
+  if (currentEtag) q.set('v', currentEtag);
   return `/api/media?${q.toString()}`;
 }
 

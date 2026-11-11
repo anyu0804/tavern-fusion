@@ -375,15 +375,17 @@ function dirStamp(dirPath) {
     if (!existsSync(dirPath)) return 'missing';
     const names = readdirSync(dirPath);
     let maxMtime = 0;
+    let totalSize = 0;
     for (const n of names) {
       try {
         const st = statSync(join(dirPath, n));
         if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
+        totalSize += st.size;
       } catch {
         // Ignore transient temp files
       }
     }
-    return `${names.length}:${Math.trunc(maxMtime)}`;
+    return `${names.length}:${totalSize}:${Math.trunc(maxMtime)}`;
   } catch {
     return 'err';
   }
@@ -560,7 +562,7 @@ function serveMediaAsset(data, ResponseClass) {
     headers: {
       'X-Content-Type-Options': 'nosniff',
       'Content-Security-Policy': "default-src 'none'; sandbox",
-      'Cache-Control': 'private, max-age=30',
+      'Cache-Control': 'no-cache',
     },
   });
 }
@@ -658,16 +660,19 @@ const { app, ResponseClass } = await createSidecarHost();
 app.page('/', () =>
   new ResponseClass(readFileSync(join(UI_DIR, 'index.html'), 'utf-8'), {
     contentType: 'text/html; charset=utf-8',
+    headers: { 'Cache-Control': 'no-cache' },
   })
 );
 app.page('/styles.css', () =>
   new ResponseClass(readFileSync(join(UI_DIR, 'styles.css'), 'utf-8'), {
     contentType: 'text/css; charset=utf-8',
+    headers: { 'Cache-Control': 'no-cache' },
   })
 );
 app.page('/app.js', () =>
   new ResponseClass(readFileSync(join(UI_DIR, 'app.js'), 'utf-8'), {
     contentType: 'application/javascript; charset=utf-8',
+    headers: { 'Cache-Control': 'no-cache' },
   })
 );
 
