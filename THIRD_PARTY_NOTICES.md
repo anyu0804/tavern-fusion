@@ -56,7 +56,24 @@ SOFTWARE.
 
 ---
 
-## 4. Community Acknowledgments & Non-Affiliation Disclaimer
+## 4. Declared Font Stack (SIL Open Font License 1.1)
+
+- **Scope of Use**: The Tavern Stage sidecar stylesheets (`sidecars/tavern_stage/ui/styles.css`) and the browser extension (`st_web_extension/st-ag-sync`) **only declare** the following open-source font families and W3C generic family keywords (`system-ui`, `sans-serif`, `ui-monospace`, `monospace`). No font binary is bundled, embedded, or redistributed by this repository; the browser resolves the names against fonts installed on the local system and falls back to generic families when they are absent.
+- **Declared families and their licenses**:
+
+| Font family | Upstream project | License |
+| :--- | :--- | :--- |
+| Noto Sans SC / Noto Sans Mono CJK SC | [notofonts](https://github.com/notofonts) (Google) | SIL Open Font License 1.1 |
+| Source Han Sans SC (思源黑体) | [adobe-fonts/source-han-sans](https://github.com/adobe-fonts/source-han-sans) | SIL Open Font License 1.1 |
+| Inter | [rsms/inter](https://github.com/rsms/inter) | SIL Open Font License 1.1 |
+| JetBrains Mono | [JetBrains/JetBrainsMono](https://github.com/JetBrains/JetBrainsMono) | SIL Open Font License 1.1 |
+| Source Code Pro | [adobe-fonts/source-code-pro](https://github.com/adobe-fonts/source-code-pro) | SIL Open Font License 1.1 |
+
+- **Commercial font exclusion**: The stylesheets deliberately exclude proprietary system fonts such as Microsoft YaHei (方正字库), PingFang SC (Apple), Segoe UI, and Consolas (Microsoft). This avoids any commercial redistribution or embedded-screenshot licensing risk associated with those font files.
+
+---
+
+## 5. Community Acknowledgments & Non-Affiliation Disclaimer
 
 - **社区致谢**: 本项目认可并致谢 [LINUX DO 社区](https://linux.do/)（https://linux.do），感谢社区佬友在 AI Agent 工程实践与工具链上的交流分享与严谨审阅。
 - **非官方声明**: 本项目为独立的非官方社区开源插件与工具集，与 Google LLC 及 SillyTavern 官方团队无任何隶属、授权或背书关系。文中提及的 Google、Antigravity、Gemini、SillyTavern、TavernAI 等名称仅用于说明兼容环境与数据格式，相关商标归各自所有者所有。
