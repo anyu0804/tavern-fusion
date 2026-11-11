@@ -1,0 +1,318 @@
+[
+  {
+    "args": {
+      "op": "list"
+    },
+    "call": "chat:list",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "chat",
+                "variables": {
+                  "affection": 1,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "affection",
+      "op": "get"
+    },
+    "call": "chat:get",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "key": "affection",
+                "scope": "chat",
+                "value": 1
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "hp",
+      "op": "set",
+      "value": 10
+    },
+    "call": "chat:set",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "chat",
+                "variables": {
+                  "affection": 1,
+                  "hp": 10,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "hp",
+      "op": "inc",
+      "value": 2.5
+    },
+    "call": "chat:inc",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "chat",
+                "variables": {
+                  "affection": 1,
+                  "hp": 12.5,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "hp",
+      "op": "inc"
+    },
+    "call": "chat:inc",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "chat",
+                "variables": {
+                  "affection": 1,
+                  "hp": 13.5,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "hp",
+      "op": "inc",
+      "value": 0
+    },
+    "call": "chat:inc",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "chat",
+                "variables": {
+                  "affection": 1,
+                  "hp": 13.5,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "hp",
+      "op": "del"
+    },
+    "call": "chat:del",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "chat",
+                "variables": {
+                  "affection": 1,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "g1",
+      "op": "set",
+      "scope": "global",
+      "value": "x"
+    },
+    "call": "global:set",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "global",
+                "variables": {
+                  "g1": "x",
+                  "world_era": "星陨纪第四年"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "g2",
+      "op": "inc",
+      "scope": "global"
+    },
+    "call": "global:inc",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "global",
+                "variables": {
+                  "g1": "x",
+                  "g2": 1.0,
+                  "world_era": "星陨纪第四年"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "key": "g1",
+      "op": "get",
+      "scope": "global"
+    },
+    "call": "global:get",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "key": "g1",
+                "scope": "global",
+                "value": "x"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "op": "list",
+      "scope": "global"
+    },
+    "call": "global:list",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "scope": "global",
+                "variables": {
+                  "g1": "x",
+                  "g2": 1.0,
+                  "world_era": "星陨纪第四年"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  }
+]

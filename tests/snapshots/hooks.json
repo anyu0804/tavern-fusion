@@ -1,0 +1,852 @@
+[
+  {
+    "call": "non_st_workspace",
+    "hook": "session_init.py",
+    "rc": 0,
+    "session_after": null,
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": []
+    }
+  },
+  {
+    "call": "st_workspace",
+    "hook": "session_init.py",
+    "rc": 0,
+    "session_after": null,
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "systemMessage": {
+            "systemMessage": "[Tavern Fusion v3.0.3-preview Ready] Data profile: `default-user` (cards=1, lorebooks=['Eldoria'], st_web_8000=offline). Standard engineering mode (RP isolated; type `/rp <CharacterName>` or use `[Tavern Stage](sidecar://tavern-fusion/tavern_stage/)` to open a dedicated RP chat)."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "call": "non_rp",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": null,
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": []
+    }
+  },
+  {
+    "call": "rp_bootstrap",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "/rp Seraphina --play",
+      "mode": "play",
+      "pending_turn_mode": "bootstrap_greeting",
+      "pending_uncommitted_turn": false,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "ephemeralMessage": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"bootstrap\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (693 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[World Info (Before)]\n艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (1 items | Quarantined Backstage: 0)\nSeraphina: *雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=0]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n</ST_RUNTIME_FRAME>\n[PURE IMMERSIVE SCENE ENTRY — ZERO TOOL CALLS]: Present Seraphina's opening or resumed scene strictly in character (\"...\" and *...*) with zero meta/engineering commentary. Do NOT call `st_session_bootstrap` or `st_commit_turn` (already bootstrapped on disk)."
+        }
+      ]
+    }
+  },
+  {
+    "call": "continuation_skip",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "/rp Seraphina --play",
+      "mode": "play",
+      "pending_turn_mode": "bootstrap_greeting",
+      "pending_uncommitted_turn": false,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": []
+    }
+  },
+  {
+    "call": "rp_turn",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "ephemeralMessage": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"incremental\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (693 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[World Info (Before)]\n艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (2 items | Quarantined Backstage: 0)\nSeraphina: *雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"\nUser: *点头* 我们去钟塔吧\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=0]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n</ST_RUNTIME_FRAME>\n[PURE IMMERSIVE RP TURN — ZERO TOOL CALLS (TOOLS PHYSICALLY UNPLUGGED)]: Output ONLY Seraphina's in-character reply (spoken dialogue in \"...\" and physical actions/inner thoughts in *...*). Do NOT call `st_commit_turn` or any other tool, and output NO meta/engineering preamble—the host Stop hook will automatically persist your prose to `.jsonl`."
+        }
+      ]
+    }
+  },
+  {
+    "call": "pure_theater_deny",
+    "hook": "pre_tool_guard.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "deny",
+      "reason": "Pure Theater Mode (Dimension Mixer Switch B OFF): Tools are physically unplugged during pure roleplay turns to protect narrative immersion. Output in-character prose only."
+    }
+  },
+  {
+    "call": "jsonl_write_deny",
+    "hook": "pre_tool_guard.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "deny",
+      "reason": "Direct raw writes to SillyTavern `.jsonl` chat logs are blocked by Tavern Fusion to prevent race conditions and broken swipe headers. Call `st_commit_turn`, `st_stage_floor_op`, or `st_manage_chat_branch` instead."
+    }
+  },
+  {
+    "call": "png_write_deny",
+    "hook": "pre_tool_guard.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "deny",
+      "reason": "Direct raw writes to Character Card `.png` files are blocked. Call `st_build_export_card` to guarantee synchronized `ccv3` + `chara` chunks."
+    }
+  },
+  {
+    "call": "traversal_deny",
+    "hook": "pre_tool_guard.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "deny",
+      "reason": "Path traversal ('..') is forbidden in `card_filename`."
+    }
+  },
+  {
+    "call": "policy_deny",
+    "hook": "pre_tool_guard.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "deny",
+      "reason": "Blocked by Policy Chokepoint: Zero-Tolerance Safety Redline: Non-consensual sexual content / sexual violence is strictly prohibited."
+    }
+  },
+  {
+    "call": "st_allow",
+    "hook": "pre_tool_guard.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "allow",
+      "reason": "Verified Tavern Fusion atomic MCP operation."
+    }
+  },
+  {
+    "call": "other_allow",
+    "hook": "pre_tool_guard.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "allow"
+    }
+  },
+  {
+    "call": "other_conv_allow",
+    "hook": "stop_persistence_check.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "allow"
+    }
+  },
+  {
+    "call": "persist_turn",
+    "hook": "stop_persistence_check.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_seen_host_input": "*点头* 我们去钟塔吧",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "*点头* 我们去钟塔吧",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": false,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "allow"
+    }
+  },
+  {
+    "call": "gentle_notice_turn",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_seen_host_input": "这段要 nsfw",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "这段要 nsfw",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "ephemeralMessage": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"incremental\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (693 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[World Info (Before)]\n艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (4 items | Quarantined Backstage: 0)\nSeraphina: *雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"\n旅行者: *点头* 我们去钟塔吧\nSeraphina: *她提起灯* \"走吧。\"\nUser: 这段要 nsfw\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=0]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n\n剧场提示：当前幕将以文学意象、情感张力与留白笔法推进。\n</ST_RUNTIME_FRAME>\n[PURE IMMERSIVE RP TURN — ZERO TOOL CALLS (TOOLS PHYSICALLY UNPLUGGED)]: Output ONLY Seraphina's in-character reply (spoken dialogue in \"...\" and physical actions/inner thoughts in *...*). Do NOT call `st_commit_turn` or any other tool, and output NO meta/engineering preamble—the host Stop hook will automatically persist your prose to `.jsonl`."
+        }
+      ]
+    }
+  },
+  {
+    "call": "abnormal_stop",
+    "hook": "stop_persistence_check.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_seen_host_input": "这段要 nsfw",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "这段要 nsfw",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": false,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "allow"
+    }
+  },
+  {
+    "call": "policy_block",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_seen_host_input": "这段要 nsfw",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "这段要 nsfw",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": false,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "errorMessage": {
+            "userMessage": "[Tavern Fusion 安全拦截] 请求触及安全红线已熔断：Zero-Tolerance Safety Redline: Non-consensual sexual content / sexual violence is strictly prohibited."
+          }
+        }
+      ],
+      "terminationBehavior": "terminate"
+    }
+  },
+  {
+    "call": "turn_no_prose",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_seen_host_input": "我们继续",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "我们继续",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": true,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "ephemeralMessage": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"incremental\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (693 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[World Info (Before)]\n艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (4 items | Quarantined Backstage: 0)\nSeraphina: *雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"\n旅行者: *点头* 我们去钟塔吧\nSeraphina: *她提起灯* \"走吧。\"\nUser: 我们继续\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=0]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n</ST_RUNTIME_FRAME>\n[PURE IMMERSIVE RP TURN — ZERO TOOL CALLS (TOOLS PHYSICALLY UNPLUGGED)]: Output ONLY Seraphina's in-character reply (spoken dialogue in \"...\" and physical actions/inner thoughts in *...*). Do NOT call `st_commit_turn` or any other tool, and output NO meta/engineering preamble—the host Stop hook will automatically persist your prose to `.jsonl`."
+        }
+      ]
+    }
+  },
+  {
+    "call": "missing_prose",
+    "hook": "stop_persistence_check.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_persistence_error": {
+        "error": "no_pure_prose_found",
+        "hint": "未能从宿主对话记录中提取到不含工具调用的角色回复；可能是宿主 transcript 格式已变更，或模型本轮只输出了工具调用。本轮未写入楼层，可在舞台中重抽。",
+        "transcript_candidates": [],
+        "ts": "<VOLATILE>",
+        "turn_mode": "normal"
+      },
+      "last_seen_host_input": "我们继续",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "我们继续",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": false,
+      "persistence_failure_count": 1,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "decision": "allow"
+    }
+  },
+  {
+    "call": "utility_in_rp",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_persistence_error": {
+        "error": "no_pure_prose_found",
+        "hint": "未能从宿主对话记录中提取到不含工具调用的角色回复；可能是宿主 transcript 格式已变更，或模型本轮只输出了工具调用。本轮未写入楼层，可在舞台中重抽。",
+        "transcript_candidates": [],
+        "ts": "<VOLATILE>",
+        "turn_mode": "normal"
+      },
+      "last_seen_host_input": "/dump-prompt",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "我们继续",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": false,
+      "persistence_failure_count": 1,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "ephemeralMessage": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"incremental\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (693 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[World Info (Before)]\n艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (4 items | Quarantined Backstage: 0)\nSeraphina: *雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"\n旅行者: *点头* 我们去钟塔吧\nSeraphina: *她提起灯* \"走吧。\"\nUser: /dump-prompt\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=0]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n</ST_RUNTIME_FRAME>\n[UTILITY INSPECTION TURN]: Execute the requested Tavern Fusion diagnostic/forge tool."
+        }
+      ]
+    }
+  },
+  {
+    "call": "utility_outside_rp",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": true,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_persistence_error": {
+        "error": "no_pure_prose_found",
+        "hint": "未能从宿主对话记录中提取到不含工具调用的角色回复；可能是宿主 transcript 格式已变更，或模型本轮只输出了工具调用。本轮未写入楼层，可在舞台中重抽。",
+        "transcript_candidates": [],
+        "ts": "<VOLATILE>",
+        "turn_mode": "normal"
+      },
+      "last_seen_host_input": "/dump-prompt",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "我们继续",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": false,
+      "persistence_failure_count": 1,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "c1",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "ephemeralMessage": "[UTILITY INSPECTION TURN]: Execute the requested Tavern Fusion diagnostic/forge tool."
+        }
+      ]
+    }
+  },
+  {
+    "call": "rp_off",
+    "hook": "pre_invocation_gate.py",
+    "rc": 0,
+    "session_after": {
+      "active": false,
+      "avatar_stem": "Seraphina",
+      "bootstrapped_char": "Seraphina.png",
+      "bootstrapped_conv_id": "c1",
+      "card_file": "Seraphina.png",
+      "card_path": "<TMP>/ws/data/default-user/characters/Seraphina.png",
+      "character_name": "Seraphina",
+      "chat_path": "<TMP>/ws/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+      "extra_lorebooks": [],
+      "last_bootstrapped_at": "<VOLATILE>",
+      "last_committed_at": "<VOLATILE>",
+      "last_persistence_error": {
+        "error": "no_pure_prose_found",
+        "hint": "未能从宿主对话记录中提取到不含工具调用的角色回复；可能是宿主 transcript 格式已变更，或模型本轮只输出了工具调用。本轮未写入楼层，可在舞台中重抽。",
+        "transcript_candidates": [],
+        "ts": "<VOLATILE>",
+        "turn_mode": "normal"
+      },
+      "last_seen_host_input": "/rp off",
+      "last_turn_hash": "6158526762e8e988",
+      "last_user_input": "我们继续",
+      "mode": "play",
+      "pending_turn_mode": "normal",
+      "pending_uncommitted_turn": false,
+      "persistence_failure_count": 1,
+      "persona_name": "旅行者",
+      "preset_name": "Default",
+      "rp_conv_id": "",
+      "stage_busy": false,
+      "stop_retry_count": 0,
+      "user_floor_already_appended": false
+    },
+    "stderr_tail": "",
+    "stdout": {
+      "injectSteps": [
+        {
+          "ephemeralMessage": "[Tavern Fusion] 已退出当前会话的 RP 模式并解除绑定，现已恢复常规工程对话模式。"
+        }
+      ]
+    }
+  },
+  {
+    "final_chats": [
+      {
+        "file": "<STAMP>.jsonl",
+        "floors": [
+          {
+            "character_name": "Seraphina",
+            "chat_metadata": {
+              "integrity": "<VOLATILE>",
+              "note_depth": 4,
+              "note_interval": 1,
+              "note_prompt": "",
+              "note_role": 0,
+              "timed_effects": {
+                "cooldown": {},
+                "sticky": {}
+              },
+              "variables": {}
+            },
+            "create_date": "<VOLATILE>",
+            "user_name": "旅行者"
+          },
+          {
+            "extra": {
+              "seeded_greeting": true
+            },
+            "is_system": false,
+            "is_user": false,
+            "mes": "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+            "name": "Seraphina",
+            "send_date": "<VOLATILE>",
+            "swipe_id": 0,
+            "swipe_info": [
+              {
+                "extra": {},
+                "send_date": "<VOLATILE>"
+              },
+              {
+                "extra": {},
+                "send_date": "<VOLATILE>"
+              }
+            ],
+            "swipes": [
+              "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+              "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+            ]
+          },
+          {
+            "extra": {
+              "source": "antigravity_user"
+            },
+            "is_system": false,
+            "is_user": true,
+            "mes": "*点头* 我们去钟塔吧",
+            "name": "旅行者",
+            "send_date": "<VOLATILE>"
+          },
+          {
+            "extra": {
+              "idempotency_key": "84425a4598f59bdff292",
+              "source": "antigravity_tavern_fusion"
+            },
+            "is_system": false,
+            "is_user": false,
+            "mes": "*她提起灯* \"走吧。\"",
+            "name": "Seraphina",
+            "send_date": "<VOLATILE>",
+            "swipe_id": 0,
+            "swipe_info": [
+              {
+                "extra": {
+                  "idempotency_key": "84425a4598f59bdff292",
+                  "source": "antigravity_tavern_fusion"
+                },
+                "send_date": "<VOLATILE>"
+              }
+            ],
+            "swipes": [
+              "*她提起灯* \"走吧。\""
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

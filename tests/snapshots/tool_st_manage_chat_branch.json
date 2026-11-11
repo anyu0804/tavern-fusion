@@ -1,0 +1,132 @@
+[
+  {
+    "args": {
+      "action": "switch_swipe",
+      "character_name": "Seraphina",
+      "target_id": 0
+    },
+    "call": "switch_swipe",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "action": "switch_swipe",
+                "mes": "*编辑后的回复*",
+                "swipe_id": 0
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "action": "fork_checkpoint",
+      "character_name": "Seraphina"
+    },
+    "call": "fork_checkpoint",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "action": "fork_checkpoint",
+                "branch_file": "<STAMP>_branch_<STAMP>.jsonl",
+                "branch_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>_branch_<STAMP>.jsonl",
+                "floors_copied": 5
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "action": "rollback",
+      "character_name": "Seraphina",
+      "target_id": 1
+    },
+    "call": "rollback",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "action": "rollback",
+                "backup_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl.bak",
+                "floors_removed": 1,
+                "remaining_floors": 4
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "action": "new",
+      "character_name": "Seraphina",
+      "target_id": 0
+    },
+    "call": "new",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "chat_file": "<STAMP>.jsonl",
+                "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                "floor_count": 1,
+                "seeded_greeting": true
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "action": "bogus",
+      "character_name": "Seraphina"
+    },
+    "call": "bogus_action",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_manage_chat_branch: Unknown branch action: bogus",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  }
+]

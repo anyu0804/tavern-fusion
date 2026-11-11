@@ -1,0 +1,197 @@
+[
+  {
+    "args": {
+      "char_mes": "<think>internal</think>*她微微一笑* \"欢迎，{{user}}。\"{{setvar::mood::warm}}",
+      "user_mes": "*走近星盘* 你好，{{char}}。",
+      "variables_delta": {
+        "affection": 1
+      }
+    },
+    "call": "normal",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "active_swipe_id": 0,
+                "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                "expression": null,
+                "floor_count": 3,
+                "st_web_notified": false,
+                "total_swipes": 1,
+                "turn_hash": "306093f838efabba",
+                "variables": {
+                  "affection": 1,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "char_mes": "*她转过身* \"雨还没停。\"",
+      "swipe_mode": true
+    },
+    "call": "swipe",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "active_swipe_id": 1,
+                "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                "expression": null,
+                "floor_count": 3,
+                "st_web_notified": false,
+                "total_swipes": 2,
+                "turn_hash": "3bd5507f09ada9c0",
+                "variables": {
+                  "affection": 1,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "char_mes": "（场外：作为AI我不能）*她点头* \"好。\"",
+      "extra_meta": {
+        "is_backstage": true
+      }
+    },
+    "call": "backstage_ooc",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "active_swipe_id": 0,
+                "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                "expression": null,
+                "floor_count": 4,
+                "st_web_notified": false,
+                "total_swipes": 1,
+                "turn_hash": "cb983a18d79c1add",
+                "variables": {
+                  "affection": 1,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "char_mes": "这里有强奸情节"
+    },
+    "call": "policy_block",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_commit_turn: Turn commit blocked by policy gate: Zero-Tolerance Safety Redline: Non-consensual sexual content / sexual violence is strictly prohibited.",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  },
+  {
+    "args": {},
+    "call": "missing_char_mes",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_commit_turn: 'char_mes'",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  },
+  {
+    "args": {
+      "char_mes": "这是 nsfw 段落"
+    },
+    "call": "strict_mature_block",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_commit_turn: Turn commit blocked by policy gate: Platform Boundary: Explicit NSFW/ERP content exceeds host model boundaries.",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  },
+  {
+    "args": {
+      "char_mes": "这是 nsfw 段落"
+    },
+    "call": "gentle_mature_allowed",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "active_swipe_id": 0,
+                "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                "expression": null,
+                "floor_count": 5,
+                "st_web_notified": false,
+                "total_swipes": 1,
+                "turn_hash": "e999050186b78042",
+                "variables": {
+                  "affection": 1,
+                  "mood": "warm"
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  }
+]

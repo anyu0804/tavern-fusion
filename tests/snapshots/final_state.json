@@ -1,0 +1,155 @@
+{
+  "active_session": {
+    "active": false,
+    "avatar_stem": "Seraphina",
+    "bootstrapped_char": "",
+    "bootstrapped_conv_id": "",
+    "card_file": "Seraphina.png",
+    "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
+    "character_name": "Seraphina",
+    "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+    "extra_lorebooks": [],
+    "last_bootstrapped_at": "<VOLATILE>",
+    "mode": "play",
+    "pending_turn_mode": "normal",
+    "pending_uncommitted_turn": false,
+    "persona_name": "旅行者",
+    "preset_name": "Default",
+    "rp_conv_id": "",
+    "stage_busy": false,
+    "stop_retry_count": 0
+  },
+  "chat_count": 6,
+  "chat_floor_counts": [
+    2,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "data_files": [
+    "data/default-user/OpenAI Settings/Default.json",
+    "data/default-user/characters/Imported Sage.png",
+    "data/default-user/characters/Seraphina.png",
+    "data/default-user/characters/Snapshot Bard.png",
+    "data/default-user/characters/evil.png",
+    "data/default-user/chats/Imported Sage/<STAMP>.jsonl",
+    "data/default-user/chats/Imported Sage/<STAMP>.jsonl.lock",
+    "data/default-user/chats/Imported Sage/session_create.lock.lock",
+    "data/default-user/chats/Seraphina/<STAMP>.jsonl",
+    "data/default-user/chats/Seraphina/<STAMP>.jsonl",
+    "data/default-user/chats/Seraphina/<STAMP>.jsonl",
+    "data/default-user/chats/Seraphina/<STAMP>.jsonl.bak",
+    "data/default-user/chats/Seraphina/<STAMP>.jsonl.lock",
+    "data/default-user/chats/Seraphina/<STAMP>.jsonl.lock",
+    "data/default-user/chats/Seraphina/<STAMP>.jsonl.lock",
+    "data/default-user/chats/Seraphina/<STAMP>_branch_<STAMP>.jsonl",
+    "data/default-user/chats/Seraphina/<STAMP>_branch_<STAMP>.jsonl.lock",
+    "data/default-user/chats/Seraphina/<STAMP>_fork_f2_<STAMP>.jsonl",
+    "data/default-user/chats/Seraphina/<STAMP>_fork_f2_<STAMP>.jsonl.lock",
+    "data/default-user/chats/Seraphina/session_create.lock.lock",
+    "data/default-user/settings.json",
+    "data/default-user/settings.json.lock",
+    "data/default-user/worlds/Eldoria.json",
+    "data/default-user/worlds/Eldoria.json.lock",
+    "data/default-user/worlds/Fresh Book.json",
+    "data/default-user/worlds/Fresh Book.json.lock"
+  ],
+  "eldoria": {
+    "entries": {
+      "1": {
+        "comment": "苍银秘仪与星界回响",
+        "constant": false,
+        "content": "当施法者过度汲取星界裂隙中的秘银辉光时，指尖会浮现细微的霜蓝色结晶，必须以温热的琥珀茶缓和。",
+        "cooldown": 1,
+        "depth": 2,
+        "disable": true,
+        "key": [
+          "苍银秘仪",
+          "魔力枯竭",
+          "mana",
+          "星界裂隙"
+        ],
+        "keysecondary": [
+          "封印完好"
+        ],
+        "order": 110,
+        "position": 4,
+        "selective": true,
+        "selectiveLogic": 2,
+        "sticky": 2,
+        "uid": 1,
+        "vectorized": true
+      },
+      "2": {
+        "addMemo": true,
+        "automationId": "",
+        "caseSensitive": null,
+        "comment": "新条目",
+        "constant": false,
+        "content": "琥珀茶能缓和霜蓝结晶。",
+        "cooldown": 0,
+        "delay": 0,
+        "delayUntilRecursion": false,
+        "depth": 4,
+        "disable": false,
+        "excludeRecursion": false,
+        "group": "",
+        "groupOverride": false,
+        "groupWeight": 100,
+        "key": [
+          "琥珀茶"
+        ],
+        "keysecondary": [],
+        "matchWholeWords": null,
+        "order": 150,
+        "position": 4,
+        "preventRecursion": false,
+        "probability": 100,
+        "role": 0,
+        "scanDepth": null,
+        "selective": false,
+        "selectiveLogic": 0,
+        "sticky": 0,
+        "uid": 2,
+        "useGroupScoring": null,
+        "useProbability": true,
+        "vectorized": true
+      }
+    }
+  },
+  "plugin_settings": {
+    "byok_base_url": "https://api.example.com/v1",
+    "byok_model": "m1",
+    "first_run_ack_at": "<VOLATILE>",
+    "first_run_cli_shown_v1": true,
+    "first_run_cli_shown_version": 2,
+    "first_run_notice_ack_v1": true,
+    "first_run_notice_ack_version": 2,
+    "generation_backend": "host",
+    "inference_channel": "antigravity_builtin",
+    "last_st_data_root": "<TMP>/data/default-user",
+    "minor_warn_acked_cards": [
+      "Seraphina.png"
+    ],
+    "policy_mode": "host_gentle"
+  },
+  "settings_json_ext": {
+    "variables": {
+      "global": {
+        "g1": "x",
+        "g2": 1.0,
+        "world_era": "星陨纪第四年"
+      }
+    }
+  },
+  "state_files": [
+    "state/active_session.json",
+    "state/active_session.json.lock",
+    "state/lore_vectors.sqlite",
+    "state/plugin_settings.json",
+    "state/plugin_settings.json.lock",
+    "state/widgets/snap.html"
+  ]
+}
