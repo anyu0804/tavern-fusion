@@ -72,10 +72,11 @@ def exclusive_file_lock(lock_target: Path, timeout_sec: float = 5.0) -> Iterator
         yield
         return
 
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fh = open(lock_path, "a+b")
+    fh = None
     locked = False
     try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(lock_path, "a+b")
         fh.seek(0, os.SEEK_END)
         if fh.tell() == 0:
             fh.write(b"L")
@@ -98,7 +99,7 @@ def exclusive_file_lock(lock_target: Path, timeout_sec: float = 5.0) -> Iterator
         yield
     finally:
         try:
-            if locked:
+            if locked and fh is not None:
                 try:
                     fh.seek(0)
                     if fcntl is not None:
@@ -107,7 +108,8 @@ def exclusive_file_lock(lock_target: Path, timeout_sec: float = 5.0) -> Iterator
                         msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
                 except OSError:
                     pass
-            fh.close()
+            if fh is not None:
+                fh.close()
         finally:
             with _HELD_LOCKS_GUARD:
                 _HELD_FILE_LOCKS.discard(reentrant_key)
@@ -257,48 +259,51 @@ def create_new_chat_session(
     """Creates a brand-new `.jsonl` chat file under `chats/<avatar_stem>` and seeds `first_mes` ONCE."""
     chat_dir = get_character_chat_dir(st_data_root, avatar_stem or character_name)
     chat_dir.mkdir(parents=True, exist_ok=True)
-    ts_label = format_st_timestamp()
-    chat_path = chat_dir / f"{ts_label}.jsonl"
-    if chat_path.exists():
-        chat_path = chat_dir / f"{ts_label}_{uuid.uuid4().hex[:4]}.jsonl"
+    # Serialize concurrent session creation (hooks + sidecar may race within the same second):
+    # without this, two creators both pass the exists() check and `os.replace` loses one file.
+    with exclusive_file_lock(chat_dir / "session_create.lock"):
+        ts_label = format_st_timestamp()
+        chat_path = chat_dir / f"{ts_label}.jsonl"
+        if chat_path.exists():
+            chat_path = chat_dir / f"{ts_label}_{uuid.uuid4().hex[:4]}.jsonl"
 
-    header: dict[str, Any] = {
-        "user_name": user_name,
-        "character_name": character_name,
-        "create_date": ts_label,
-        "chat_metadata": {
-            "integrity": uuid.uuid4().hex,
-            "variables": {},
-            "timed_effects": {"sticky": {}, "cooldown": {}},
-            "note_prompt": "",
-            "note_depth": 4,
-            "note_interval": 1,
-            "note_role": 0,
-        },
-    }
+        header: dict[str, Any] = {
+            "user_name": user_name,
+            "character_name": character_name,
+            "create_date": ts_label,
+            "chat_metadata": {
+                "integrity": uuid.uuid4().hex,
+                "variables": {},
+                "timed_effects": {"sticky": {}, "cooldown": {}},
+                "note_prompt": "",
+                "note_depth": 4,
+                "note_interval": 1,
+                "note_role": 0,
+            },
+        }
 
-    all_greetings = [greeting_text] if greeting_text else []
-    if alternate_greetings:
-        all_greetings.extend([g for g in alternate_greetings if g])
+        all_greetings = [greeting_text] if greeting_text else []
+        if alternate_greetings:
+            all_greetings.extend([g for g in alternate_greetings if g])
 
-    messages: list[dict[str, Any]] = []
-    if all_greetings:
-        chosen_idx = max(0, min(greeting_index, len(all_greetings) - 1))
-        chosen_mes = all_greetings[chosen_idx]
-        now_human = format_human_send_date()
-        messages.append({
-            "name": character_name,
-            "is_user": False,
-            "is_system": False,
-            "send_date": now_human,
-            "mes": chosen_mes,
-            "swipes": all_greetings,
-            "swipe_id": chosen_idx,
-            "swipe_info": [{"send_date": now_human, "extra": {}} for _ in all_greetings],
-            "extra": {"seeded_greeting": True},
-        })
+        messages: list[dict[str, Any]] = []
+        if all_greetings:
+            chosen_idx = max(0, min(greeting_index, len(all_greetings) - 1))
+            chosen_mes = all_greetings[chosen_idx]
+            now_human = format_human_send_date()
+            messages.append({
+                "name": character_name,
+                "is_user": False,
+                "is_system": False,
+                "send_date": now_human,
+                "mes": chosen_mes,
+                "swipes": all_greetings,
+                "swipe_id": chosen_idx,
+                "swipe_info": [{"send_date": now_human, "extra": {}} for _ in all_greetings],
+                "extra": {"seeded_greeting": True},
+            })
 
-    write_jsonl_chat_atomic(chat_path, header, messages)
+        write_jsonl_chat_atomic(chat_path, header, messages)
     notify_st_web_bridge("CHAT_CREATED", {"character": character_name, "chat_file": chat_path.name})
     return {
         "chat_path": str(chat_path.resolve()),
@@ -339,57 +344,71 @@ def append_turn_to_chat(
         now_human = format_human_send_date()
         extra_payload = dict(extra_meta or {})
         extra_payload["source"] = "antigravity_tavern_fusion"
+        idem_key = str(extra_payload.get("idempotency_key") or "").strip()
 
-        if swipe_mode and messages and not messages[-1].get("is_user", False):
-            last_msg = messages[-1]
-            swipes: list[str] = list(last_msg.get("swipes") or [last_msg.get("mes", "")])
-            swipes.append(char_mes)
-            new_swipe_idx = len(swipes) - 1
-            last_msg["swipes"] = swipes
-            last_msg["swipe_id"] = new_swipe_idx
-            last_msg["mes"] = char_mes
-            last_msg["send_date"] = now_human
-            swipe_info = list(last_msg.get("swipe_info") or [])
-            while len(swipe_info) < len(swipes) - 1:
-                swipe_info.append({"send_date": now_human, "extra": {}})
-            swipe_info.append({"send_date": now_human, "extra": extra_payload})
-            last_msg["swipe_info"] = swipe_info
-        else:
-            if user_mes is not None and user_mes.strip():
-                clean_u = user_mes.strip()
-                is_backstage = bool(extra_payload.get("is_backstage", False))
-                already_pending = (
-                    bool(messages)
-                    and bool(messages[-1].get("is_user"))
-                    and str(messages[-1].get("mes", "")).strip() == clean_u
-                )
-                if already_pending and is_backstage:
-                    messages[-1].setdefault("extra", {})["is_backstage"] = True
-                elif not already_pending:
-                    u_extra: dict[str, Any] = {"source": "antigravity_user"}
-                    if is_backstage:
-                        u_extra["is_backstage"] = True
-                    messages.append({
-                        "name": user_name,
-                        "is_user": True,
-                        "is_system": False,
-                        "send_date": now_human,
-                        "mes": clean_u,
-                        "extra": u_extra,
-                    })
-            messages.append({
-                "name": character_name,
-                "is_user": False,
-                "is_system": False,
-                "send_date": now_human,
-                "mes": char_mes,
-                "swipes": [char_mes],
-                "swipe_id": 0,
-                "swipe_info": [{"send_date": now_human, "extra": extra_payload}],
-                "extra": extra_payload,
-            })
+        already_committed = False
+        if idem_key and messages and not messages[-1].get("is_user", False):
+            last_m = messages[-1]
+            if swipe_mode:
+                s_info = last_m.get("swipe_info") or []
+                if s_info and isinstance(s_info[-1], dict):
+                    if s_info[-1].get("extra", {}).get("idempotency_key") == idem_key:
+                        already_committed = True
+            else:
+                if last_m.get("extra", {}).get("idempotency_key") == idem_key:
+                    already_committed = True
 
-        write_jsonl_chat_atomic(path, header, messages)
+        if not already_committed:
+            if swipe_mode and messages and not messages[-1].get("is_user", False):
+                last_msg = messages[-1]
+                swipes: list[str] = list(last_msg.get("swipes") or [last_msg.get("mes", "")])
+                swipes.append(char_mes)
+                new_swipe_idx = len(swipes) - 1
+                last_msg["swipes"] = swipes
+                last_msg["swipe_id"] = new_swipe_idx
+                last_msg["mes"] = char_mes
+                last_msg["send_date"] = now_human
+                swipe_info = list(last_msg.get("swipe_info") or [])
+                while len(swipe_info) < len(swipes) - 1:
+                    swipe_info.append({"send_date": now_human, "extra": {}})
+                swipe_info.append({"send_date": now_human, "extra": extra_payload})
+                last_msg["swipe_info"] = swipe_info
+            else:
+                if user_mes is not None and user_mes.strip():
+                    clean_u = user_mes.strip()
+                    is_backstage = bool(extra_payload.get("is_backstage", False))
+                    already_pending = (
+                        bool(messages)
+                        and bool(messages[-1].get("is_user"))
+                        and str(messages[-1].get("mes", "")).strip() == clean_u
+                    )
+                    if already_pending and is_backstage:
+                        messages[-1].setdefault("extra", {})["is_backstage"] = True
+                    elif not already_pending:
+                        u_extra: dict[str, Any] = {"source": "antigravity_user"}
+                        if is_backstage:
+                            u_extra["is_backstage"] = True
+                        messages.append({
+                            "name": user_name,
+                            "is_user": True,
+                            "is_system": False,
+                            "send_date": now_human,
+                            "mes": clean_u,
+                            "extra": u_extra,
+                        })
+                messages.append({
+                    "name": character_name,
+                    "is_user": False,
+                    "is_system": False,
+                    "send_date": now_human,
+                    "mes": char_mes,
+                    "swipes": [char_mes],
+                    "swipe_id": 0,
+                    "swipe_info": [{"send_date": now_human, "extra": extra_payload}],
+                    "extra": extra_payload,
+                })
+
+            write_jsonl_chat_atomic(path, header, messages)
         active_swipe = messages[-1].get("swipe_id", 0)
         total_swipes = len(messages[-1].get("swipes", [1]))
         floor_count = len(messages)
@@ -539,6 +558,9 @@ def stage_floor_operation(
             cutoff = idx + 1
             branch_ts = format_st_timestamp()
             branch_path = path.parent / f"{path.stem}_fork_f{cutoff}_{branch_ts}.jsonl"
+            if branch_path.exists():
+                # Same-second fork collision: never silently replace an existing branch file
+                branch_path = path.parent / f"{path.stem}_fork_f{cutoff}_{branch_ts}_{uuid.uuid4().hex[:4]}.jsonl"
             branch_header = json.loads(json.dumps(header))
             branch_header.setdefault("chat_metadata", {})["main_chat"] = path.stem
             branch_header["chat_metadata"]["forked_at_floor"] = cutoff
@@ -579,6 +601,9 @@ def manage_chat_branch(
             cutoff = len(messages) if target_id <= 0 else min(len(messages), target_id)
             branch_ts = format_st_timestamp()
             branch_path = path.parent / f"{path.stem}_branch_{branch_ts}.jsonl"
+            if branch_path.exists():
+                # Same-second branch collision: never silently replace an existing branch file
+                branch_path = path.parent / f"{path.stem}_branch_{branch_ts}_{uuid.uuid4().hex[:4]}.jsonl"
             branch_header = json.loads(json.dumps(header))
             branch_header.setdefault("chat_metadata", {})["main_chat"] = path.stem
             write_jsonl_chat_atomic(branch_path, branch_header, messages[:cutoff])

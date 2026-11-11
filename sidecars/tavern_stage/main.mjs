@@ -154,6 +154,24 @@ class StandaloneSidecarApp {
           res.end(JSON.stringify({ error: 'Method Not Allowed' }));
           return;
         }
+        // Lightweight CSRF guard for the standalone server: browsers attach `Origin` on
+        // cross-origin POSTs even without a preflight, so a drive-by web page must never
+        // reach the mutating op bridge. (SDK mode relies on the host's UI token instead.)
+        const originHeader = req.headers.origin;
+        if (originHeader) {
+          let sameHost = false;
+          try {
+            const selfHost = new URL(`http://${req.headers.host || '127.0.0.1'}`).host;
+            sameHost = new URL(originHeader).host === selfHost;
+          } catch {
+            sameHost = false;
+          }
+          if (!sameHost) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Cross-origin request rejected' }));
+            return;
+          }
+        }
         const handler = mMap.get(req.method);
         const chunks = [];
         req.on('data', (c) => chunks.push(c));

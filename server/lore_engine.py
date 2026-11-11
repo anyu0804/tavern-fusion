@@ -135,6 +135,9 @@ class NormalizedLoreEntry:
     cooldown: int = 0
     delay: int = 0
     case_sensitive: bool = False
+    # ST per-entry override (`matchWholeWords`); `None` = inherit the ST global default
+    # (substring matching). Only an explicit `true` forces whole-word matching.
+    match_whole_words: bool | None = None
 
 
 def estimate_tokens(text: str) -> int:
@@ -405,6 +408,10 @@ def _parse_key_list(raw: Any) -> list[str]:
     return []
 
 
+def _coerce_optional_bool(raw: Any) -> bool | None:
+    return None if raw is None else bool(raw)
+
+
 def parse_lorebook_dict(
     raw_book: dict[str, Any],
     book_name: str = "inline_book",
@@ -412,76 +419,96 @@ def parse_lorebook_dict(
 ) -> list[NormalizedLoreEntry]:
     """Parses either SillyTavern `worlds/*.json` (`entries` dict) or CCv2/CCv3 `character_book` (`entries` list)."""
     entries_raw = raw_book.get("entries", {})
-    iterable: list[tuple[int, dict[str, Any]]] = []
+    iterable: list[tuple[Any, dict[str, Any]]] = []
     if isinstance(entries_raw, dict):
         for k, v in entries_raw.items():
             if isinstance(v, dict):
-                uid = int(v.get("uid", v.get("id", k if str(k).isdigit() else len(iterable))))
-                iterable.append((uid, v))
+                iterable.append((v.get("uid", v.get("id", k)), v))
     elif isinstance(entries_raw, list):
         for idx, v in enumerate(entries_raw):
             if isinstance(v, dict):
-                uid = int(v.get("uid", v.get("id", idx)))
-                iterable.append((uid, v))
+                iterable.append((v.get("uid", v.get("id", idx)), v))
+
+    # Tolerate malformed uids and guarantee uniqueness: a garbage or duplicate uid must
+    # neither crash the whole book (previously `int()` raised) nor silently overwrite a
+    # sibling entry in the candidate map (previously `len(iterable)` could collide).
+    used_uids: set[int] = set()
+
+    def _coerce_uid(raw_uid: Any) -> int:
+        try:
+            return int(raw_uid)
+        except (TypeError, ValueError):
+            return -1
 
     parsed: list[NormalizedLoreEntry] = []
-    for uid, item in iterable:
-        if "disable" in item:
-            enabled = not bool(item.get("disable", False))
-        else:
-            enabled = bool(item.get("enabled", True))
+    for raw_uid, item in iterable:
+        uid = _coerce_uid(raw_uid)
+        if uid < 0 or uid in used_uids:
+            uid = max(used_uids, default=-1) + 1
+            while uid in used_uids:
+                uid += 1
+        used_uids.add(uid)
+        try:
+            if "disable" in item:
+                enabled = not bool(item.get("disable", False))
+            else:
+                enabled = bool(item.get("enabled", True))
 
-        keys = _parse_key_list(item.get("key", item.get("keys", [])))
-        keys_sec = _parse_key_list(item.get("keysecondary", item.get("secondary_keys", [])))
+            keys = _parse_key_list(item.get("key", item.get("keys", [])))
+            keys_sec = _parse_key_list(item.get("keysecondary", item.get("secondary_keys", [])))
 
-        selective = bool(item.get("selective", bool(keys_sec and "selective" not in item)))
-        raw_logic = item.get("selectiveLogic", item.get("selective_logic", 0))
-        logic = ST_SELECTIVE_LOGIC_MAP.get(raw_logic, "AND_ANY")
+            selective = bool(item.get("selective", bool(keys_sec and "selective" not in item)))
+            raw_logic = item.get("selectiveLogic", item.get("selective_logic", 0))
+            logic = ST_SELECTIVE_LOGIC_MAP.get(raw_logic, "AND_ANY")
 
-        raw_pos = item.get("position", 0)
-        pos = ST_POSITION_MAP.get(raw_pos, "before_char")
-        ext = item.get("extensions", {}) if isinstance(item.get("extensions"), dict) else {}
-        if ext.get("position") in ST_POSITION_MAP:
-            pos = ST_POSITION_MAP[ext["position"]]
+            raw_pos = item.get("position", 0)
+            pos = ST_POSITION_MAP.get(raw_pos, "before_char")
+            ext = item.get("extensions", {}) if isinstance(item.get("extensions"), dict) else {}
+            if ext.get("position") in ST_POSITION_MAP:
+                pos = ST_POSITION_MAP[ext["position"]]
 
-        depth = int(item.get("depth", ext.get("depth", 4)))
-        raw_role = item.get("role", ext.get("role", 0))
-        role = ST_ROLE_MAP.get(raw_role, "system")
+            depth = int(item.get("depth", ext.get("depth", 4)))
+            raw_role = item.get("role", ext.get("role", 0))
+            role = ST_ROLE_MAP.get(raw_role, "system")
 
-        parsed.append(
-            NormalizedLoreEntry(
-                uid=uid,
-                source_book=book_name,
-                source_tier=source_tier,
-                keys=keys,
-                selective=selective,
-                keys_secondary=keys_sec,
-                selective_logic=logic,
-                content=str(item.get("content", "")),
-                comment=str(item.get("comment", item.get("name", ""))),
-                constant=bool(item.get("constant", False)),
-                vectorized=bool(item.get("vectorized", True)),
-                enabled=enabled,
-                order=int(item.get("order", item.get("insertion_order", 100))),
-                position=pos,
-                depth=depth,
-                role=role,
-                outlet_name=str(item.get("outletName", item.get("outlet_name", ""))).strip(),
-                probability=int(item.get("probability", 100)),
-                use_probability=bool(item.get("useProbability", False)),
-                group=str(item.get("group", "")).strip(),
-                group_weight=int(item.get("groupWeight", 100)),
-                prioritize_inclusion=bool(item.get("groupOverride", item.get("prioritizeInclusion", False))),
-                use_group_scoring=bool(item.get("useGroupScoring", False)),
-                prevent_recursion=bool(item.get("preventRecursion", False)),
-                exclude_recursion=bool(item.get("excludeRecursion", False)),
-                delay_until_recursion=bool(item.get("delayUntilRecursion", False)),
-                sticky=int(item.get("sticky", 0) or 0),
-                cooldown=int(item.get("cooldown", 0) or 0),
-                delay=int(item.get("delay", 0) or 0),
-                case_sensitive=bool(item.get("caseSensitive", item.get("case_sensitive", False))),
+            parsed.append(
+                NormalizedLoreEntry(
+                    uid=uid,
+                    source_book=book_name,
+                    source_tier=source_tier,
+                    keys=keys,
+                    selective=selective,
+                    keys_secondary=keys_sec,
+                    selective_logic=logic,
+                    content=str(item.get("content", "")),
+                    comment=str(item.get("comment", item.get("name", ""))),
+                    constant=bool(item.get("constant", False)),
+                    vectorized=bool(item.get("vectorized", True)),
+                    enabled=enabled,
+                    order=int(item.get("order", item.get("insertion_order", 100))),
+                    position=pos,
+                    depth=depth,
+                    role=role,
+                    outlet_name=str(item.get("outletName", item.get("outlet_name", ""))).strip(),
+                    probability=int(item.get("probability", 100)),
+                    use_probability=bool(item.get("useProbability", False)),
+                    group=str(item.get("group", "")).strip(),
+                    group_weight=int(item.get("groupWeight", 100)),
+                    prioritize_inclusion=bool(item.get("groupOverride", item.get("prioritizeInclusion", False))),
+                    use_group_scoring=bool(item.get("useGroupScoring", False)),
+                    prevent_recursion=bool(item.get("preventRecursion", False)),
+                    exclude_recursion=bool(item.get("excludeRecursion", False)),
+                    delay_until_recursion=bool(item.get("delayUntilRecursion", False)),
+                    sticky=int(item.get("sticky", 0) or 0),
+                    cooldown=int(item.get("cooldown", 0) or 0),
+                    delay=int(item.get("delay", 0) or 0),
+                    case_sensitive=bool(item.get("caseSensitive", item.get("case_sensitive", False))),
+                    match_whole_words=_coerce_optional_bool(item.get("matchWholeWords", item.get("match_whole_words"))),
+                )
             )
-        )
+        except Exception:
+            # A single malformed entry must not invalidate the entire lorebook
+            continue
     return parsed
 
 
@@ -547,15 +574,27 @@ def lint_lorebook_file(path: str | Path) -> list[dict[str, Any]]:
     return issues
 
 
-def match_key_pattern(pattern: str, scan_buffer: str, case_sensitive: bool = False) -> bool:
-    """Matches a SillyTavern plain key or JS-style `/regex/flags` pattern."""
+def match_key_pattern(
+    pattern: str,
+    scan_buffer: str,
+    case_sensitive: bool = False,
+    whole_words: bool = False,
+) -> bool:
+    """Matches a SillyTavern plain key or JS-style `/regex/flags` pattern.
+
+    Regex keys honor only their own inline flags (`/pat/i`), matching ST behavior;
+    `case_sensitive` applies to plain keys. Whole-word matching is used only when the
+    entry explicitly sets `matchWholeWords` (ST global default: substring matching).
+    """
     pat = pattern.strip()
     if not pat:
         return False
     if pat.startswith("/") and pat.count("/") >= 2:
         last_slash = pat.rfind("/")
         expr, flags_str = pat[1:last_slash], pat[last_slash + 1 :]
-        flags = 0 if ("i" not in flags_str and case_sensitive) else re.IGNORECASE
+        flags = 0
+        if "i" in flags_str:
+            flags |= re.IGNORECASE
         if "m" in flags_str:
             flags |= re.MULTILINE
         if "s" in flags_str:
@@ -567,21 +606,28 @@ def match_key_pattern(pattern: str, scan_buffer: str, case_sensitive: bool = Fal
 
     haystack = scan_buffer if case_sensitive else scan_buffer.lower()
     needle = pat if case_sensitive else pat.lower()
-    if needle.isascii() and needle.replace("_", "").isalnum():
+    if whole_words and needle.isascii() and needle.replace("_", "").isalnum():
         return bool(re.search(rf"\b{re.escape(needle)}\b", haystack))
     return needle in haystack
 
 
 def count_key_matches(entry: NormalizedLoreEntry, scan_buffer: str) -> tuple[bool, int]:
     """Evaluates primary + secondary gate and returns `(activated, group_score)`."""
-    primary_hits = sum(1 for k in entry.keys if match_key_pattern(k, scan_buffer, entry.case_sensitive))
+    primary_hits = sum(
+        1
+        for k in entry.keys
+        if match_key_pattern(k, scan_buffer, entry.case_sensitive, bool(entry.match_whole_words))
+    )
     if primary_hits == 0:
         return False, 0
 
     if not entry.selective or not entry.keys_secondary:
         return True, primary_hits
 
-    sec_bools = [match_key_pattern(k, scan_buffer, entry.case_sensitive) for k in entry.keys_secondary]
+    sec_bools = [
+        match_key_pattern(k, scan_buffer, entry.case_sensitive, bool(entry.match_whole_words))
+        for k in entry.keys_secondary
+    ]
     if entry.selective_logic == "AND_ANY":
         ok = any(sec_bools)
         return ok, (primary_hits + 1) if ok else 0
@@ -601,7 +647,10 @@ def passes_negative_secondary_gate(entry: NormalizedLoreEntry, scan_buffer: str)
     """Ensures semantic recall still honors `NOT_ANY` / `NOT_ALL` / `AND_ALL` secondary gates."""
     if not entry.selective or not entry.keys_secondary:
         return True
-    sec_bools = [match_key_pattern(k, scan_buffer, entry.case_sensitive) for k in entry.keys_secondary]
+    sec_bools = [
+        match_key_pattern(k, scan_buffer, entry.case_sensitive, bool(entry.match_whole_words))
+        for k in entry.keys_secondary
+    ]
     if entry.selective_logic == "NOT_ANY":
         return not any(sec_bools)
     if entry.selective_logic == "NOT_ALL":

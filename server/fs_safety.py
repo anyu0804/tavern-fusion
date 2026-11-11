@@ -21,6 +21,10 @@ def sanitize_filename_stem(raw_name: str) -> str:
     cleaned = cleaned.rstrip(". ").strip()
     if not cleaned or cleaned in {".", ".."} or ".." in cleaned:
         raise ValueError(f"Invalid filename stem after sanitization: {raw_name!r}")
+    # Windows reserved device names (CON, NUL, COM1-9, LPT1-9, optionally with an
+    # extension) cannot be created as-is — prefix an underscore to make them legal.
+    if re.fullmatch(r"(?i)(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?", cleaned):
+        cleaned = f"_{cleaned}"
     return cleaned
 
 
@@ -33,6 +37,21 @@ def ensure_under_dir(target_path: str | Path, base_dir: str | Path) -> Path:
             f"Path containment violation: '{resolved_target.name}' escapes '{resolved_base.name}'."
         )
     return resolved_target
+
+
+# Windows share-handle contention on `os.replace`: WinError 5 (access denied)
+# and WinError 32 (file in use) are transient while another reader (SillyTavern
+# itself or the sync extension) still holds the .jsonl. Other OSErrors must
+# surface immediately instead of being retried.
+REPLACE_MAX_ATTEMPTS = 8
+REPLACE_BASE_DELAY = 0.05
+REPLACE_MAX_DELAY = 0.6
+
+
+def _is_transient_lock_error(err: OSError) -> bool:
+    if isinstance(err, PermissionError):
+        return True
+    return getattr(err, "winerror", None) in (5, 32)
 
 
 def atomic_write_bytes(target_path: str | Path, payload: bytes) -> Path:
@@ -53,16 +72,20 @@ def atomic_write_bytes(target_path: str | Path, payload: bytes) -> Path:
                 os.fsync(handle.fileno())
             except OSError:
                 pass
-        # Retry briefly on Windows in case a reader holds a transient share handle
+        # Exponential backoff (~2.5s over 8 attempts) covers transient Windows
+        # share handles without overrunning the 10s lifecycle-hook timeout.
         last_err: OSError | None = None
-        for attempt in range(5):
+        for attempt in range(REPLACE_MAX_ATTEMPTS):
             try:
                 os.replace(tmp_path, dst)
                 last_err = None
                 break
-            except PermissionError as err:
+            except OSError as err:
+                if not _is_transient_lock_error(err):
+                    raise
                 last_err = err
-                time.sleep(0.03 * (attempt + 1))
+                if attempt + 1 < REPLACE_MAX_ATTEMPTS:
+                    time.sleep(min(REPLACE_BASE_DELAY * (2**attempt), REPLACE_MAX_DELAY))
         if last_err is not None:
             raise last_err
         return dst

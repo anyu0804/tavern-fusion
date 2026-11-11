@@ -5,6 +5,7 @@
  * and Antigravity Lifecycle Hook JSON payloads pass with zero buffering.
  */
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PLUGIN_ROOT, resolvePythonCommand } from './py_resolver.mjs';
 
@@ -14,7 +15,19 @@ if (rawArgs.length === 0) {
   process.exit(2);
 }
 
-const scriptPath = resolve(process.cwd(), rawArgs[0]);
+// Lifecycle hooks are not guaranteed to run with the plugin root as cwd. Keep the
+// historic cwd-relative behaviour first, then fall back to the launcher's own
+// location (derived from import.meta.url in py_resolver.mjs) so a hook script is
+// still found when the host starts us from a workspace directory. An unexpanded
+// ${PLUGIN_ROOT} placeholder is also normalized here as a defensive measure.
+const rawScript = rawArgs[0].replace(/\$\{PLUGIN_ROOT\}/g, PLUGIN_ROOT);
+const cwdCandidate = resolve(process.cwd(), rawScript);
+const pluginCandidate = resolve(PLUGIN_ROOT, rawScript);
+const scriptPath = existsSync(cwdCandidate)
+  ? cwdCandidate
+  : existsSync(pluginCandidate)
+    ? pluginCandidate
+    : cwdCandidate;
 const restArgs = rawArgs.slice(1);
 const { command, prefixArgs } = resolvePythonCommand();
 

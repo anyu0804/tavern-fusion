@@ -9,6 +9,7 @@ Compliant with Google Antigravity's `/generative_ui` CSP & theming specification
 
 from __future__ import annotations
 
+import html
 import json
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,9 @@ def compile_stage_widget_html(
 ) -> dict[str, Any]:
     data = character_card.get("data", {})
     char_name = str(data.get("name", "Character"))
+    # Escape before HTML template interpolation — `char_name` comes from untrusted card
+    # data and lands raw inside `<title>` and an `alt=` attribute (injection points).
+    char_name_html = html.escape(char_name, quote=True)
     scenario_str = str(data.get("scenario", "Active Adventure Scene"))[:140]
 
     fallback_svg_uri = (
@@ -61,7 +65,7 @@ def compile_stage_widget_html(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tavern Fusion Stage — {char_name}</title>
+  <title>Tavern Fusion Stage — {char_name_html}</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     .inline-cap {{ max-height: 484px; overflow: hidden; }}
@@ -73,7 +77,7 @@ def compile_stage_widget_html(
   <div id="stageRoot" class="mx-auto w-full rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden flex flex-col">
     <header class="px-4 py-3 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-3 min-w-0">
-        <img id="avatarImg" src="{safe_avatar}" alt="{char_name}" class="w-11 h-11 rounded-full object-cover border-2 border-emerald-500/60 shrink-0" />
+        <img id="avatarImg" src="{safe_avatar}" alt="{char_name_html}" class="w-11 h-11 rounded-full object-cover border-2 border-emerald-500/60 shrink-0" />
         <div class="min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <h1 id="charTitle" class="text-sm font-semibold text-[var(--foreground)] truncate"></h1>

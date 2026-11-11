@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 import sys
 import time
-from typing import Any
+from typing import Any, Callable
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -133,18 +133,40 @@ class TavernFusionRuntime:
     def stage_suggestions_file(self) -> Path:
         return self.state_dir / "stage_suggestions.json"
 
-    def load_active_session(self) -> dict[str, Any]:
+    def _read_active_session_unlocked(self) -> dict[str, Any]:
         if not self.active_session_file.exists():
             return {}
         try:
-            return json.loads(self.active_session_file.read_text(encoding="utf-8"))
+            loaded = json.loads(self.active_session_file.read_text(encoding="utf-8"))
+            return loaded if isinstance(loaded, dict) else {}
         except Exception:
             return {}
 
-    def save_active_session(self, session: dict[str, Any]) -> None:
-        atomic_write_json(self.active_session_file, session, indent=2)
+    def load_active_session(self) -> dict[str, Any]:
+        with exclusive_file_lock(self.active_session_file):
+            return self._read_active_session_unlocked()
 
-    def load_plugin_settings(self) -> dict[str, Any]:
+    def save_active_session(self, session: dict[str, Any]) -> None:
+        with exclusive_file_lock(self.active_session_file):
+            atomic_write_json(self.active_session_file, session, indent=2)
+
+    def update_active_session(
+        self,
+        updates: dict[str, Any] | Callable[[dict[str, Any]], dict[str, Any] | None],
+    ) -> dict[str, Any]:
+        """Locked Read-Modify-Write update on `active_session.json` preventing lost updates."""
+        with exclusive_file_lock(self.active_session_file):
+            cur = self._read_active_session_unlocked()
+            if callable(updates):
+                maybe_next = updates(cur)
+                if isinstance(maybe_next, dict):
+                    cur = maybe_next
+            else:
+                cur.update(updates)
+            atomic_write_json(self.active_session_file, cur, indent=2)
+            return cur
+
+    def _read_plugin_settings_unlocked(self) -> dict[str, Any]:
         defaults: dict[str, Any] = {
             "policy_mode": resolve_policy_mode(state_dir=self.state_dir),
             "inference_channel": "antigravity_builtin",
@@ -160,12 +182,17 @@ class TavernFusionRuntime:
         defaults["policy_mode"] = resolve_policy_mode(str(defaults.get("policy_mode", "")))
         return defaults
 
+    def load_plugin_settings(self) -> dict[str, Any]:
+        with exclusive_file_lock(self.plugin_settings_file):
+            return self._read_plugin_settings_unlocked()
+
     def save_plugin_settings(self, updates: dict[str, Any]) -> dict[str, Any]:
-        cur = self.load_plugin_settings()
-        cur.update(updates)
-        cur["policy_mode"] = resolve_policy_mode(str(cur.get("policy_mode", "")))
-        atomic_write_json(self.plugin_settings_file, cur, indent=2)
-        return cur
+        with exclusive_file_lock(self.plugin_settings_file):
+            cur = self._read_plugin_settings_unlocked()
+            cur.update(updates)
+            cur["policy_mode"] = resolve_policy_mode(str(cur.get("policy_mode", "")))
+            atomic_write_json(self.plugin_settings_file, cur, indent=2)
+            return cur
 
     def find_character_card_path(self, character_query: str) -> Path:
         char_dir = self.st_data_root / "characters"
@@ -242,7 +269,11 @@ class TavernFusionRuntime:
             b_path = worlds_dir / fname
             if b_path.exists():
                 tier = 2 if b_name == linked_world else 3
-                entries.extend(load_lorebook_file(b_path, source_tier=tier))
+                try:
+                    entries.extend(load_lorebook_file(b_path, source_tier=tier))
+                except Exception:
+                    # One corrupted/invalid world book must never kill the whole prompt frame
+                    continue
         return entries
 
     def _resolve_card_and_identity(
@@ -395,7 +426,7 @@ class TavernFusionRuntime:
         expressions = list_character_expressions(self.st_data_root, avatar_stem) or list_character_expressions(
             self.st_data_root, char_name
         )
-        return {
+        result: dict[str, Any] = {
             "status": "active",
             "character_name": char_name,
             "card_file": card_path.name,
@@ -413,6 +444,7 @@ class TavernFusionRuntime:
             "available_expressions": expressions,
             "sidecar_pill": "[Tavern Stage](sidecar://tavern-fusion/tavern_stage/)",
         }
+        return result
 
     def tool_st_dump_prompt_frame(self, args: dict[str, Any]) -> dict[str, Any]:
         session = self.load_active_session()
@@ -539,6 +571,7 @@ class TavernFusionRuntime:
         vars_dict = header.get("chat_metadata", {}).get("variables", {})
         if isinstance(args.get("variables_delta"), dict):
             vars_dict.update(args["variables_delta"])
+        pre_macro_vars = dict(vars_dict)
 
         extra_meta = dict(args.get("extra_meta") or {})
         is_backstage = bool(extra_meta.get("is_backstage", False) or session.get("director_mode", False))
@@ -560,6 +593,12 @@ class TavernFusionRuntime:
             if raw_user is not None
             else None
         )
+        # Persist `{{setvar::k::v}}` macros applied during macro expansion: `append_turn_to_chat`
+        # re-reads the chat from disk, so in-memory mutations must be diffed into the commit delta
+        # or they would be silently lost.
+        macro_setvar_delta = {
+            k: v for k, v in vars_dict.items() if k not in pre_macro_vars or pre_macro_vars[k] != v
+        }
 
         entries = self.collect_merged_lore_entries(card_v3, session.get("extra_lorebooks"))
         lore_eval = self.lore_engine.evaluate_and_splice(
@@ -584,24 +623,25 @@ class TavernFusionRuntime:
             user_mes=cleaned_user,
             char_mes=cleaned_char,
             swipe_mode=bool(args.get("swipe_mode", False)),
-            variables_delta=args.get("variables_delta"),
+            variables_delta={**(args.get("variables_delta") or {}), **macro_setvar_delta},
             next_timed_state=lore_eval["next_timed_state"],
             extra_meta=extra_meta,
         )
         commit_res["expression"] = detected_expr
 
-        session["active"] = True
-        session["character_name"] = char_name
-        session["card_file"] = card_path.name
-        session["avatar_stem"] = avatar_stem
-        session["card_path"] = str(card_path)
-        session["chat_path"] = str(chat_path)
-        session["last_committed_at"] = time.time()
-        session["last_turn_hash"] = commit_res["turn_hash"]
-        session["pending_uncommitted_turn"] = False
-        session["user_floor_already_appended"] = False
-        session["stage_busy"] = False
-        self.save_active_session(session)
+        self.update_active_session({
+            "active": True,
+            "character_name": char_name,
+            "card_file": card_path.name,
+            "avatar_stem": avatar_stem,
+            "card_path": str(card_path),
+            "chat_path": str(chat_path),
+            "last_committed_at": time.time(),
+            "last_turn_hash": commit_res["turn_hash"],
+            "pending_uncommitted_turn": False,
+            "user_floor_already_appended": False,
+            "stage_busy": False,
+        })
         return commit_res
 
     def tool_st_publish_stage_suggestions(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -617,11 +657,15 @@ class TavernFusionRuntime:
             "updated_at": time.time(),
         }
         atomic_write_json(self.stage_suggestions_file, payload, indent=2)
-        session = self.load_active_session()
-        if session:
-            session["pending_uncommitted_turn"] = False
-            session["stage_busy"] = False
-            self.save_active_session(session)
+
+        def _clear_busy_if_exists(cur: dict[str, Any]) -> dict[str, Any]:
+            if cur:
+                cur["pending_uncommitted_turn"] = False
+                cur["stage_busy"] = False
+            return cur
+
+        if self.active_session_file.exists():
+            self.update_active_session(_clear_busy_if_exists)
         return {"published": len(suggestions), "kind": kind, "suggestions": suggestions}
 
     def tool_st_read_card(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -708,7 +752,10 @@ class TavernFusionRuntime:
         )
         for p in target_files:
             if p.exists():
-                entries.extend(load_lorebook_file(p))
+                try:
+                    entries.extend(load_lorebook_file(p))
+                except Exception:
+                    continue
 
         res = self.lore_engine.evaluate_and_splice(
             entries=entries,
@@ -733,7 +780,9 @@ class TavernFusionRuntime:
         payload = args["entry_payload"]
         if isinstance(payload, str):
             payload = json.loads(payload)
-        return evolve_lorebook_file(lore_path, op, payload)  # type: ignore[arg-type]
+        # Serialize read-modify-write on the lorebook file against concurrent evolutions
+        with exclusive_file_lock(lore_path):
+            return evolve_lorebook_file(lore_path, op, payload)  # type: ignore[arg-type]
 
     def tool_st_manage_chat_branch(self, args: dict[str, Any]) -> dict[str, Any]:
         sess = self.load_active_session()
@@ -757,9 +806,12 @@ class TavernFusionRuntime:
                 greeting_index=target_id,
                 avatar_stem=avatar_stem,
             )
-            if sess.get("character_name") == char_name and sess.get("avatar_stem", avatar_stem) == avatar_stem:
-                sess["chat_path"] = created["chat_path"]
-                self.save_active_session(sess)
+            def _sync_new_chat_if_active(cur: dict[str, Any]) -> dict[str, Any]:
+                if cur.get("character_name") == char_name and cur.get("avatar_stem", avatar_stem) == avatar_stem:
+                    cur["chat_path"] = created["chat_path"]
+                return cur
+
+            self.update_active_session(_sync_new_chat_if_active)
             return created
 
         if (
@@ -821,36 +873,38 @@ class TavernFusionRuntime:
             extra_meta=args.get("extra_meta") if isinstance(args.get("extra_meta"), dict) else None,
         )
         if args["operation"] == "fork_from_floor" and args.get("activate_fork", True):
-            sess["chat_path"] = res["branch_path"]
-            sess["character_name"] = char_name
-            sess["card_file"] = card_path.name
-            sess["avatar_stem"] = avatar_stem
-            self.save_active_session(sess)
+            self.update_active_session({
+                "chat_path": res["branch_path"],
+                "character_name": char_name,
+                "card_file": card_path.name,
+                "avatar_stem": avatar_stem,
+            })
         return res
 
     def tool_st_switch_profile(self, args: dict[str, Any]) -> dict[str, Any]:
-        session = self.load_active_session()
+        patch: dict[str, Any] = {}
         if args.get("preset_name"):
             preset = load_openai_preset(self.st_data_root, str(args["preset_name"]))
-            session["preset_name"] = preset["preset_name"]
-            session["bootstrapped_conv_id"] = ""
+            patch["preset_name"] = preset["preset_name"]
+            patch["bootstrapped_conv_id"] = ""
         if args.get("persona_name"):
             persona = get_active_persona(self.st_data_root, str(args["persona_name"]))
-            session["persona_name"] = persona["name"]
-            session["bootstrapped_conv_id"] = ""
+            patch["persona_name"] = persona["name"]
+            patch["bootstrapped_conv_id"] = ""
         if args.get("mode"):
-            session["mode"] = str(args["mode"]).lstrip("-")
+            patch["mode"] = str(args["mode"]).lstrip("-")
         if "epistemic_level" in args and args["epistemic_level"] is not None:
-            session["epistemic_level"] = normalize_epistemic_level(args["epistemic_level"])
-            session["bootstrapped_conv_id"] = ""
+            patch["epistemic_level"] = normalize_epistemic_level(args["epistemic_level"])
+            patch["bootstrapped_conv_id"] = ""
         if "agentic_hands" in args and args["agentic_hands"] is not None:
-            session["agentic_hands"] = bool(args["agentic_hands"])
+            patch["agentic_hands"] = bool(args["agentic_hands"])
         if "director_mode" in args and args["director_mode"] is not None:
-            session["director_mode"] = bool(args["director_mode"])
-            session["bootstrapped_conv_id"] = ""
+            patch["director_mode"] = bool(args["director_mode"])
+            patch["bootstrapped_conv_id"] = ""
         if args.get("policy_mode"):
             self.save_plugin_settings({"policy_mode": str(args["policy_mode"])})
 
+        session = self.update_active_session(patch) if patch else self.load_active_session()
         chat_path = session.get("chat_path")
         if chat_path and Path(chat_path).exists() and ("authors_note" in args or "an_depth" in args):
             c_path_obj = Path(chat_path)
@@ -863,7 +917,6 @@ class TavernFusionRuntime:
                     meta["note_depth"] = int(args["an_depth"])
                 write_jsonl_chat_atomic(c_path_obj, header, messages)
 
-        self.save_active_session(session)
         return {"updated_session": session, "plugin_settings": self.load_plugin_settings()}
 
     def tool_st_manage_variables(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -878,24 +931,29 @@ class TavernFusionRuntime:
             if op in ("set", "inc", "del") and settings_path.exists() and not settings:
                 # `load_st_settings` returns {} on a parse error; writing back would wipe the user's settings.json.
                 raise ValueError("settings.json exists but could not be parsed; refusing to overwrite it.")
-            # SillyTavern keeps global variables at `extension_settings.variables.global`.
-            ext_settings = settings.setdefault("extension_settings", {})
-            g_vars = ext_settings.setdefault("variables", {}).setdefault("global", {})
-            legacy = settings.get("variables")
-            if isinstance(legacy, dict) and isinstance(legacy.get("global"), dict):
-                for lk, lv in legacy["global"].items():
-                    g_vars.setdefault(lk, lv)
-            if op == "get":
-                return {"scope": "global", "key": key, "value": g_vars.get(key)}
-            if op == "set":
-                g_vars[key] = val
-            elif op == "inc":
-                g_vars[key] = float(g_vars.get(key, 0)) + float(val or 1)
-            elif op == "del":
-                g_vars.pop(key, None)
-            if op in ("set", "inc", "del"):
-                atomic_write_json(settings_path, settings, indent=2)
-            return {"scope": "global", "variables": g_vars}
+            # Serialize the read-modify-write so a concurrently running SillyTavern server
+            # (or a parallel hook process) cannot clobber the update mid-flight.
+            with exclusive_file_lock(settings_path):
+                # SillyTavern keeps global variables at `extension_settings.variables.global`.
+                ext_settings = settings.setdefault("extension_settings", {})
+                g_vars = ext_settings.setdefault("variables", {}).setdefault("global", {})
+                legacy = settings.get("variables")
+                if isinstance(legacy, dict) and isinstance(legacy.get("global"), dict):
+                    for lk, lv in legacy["global"].items():
+                        g_vars.setdefault(lk, lv)
+                if op == "get":
+                    return {"scope": "global", "key": key, "value": g_vars.get(key)}
+                if op == "set":
+                    g_vars[key] = val
+                elif op == "inc":
+                    # `val` of 0 must increment by 0 (the old `val or 1` turned it into +1)
+                    inc_step = float(val) if val not in (None, "") else 1.0
+                    g_vars[key] = float(g_vars.get(key, 0)) + inc_step
+                elif op == "del":
+                    g_vars.pop(key, None)
+                if op in ("set", "inc", "del"):
+                    atomic_write_json(settings_path, settings, indent=2)
+                return {"scope": "global", "variables": g_vars}
 
         session = self.load_active_session()
         chat_path = session.get("chat_path")
@@ -910,7 +968,8 @@ class TavernFusionRuntime:
             if op == "set":
                 c_vars[key] = val
             elif op == "inc":
-                num = float(c_vars.get(key, 0)) + float(val or 1)
+                inc_step = float(val) if val not in (None, "") else 1.0
+                num = float(c_vars.get(key, 0)) + inc_step
                 c_vars[key] = int(num) if num.is_integer() else num
             elif op == "del":
                 c_vars.pop(key, None)
@@ -985,11 +1044,11 @@ class TavernFusionRuntime:
         if op == "bootstrap":
             return self.tool_st_session_bootstrap(args)
         if op == "bind_rp_conv":
-            sess = self.load_active_session()
-            sess["rp_conv_id"] = str(args.get("rp_conv_id") or "").strip()
-            if sess["rp_conv_id"]:
-                sess["active"] = True
-            self.save_active_session(sess)
+            rp_cid = str(args.get("rp_conv_id") or "").strip()
+            upd: dict[str, Any] = {"rp_conv_id": rp_cid}
+            if rp_cid:
+                upd["active"] = True
+            sess = self.update_active_session(upd)
             return {"rp_conv_id": sess["rp_conv_id"]}
         if op == "floor_op":
             return self.tool_st_stage_floor_op(args)
@@ -1273,15 +1332,27 @@ class TavernFusionRuntime:
         else:
             raise ValueError(f"Unknown prepare_agent_turn kind: {action_kind}")
 
-        session["user_floor_already_appended"] = action_kind in ("send_turn", "director_intervention") or is_director_turn
-        session["pending_sidecar_launch"] = {
-            "prompt": prompt_to_agent,
-            "action_kind": "director_intervention" if is_director_turn else action_kind,
-            "user_text": user_text,
-            "user_floor_already_appended": action_kind in ("send_turn", "director_intervention") or is_director_turn,
-            "ts": time.time(),
+        already_flag = action_kind in ("send_turn", "director_intervention") or is_director_turn
+        prep_updates: dict[str, Any] = {
+            "active": True,
+            "rp_conv_id": rp_conv_id,
+            "stage_busy": True,
+            "pending_uncommitted_turn": session["pending_uncommitted_turn"],
+            "pending_turn_mode": session["pending_turn_mode"],
+            "user_floor_already_appended": already_flag,
+            "pending_sidecar_launch": {
+                "prompt": prompt_to_agent,
+                "action_kind": "director_intervention" if is_director_turn else action_kind,
+                "user_text": user_text,
+                "user_floor_already_appended": already_flag,
+                "ts": time.time(),
+            },
         }
-        self.save_active_session(session)
+        if "stop_retry_count" in session:
+            prep_updates["stop_retry_count"] = session["stop_retry_count"]
+        if "last_user_input" in session:
+            prep_updates["last_user_input"] = session["last_user_input"]
+        self.update_active_session(prep_updates)
 
         return {
             "ready": True,

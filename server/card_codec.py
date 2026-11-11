@@ -28,7 +28,7 @@ import time
 from typing import Any
 import zlib
 
-from .fs_safety import atomic_write_bytes
+from .fs_safety import atomic_write_bytes, ensure_under_dir, sanitize_filename_stem
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -288,7 +288,7 @@ def downgrade_v3_to_v2_envelope(v3_card: dict[str, Any]) -> dict[str, Any]:
     return v2
 
 
-def extract_avatar_data_uri(png_bytes: bytes, max_size: int = 384) -> str:
+def extract_avatar_data_uri(png_bytes: bytes, max_size: int = 384) -> str | None:
     """Converts PNG bytes into a compact Data URI for Generative UI snapshots."""
     try:
         from PIL import Image  # type: ignore
@@ -301,6 +301,10 @@ def extract_avatar_data_uri(png_bytes: bytes, max_size: int = 384) -> str:
             b64 = base64.b64encode(buf.getvalue()).decode("ascii")
             return f"data:image/jpeg;base64,{b64}"
     except Exception:
+        if len(png_bytes) > 1_500_000:
+            # Without Pillow, returning the full-size original PNG as a data URI would
+            # bloat widgets and model context by megabytes — degrade to no avatar instead.
+            return None
         b64 = base64.b64encode(png_bytes).decode("ascii")
         return f"data:image/png;base64,{b64}"
 
@@ -428,7 +432,14 @@ def write_character_card_png(
 
 def list_character_expressions(st_data_root: str | Path, character_name: str) -> list[str]:
     """Lists available emotion sprite names under `characters/<CharacterName>/`."""
-    expr_dir = Path(st_data_root) / "characters" / character_name
+    root = Path(st_data_root)
+    try:
+        # `character_name` originates from untrusted card data (Card-is-Data): sanitize the
+        # stem and enforce directory containment to block traversal outside `characters/`.
+        safe_name = sanitize_filename_stem(character_name)
+        expr_dir = ensure_under_dir(root / "characters" / safe_name, root / "characters")
+    except (ValueError, OSError):
+        return []
     if not expr_dir.exists() or not expr_dir.is_dir():
         return []
     allowed = {".png", ".jpg", ".jpeg", ".webp", ".gif"}

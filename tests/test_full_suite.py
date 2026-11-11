@@ -35,12 +35,21 @@ if str(PLUGIN_ROOT) not in sys.path:
 from server.card_codec import (
     detect_message_emotion,
     lint_character_card,
+    list_character_expressions,
     read_character_card,
     write_character_card_png,
 )
 from server.chat_sync import read_jsonl_chat
-from server.lore_engine import HybridLoreEngine, evolve_lorebook_file, lint_lorebook_file, load_lorebook_file
+from server.lore_engine import (
+    HybridLoreEngine,
+    evolve_lorebook_file,
+    lint_lorebook_file,
+    load_lorebook_file,
+    match_key_pattern,
+    parse_lorebook_dict,
+)
 from server.mcp_server import TavernFusionRuntime
+from server.st_runtime_compat import run_regex_pipeline
 from server.widget_compiler import compile_stage_widget_html
 
 
@@ -1076,6 +1085,116 @@ class TavernFusionFullTestSuite(unittest.TestCase):
                     check=False,
                 )
                 self.assertEqual(node_probe.returncode, 0)
+            finally:
+                rt.close()
+
+    def test_10_bugfix_regressions_setvar_traversal_uid_and_widget_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tdir = Path(tmp)
+            st_root = make_sandbox_st_root(tdir)
+            state_dir = tdir / "state"
+            rt = TavernFusionRuntime(st_data_root=st_root, state_dir=state_dir)
+            try:
+                # 1. `{{setvar}}` macros in committed prose MUST persist to chat variables
+                rt.tool_st_session_bootstrap({"character_name": "Seraphina", "mode": "play", "new_chat": True})
+                commit = rt.tool_st_commit_turn({
+                    "character_name": "Seraphina",
+                    "user_mes": "*推门而入*",
+                    "char_mes": "*她抬眼微笑。* \"欢迎。\"{{setvar::mood::calm}}",
+                })
+                header, _ = read_jsonl_chat(Path(commit["chat_path"]))
+                self.assertEqual(header["chat_metadata"]["variables"].get("mood"), "calm")
+
+                # 2. `inc` with value 0 must increment by 0 (not coerce to +1)
+                rt.tool_st_manage_variables({"scope": "chat", "op": "set", "key": "gold", "value": 5})
+                rt.tool_st_manage_variables({"scope": "chat", "op": "inc", "key": "gold", "value": 0})
+                got = rt.tool_st_manage_variables({"scope": "chat", "op": "get", "key": "gold"})
+                self.assertEqual(got["value"], 5)
+
+                # 3. Expression listing must sanitize untrusted card names (no traversal)
+                self.assertEqual(list_character_expressions(st_root, "../../outside"), [])
+                self.assertIn("joy", list_character_expressions(st_root, "Seraphina"))
+
+                # 4. Malformed/duplicate lorebook uids: no crash, no silent sibling overwrite
+                entries = parse_lorebook_dict({
+                    "entries": {
+                        "zero": {"uid": 0, "key": ["alpha"], "content": "Alpha entry."},
+                        "garbage": {"uid": "not-a-number", "key": ["beta"], "content": "Beta entry."},
+                        "auto": {"key": ["gamma"], "content": "Gamma entry."},
+                    }
+                })
+                self.assertEqual(len(entries), 3)
+                self.assertEqual(len({e.uid for e in entries}), 3)
+
+                # 5. Regex scripts WITHOUT `markdownOnly` MUST apply at storage pass (ST default)
+                cleaned = run_regex_pipeline(
+                    "获得纹章 [badge:Silver]！",
+                    card_extensions={"regex_scripts": [{
+                        "scriptName": "no-scope-flags",
+                        "findRegex": "\\[badge:(\\w+)\\]",
+                        "replaceString": "<$1>",
+                    }]},
+                    epistemic_level=100,
+                )
+                self.assertEqual(cleaned, "获得纹章 <Silver>！")
+
+                # 6. `/regex/` keys honor their own inline flags (no `i` => case-sensitive)
+                self.assertFalse(match_key_pattern("/DEATH/", "the death of kings"))
+                self.assertTrue(match_key_pattern("/DEATH/i", "the death of kings"))
+
+                # 7. Widget HTML escapes untrusted card names in title/alt
+                widget = compile_stage_widget_html(
+                    character_card={"data": {"name": "<img src=x onerror=alert(1)>", "description": "d"}},
+                    avatar_data_uri=None,
+                    messages=[],
+                    variables={},
+                    active_lore_trace=[],
+                    dump_report="",
+                )
+                self.assertIn("&lt;img src=x onerror=alert(1)&gt;</title>", widget["html"])
+                self.assertIn('alt="&lt;img', widget["html"])
+
+                # 8. P0 lock cleanup, idempotency deduplication, and locked RMW session updates
+                from server.chat_sync import _HELD_FILE_LOCKS, append_turn_to_chat, exclusive_file_lock
+
+                bad_parent = tdir / "blocking_file"
+                bad_parent.write_text("not_a_dir", encoding="utf-8")
+                with self.assertRaises(OSError):
+                    with exclusive_file_lock(bad_parent / "child.json"):
+                        pass
+                self.assertEqual(len(_HELD_FILE_LOCKS), 0)
+
+                chat_p = Path(commit["chat_path"])
+                _, before_idem = read_jsonl_chat(chat_p)
+                append_turn_to_chat(
+                    chat_p,
+                    "Seraphina",
+                    "Traveler",
+                    "幂等测试提问",
+                    "*她颔首。* \"只记录一次。\"",
+                    extra_meta={"idempotency_key": "idem-p0-001"},
+                )
+                append_turn_to_chat(
+                    chat_p,
+                    "Seraphina",
+                    "Traveler",
+                    "幂等测试提问",
+                    "*她颔首。* \"只记录一次。\"",
+                    extra_meta={"idempotency_key": "idem-p0-001"},
+                )
+                _, after_idem = read_jsonl_chat(chat_p)
+                self.assertEqual(len(after_idem), len(before_idem) + 2)
+
+                # Concurrent session flag toggle (`agentic_hands`) MUST survive `tool_st_commit_turn` RMW merge
+                rt.update_active_session({"agentic_hands": True, "epistemic_level": 50})
+                rt.tool_st_commit_turn({
+                    "character_name": "Seraphina",
+                    "user_mes": "第二轮确认",
+                    "char_mes": "*微风轻拂。* \"状态仍在。\"",
+                })
+                merged_sess = rt.load_active_session()
+                self.assertTrue(merged_sess["agentic_hands"])
+                self.assertEqual(merged_sess["epistemic_level"], 50)
             finally:
                 rt.close()
 

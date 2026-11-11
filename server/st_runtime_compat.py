@@ -568,7 +568,13 @@ def run_regex_pipeline(
     for rule in scripts:
         if not isinstance(rule, dict) or rule.get("disabled"):
             continue
-        if is_storage_pass and rule.get("markdownOnly", True):
+        # ST semantics: a field absent means `false`. Only skip scripts explicitly scoped
+        # away from storage: `markdownOnly` (display-only) and `promptOnly` / `is_user_regex`
+        # (never alter the character's stored text). The old `get("markdownOnly", True)`
+        # default silently skipped every script that did not set the field explicitly.
+        if is_storage_pass and (
+            rule.get("markdownOnly") or rule.get("promptOnly") or rule.get("is_user_regex")
+        ):
             continue
         raw_pat = str(rule.get("findRegex", "")).strip()
         repl = str(rule.get("replaceString", ""))

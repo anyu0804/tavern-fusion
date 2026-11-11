@@ -9,6 +9,7 @@
 (function () {
   const POLL_INTERVAL_MS = 3000;
   let lastKnownFloorSignature = '';
+  let lastChatIdentity = '';
   let autoSyncEnabled = true;
 
   function getContextSafe() {
@@ -25,6 +26,15 @@
     if (!ctx || ctx.characterId === undefined || !ctx.chatId) return;
     const charObj = ctx.characters?.[ctx.characterId];
     if (!charObj?.avatar) return;
+
+    // Reset the floor signature when the active chat identity changes so switching
+    // characters or chats in ST does not trigger one spurious reloadCurrentChat.
+    const chatIdentity = `${charObj.avatar}:${ctx.chatId}`;
+    if (chatIdentity !== lastChatIdentity) {
+      lastChatIdentity = chatIdentity;
+      lastKnownFloorSignature = '';
+      return;
+    }
 
     try {
       const headers = typeof ctx.getRequestHeaders === 'function'

@@ -84,7 +84,8 @@ def main() -> None:
                     or bool(session.get("stage_busy"))
                 )
             )
-            if 0 <= age < 60.0 and (is_fresh_start or is_bound_send):
+            # 120s window: a slow built-in model start must not lose the sidecar claim
+            if 0 <= age < 120.0 and (is_fresh_start or is_bound_send):
                 session["rp_conv_id"] = conv_id
                 session["active"] = True
                 effective_raw_input = expected_prompt
@@ -98,16 +99,19 @@ def main() -> None:
 
         # 2. Handle `/rp off` / `/rp stop` exit command
         if rp_match and rp_match.group(1) and rp_match.group(1).strip().lower() in RP_EXIT_ARGS:
-            session["active"] = False
-            session["rp_conv_id"] = ""
-            session["pending_uncommitted_turn"] = False
-            session["user_floor_already_appended"] = False
-            session["stage_busy"] = False
-            session["stop_retry_count"] = 0
-            session.pop("pending_sidecar_launch", None)
-            if last_input:
-                session["last_seen_host_input"] = last_input
-            runtime.save_active_session(session)
+            def _deactivate_rp(cur: dict) -> dict:
+                cur["active"] = False
+                cur["rp_conv_id"] = ""
+                cur["pending_uncommitted_turn"] = False
+                cur["user_floor_already_appended"] = False
+                cur["stage_busy"] = False
+                cur["stop_retry_count"] = 0
+                cur.pop("pending_sidecar_launch", None)
+                if last_input:
+                    cur["last_seen_host_input"] = last_input
+                return cur
+
+            runtime.update_active_session(_deactivate_rp)
             sys.stdout.write(
                 json.dumps(
                     {
@@ -183,10 +187,11 @@ def main() -> None:
         )
         if not compliant:
             if session.get("stage_busy") or session.get("pending_uncommitted_turn"):
-                session["stage_busy"] = False
-                session["pending_uncommitted_turn"] = False
-                session["user_floor_already_appended"] = False
-                runtime.save_active_session(session)
+                runtime.update_active_session({
+                    "stage_busy": False,
+                    "pending_uncommitted_turn": False,
+                    "user_floor_already_appended": False,
+                })
             block_out = {
                 "injectSteps": [
                     {
@@ -322,7 +327,7 @@ def main() -> None:
             if agentic_hands:
                 contract_line = (
                     f"[AGENTIC HANDS UNLOCKED — AUTONOMOUS RP TURN]: Portray {char_name}'s reply in character "
-                    f"(\"...\” and *...*). Switch B (Agentic Hands) is ON: you may autonomously invoke "
+                    f"(\"...\" and *...*). Switch B (Agentic Hands) is ON: you may autonomously invoke "
                     f"`st_manage_variables` (to update affection/status) or `st_evolve_lore_entry` (to record new "
                     f"plot facts into the worldbook) if warranted by the scene, then output ONLY {char_name}'s "
                     f"in-character prose. Do NOT call `st_commit_turn`—the Stop hook persists your final prose."
@@ -341,7 +346,27 @@ def main() -> None:
 
         if last_input:
             session["last_seen_host_input"] = last_input
-        runtime.save_active_session(session)
+
+        def _merge_pre_inv(cur: dict) -> dict:
+            for k in (
+                "active",
+                "rp_conv_id",
+                "bootstrapped_conv_id",
+                "bootstrapped_char",
+                "pending_uncommitted_turn",
+                "user_floor_already_appended",
+                "pending_turn_mode",
+                "stop_retry_count",
+                "last_user_input",
+                "last_seen_host_input",
+            ):
+                if k in session:
+                    cur[k] = session[k]
+            if claimed_from_sidecar:
+                cur.pop("pending_sidecar_launch", None)
+            return cur
+
+        runtime.update_active_session(_merge_pre_inv)
 
         out = {
             "injectSteps": [
