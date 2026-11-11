@@ -1902,7 +1902,7 @@ class StdioMCPServer:
                 "result": {
                     "protocolVersion": client_proto,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.2-preview"},
+                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.3-preview"},
                 },
             }
 

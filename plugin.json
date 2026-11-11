@@ -1,7 +1,7 @@
 {
   "name": "tavern-fusion",
   "displayName": "Tavern Fusion",
-  "version": "3.0.2-preview",
+  "version": "3.0.3-preview",
   "description": "Native SillyTavern Character Card V2/V3, hybrid Lorebook engine, Card Doctor, JSONL sync, and permanent Tavern Stage Sidecar workbench inside Antigravity.",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [

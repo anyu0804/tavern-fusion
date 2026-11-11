@@ -1,3 +1,3 @@
-"""Tavern Fusion 3.0.2-preview — Antigravity × SillyTavern Unified Control Plane."""
+"""Tavern Fusion 3.0.3-preview — Antigravity × SillyTavern Unified Control Plane."""
 
-__version__ = "3.0.2-preview"
+__version__ = "3.0.3-preview"
