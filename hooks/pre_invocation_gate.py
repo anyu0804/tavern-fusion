@@ -25,8 +25,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from hooks.session_init import discover_st_data_from_workspaces
-from server.mcp_server import TavernFusionRuntime
 from server.policy import evaluate_policy_compliance, resolve_policy_mode
+from server.runtime.context import RuntimeContext
 
 RP_SLASH_RE = re.compile(
     r"^\s*/rp(?:\s+((?!--)\S+))?(?:\s+--(play|chat))?(?:\s+(.*))?$",
@@ -43,6 +43,31 @@ STAGE_PREFIXES = (
 UTILITY_SLASHES = ("/dump-prompt", "/lore-weaver", "/card-forge", "/tavern-stage")
 
 
+class _LazyToolRuntime:
+    """Opens the tool runtime (lore engine, card codec, prompt compiler) only when a tool must run.
+
+    Session-state-only paths of this hook never pay for it. Transitional: the tool calls move to
+    the `server.tools` registry in the next refactor step.
+    """
+
+    def __init__(self, ctx: RuntimeContext) -> None:
+        self._ctx = ctx
+        self._rt = None
+
+    def get(self):
+        if self._rt is None:
+            from server.mcp_server import TavernFusionRuntime
+
+            rt = TavernFusionRuntime(st_data_root=self._ctx._explicit_data_root, state_dir=self._ctx.state_dir)
+            rt.st_data_root = self._ctx.st_data_root
+            self._rt = rt
+        return self._rt
+
+    def close(self) -> None:
+        if self._rt is not None:
+            self._rt.close()
+
+
 def main() -> None:
     raw_in = sys.stdin.read().strip()
     payload = json.loads(raw_in) if raw_in else {}
@@ -57,9 +82,10 @@ def main() -> None:
         return
 
     discovered = discover_st_data_from_workspaces(ws_paths)
-    runtime = TavernFusionRuntime(st_data_root=discovered)
+    runtime = RuntimeContext(st_data_root=discovered)
+    tools = _LazyToolRuntime(runtime)
     try:
-        session = runtime.load_active_session()
+        session = runtime.sessions.load()
 
         # 1. Claim Tavern Stage Sidecar dispatch (`startConversation` or bound `sendMessage`)
         #    Note: On `window.sidecar.agent.sendMessage` to an existing conversation, the host
@@ -111,7 +137,7 @@ def main() -> None:
                     cur["last_seen_host_input"] = last_input
                 return cur
 
-            runtime.update_active_session(_deactivate_rp)
+            runtime.sessions.update(_deactivate_rp)
             sys.stdout.write(
                 json.dumps(
                     {
@@ -142,13 +168,13 @@ def main() -> None:
             mode_arg = rp_match.group(2) or session.get("mode", "play")
             trailing_msg = (rp_match.group(3) or "").strip()
             try:
-                runtime.tool_st_session_bootstrap({
+                tools.get().tool_st_session_bootstrap({
                     "character_name": char_arg,
                     "mode": mode_arg,
                     "rp_conv_id": conv_id,
                     "activate_rp": True,
                 })
-                session = runtime.load_active_session()
+                session = runtime.sessions.load()
                 is_bootstrap_turn = True
                 effective_user_input = trailing_msg
                 sidecar_floor_appended = False
@@ -187,7 +213,7 @@ def main() -> None:
         )
         if not compliant:
             if session.get("stage_busy") or session.get("pending_uncommitted_turn"):
-                runtime.update_active_session({
+                runtime.sessions.update({
                     "stage_busy": False,
                     "pending_uncommitted_turn": False,
                     "user_floor_already_appended": False,
@@ -249,7 +275,7 @@ def main() -> None:
             and not is_bootstrap_turn
         )
 
-        frame_info = runtime.tool_st_dump_prompt_frame({
+        frame_info = tools.get().tool_st_dump_prompt_frame({
             "character_name": char_ref,
             "user_input": effective_user_input,
             "mode": session.get("mode", "play"),
@@ -366,7 +392,7 @@ def main() -> None:
                 cur.pop("pending_sidecar_launch", None)
             return cur
 
-        runtime.update_active_session(_merge_pre_inv)
+        runtime.sessions.update(_merge_pre_inv)
 
         out = {
             "injectSteps": [
@@ -384,6 +410,7 @@ def main() -> None:
             + "\n"
         )
     finally:
+        tools.close()
         runtime.close()
 
 

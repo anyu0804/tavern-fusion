@@ -12,11 +12,10 @@ from __future__ import annotations
 import argparse
 import base64
 import json
-import os
 from pathlib import Path
 import sys
 import time
-from typing import Any, Callable
+from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -50,7 +49,7 @@ from server.lore_engine import (
     load_lorebook_file,
     parse_lorebook_dict,
 )
-from server.policy import evaluate_minor_risk_gate, evaluate_policy_compliance, resolve_policy_mode
+from server.policy import evaluate_minor_risk_gate, evaluate_policy_compliance
 from server.st_runtime_compat import (
     compile_st_prompt_frame,
     get_active_persona,
@@ -68,165 +67,29 @@ from server.byok_backend import (
     resolve_byok_config,
 )
 from server.widget_compiler import compile_stage_widget_html
+from server.runtime import (  # noqa: F401  (re-exported for backwards-compatible imports)
+    DEFAULT_STATE_DIR,
+    FIRST_RUN_NOTICE,
+    FIRST_RUN_NOTICE_V1,
+    FIRST_RUN_NOTICE_VERSION,
+    RuntimeContext,
+    SessionStore,
+)
 
 
-DEFAULT_STATE_DIR = Path.home() / ".gemini" / "antigravity" / "tavern-fusion" / "state"
+class TavernFusionRuntime(RuntimeContext):
+    """Stateful coordinator bridging Antigravity, MCP tools, Hooks, Sidecar, and SillyTavern disk data.
 
-FIRST_RUN_NOTICE_VERSION = 2
-
-FIRST_RUN_NOTICE: dict[str, Any] = {
-    "version": FIRST_RUN_NOTICE_VERSION,
-    "title": "首次运行须知（Preview）",
-    "items": [
-        "条款与风险摘要：本工具仅通过宿主官方扩展点在本地读写酒馆数据，不提取凭证、不架反代、不做多租户。模型调用受宿主平台及上游模型服务商条款约束，内容政策与账号风险由使用者自行承担。",
-        "建议使用专用账号：当前处于早期预览版（Preview），建议使用独立的专用/测试账号运行，避免在主力生产账号上加载未经审阅的外部预设或角色卡。",
-        "不支持破限 / ERP：不支持、不建议导入越狱破限（Jailbreak）或色情露骨（NSFW / ERP）预设与角色卡；云端模型侧无法绕过服务端强制安全过滤。",
-        "Antigravity 条款风险：Google Antigravity 附加条款第 6 条禁止“将本服务与非 Google 提供的产品结合使用”，违反可能导致 Antigravity 及 Gemini CLI 账号被暂停或终止。使用宿主内置模型运行酒馆角色扮演存在被认定违规的风险；如需规避，可在舞台配置中切换为“自有 API Key”后端。",
-        "对话隐私：依据 Antigravity 条款，宿主会记录交互数据，Google 员工或承包商可能人工审阅，并可能用于改进产品和训练模型。角色扮演对话通常较为私密，请勿输入不希望被审阅的内容，并建议在 Antigravity 设置中关闭交互数据用于改进的选项（即使关闭，Google 仍会为提供服务和安全目的使用数据）。",
-    ],
-}
-
-# Backwards-compatible alias (older imports / tests).
-FIRST_RUN_NOTICE_V1 = FIRST_RUN_NOTICE
-
-
-class TavernFusionRuntime:
-    """Stateful coordinator bridging Antigravity, MCP tools, Hooks, Sidecar, and SillyTavern disk data."""
+    Paths, settings and session state come from `RuntimeContext` / `SessionStore`
+    (`server/runtime/`); this class adds the lore engine and the tool implementations.
+    """
 
     def __init__(self, st_data_root: str | Path | None = None, state_dir: str | Path | None = None) -> None:
-        self._explicit_data_root = st_data_root
-        raw_state = state_dir or os.environ.get("PLUGIN_STATE_DIR") or ""
-        if str(raw_state) in ("${PLUGIN_DATA}", ""):
-            raw_state = DEFAULT_STATE_DIR
-        self.state_dir = Path(raw_state).resolve()
-        self.state_dir.mkdir(parents=True, exist_ok=True)
-        self.st_data_root = self._resolve_data_root(st_data_root, self.state_dir)
+        super().__init__(st_data_root=st_data_root, state_dir=state_dir)
         self.lore_engine = HybridLoreEngine(self.state_dir / "lore_vectors.sqlite")
 
     def close(self) -> None:
         self.lore_engine.close()
-
-    @staticmethod
-    def _resolve_data_root(explicit: str | Path | None, state_dir: Path | None = None) -> Path:
-        remembered: str | None = None
-        if state_dir is not None:
-            settings_file = state_dir / "plugin_settings.json"
-            if settings_file.exists():
-                try:
-                    s_obj = json.loads(settings_file.read_text(encoding="utf-8"))
-                    if isinstance(s_obj, dict) and s_obj.get("last_st_data_root"):
-                        remembered = str(s_obj["last_st_data_root"])
-                except Exception:
-                    remembered = None
-
-        candidates = [
-            explicit,
-            os.environ.get("ST_DATA_ROOT"),
-            os.environ.get("ST_USER_DATA_DIR"),
-            remembered,
-            Path.cwd() / "data" / "default-user",
-            Path.cwd() / "SillyTavern" / "data" / "default-user",
-            ROOT_DIR.parent / "SillyTavern" / "data" / "default-user",
-            ROOT_DIR.parent / "data" / "default-user",
-            ROOT_DIR / "examples" / "mock_st_data" / "default-user",
-        ]
-        for c in candidates:
-            if c and not str(c).startswith("${"):
-                p = Path(c)
-                if p.exists() and p.is_dir():
-                    return p.resolve()
-        if explicit and not str(explicit).startswith("${"):
-            p = Path(explicit)
-            p.mkdir(parents=True, exist_ok=True)
-            return p.resolve()
-        fallback = ROOT_DIR / "examples" / "mock_st_data" / "default-user"
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback.resolve()
-
-    @property
-    def active_session_file(self) -> Path:
-        return self.state_dir / "active_session.json"
-
-    @property
-    def plugin_settings_file(self) -> Path:
-        return self.state_dir / "plugin_settings.json"
-
-    @property
-    def stage_suggestions_file(self) -> Path:
-        return self.state_dir / "stage_suggestions.json"
-
-    def _read_active_session_unlocked(self) -> dict[str, Any]:
-        if not self.active_session_file.exists():
-            return {}
-        try:
-            loaded = json.loads(self.active_session_file.read_text(encoding="utf-8"))
-            return loaded if isinstance(loaded, dict) else {}
-        except Exception:
-            return {}
-
-    def load_active_session(self) -> dict[str, Any]:
-        with exclusive_file_lock(self.active_session_file):
-            return self._read_active_session_unlocked()
-
-    def save_active_session(self, session: dict[str, Any]) -> None:
-        with exclusive_file_lock(self.active_session_file):
-            atomic_write_json(self.active_session_file, session, indent=2)
-
-    def update_active_session(
-        self,
-        updates: dict[str, Any] | Callable[[dict[str, Any]], dict[str, Any] | None],
-    ) -> dict[str, Any]:
-        """Locked Read-Modify-Write update on `active_session.json` preventing lost updates."""
-        with exclusive_file_lock(self.active_session_file):
-            cur = self._read_active_session_unlocked()
-            if callable(updates):
-                maybe_next = updates(cur)
-                if isinstance(maybe_next, dict):
-                    cur = maybe_next
-            else:
-                cur.update(updates)
-            atomic_write_json(self.active_session_file, cur, indent=2)
-            return cur
-
-    def _read_plugin_settings_unlocked(self) -> dict[str, Any]:
-        defaults: dict[str, Any] = {
-            "policy_mode": resolve_policy_mode(state_dir=self.state_dir),
-            "inference_channel": "antigravity_builtin",
-            "first_run_notice_ack_v1": False,
-            "first_run_cli_shown_v1": False,
-        }
-        if not self.plugin_settings_file.exists():
-            return defaults
-        try:
-            loaded = json.loads(self.plugin_settings_file.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                defaults.update(loaded)
-        except Exception:
-            pass
-        defaults["policy_mode"] = resolve_policy_mode(str(defaults.get("policy_mode", "")))
-        # `first_run_notice_ack_v1` / `first_run_cli_shown_v1` keep their historical names for
-        # UI/test compatibility, but now mean "the CURRENT notice version was acknowledged/shown".
-        # Settings written before versioning count as version 1, so a materially changed notice
-        # (version bump) is shown again once.
-        ack_ver = int(defaults.get("first_run_notice_ack_version") or (1 if defaults.get("first_run_notice_ack_v1") else 0))
-        shown_ver = int(defaults.get("first_run_cli_shown_version") or (1 if defaults.get("first_run_cli_shown_v1") else 0))
-        defaults["first_run_notice_ack_version"] = ack_ver
-        defaults["first_run_cli_shown_version"] = shown_ver
-        defaults["first_run_notice_ack_v1"] = ack_ver >= FIRST_RUN_NOTICE_VERSION
-        defaults["first_run_cli_shown_v1"] = shown_ver >= FIRST_RUN_NOTICE_VERSION
-        return defaults
-
-    def load_plugin_settings(self) -> dict[str, Any]:
-        with exclusive_file_lock(self.plugin_settings_file):
-            return self._read_plugin_settings_unlocked()
-
-    def save_plugin_settings(self, updates: dict[str, Any]) -> dict[str, Any]:
-        with exclusive_file_lock(self.plugin_settings_file):
-            cur = self._read_plugin_settings_unlocked()
-            cur.update(updates)
-            cur["policy_mode"] = resolve_policy_mode(str(cur.get("policy_mode", "")))
-            atomic_write_json(self.plugin_settings_file, cur, indent=2)
-            return cur
 
     def find_character_card_path(self, character_query: str) -> Path:
         char_dir = self.st_data_root / "characters"
@@ -1125,10 +988,7 @@ class TavernFusionRuntime:
             return self.tool_st_session_bootstrap(args)
         if op == "bind_rp_conv":
             rp_cid = str(args.get("rp_conv_id") or "").strip()
-            upd: dict[str, Any] = {"rp_conv_id": rp_cid}
-            if rp_cid:
-                upd["active"] = True
-            sess = self.update_active_session(upd)
+            sess = self.sessions.bind(rp_cid)
             return {"rp_conv_id": sess["rp_conv_id"]}
         if op == "floor_op":
             return self.tool_st_stage_floor_op(args)

@@ -21,7 +21,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from server.mcp_server import TavernFusionRuntime
+from server.runtime.context import RuntimeContext
 from server.net_utils import open_url
 
 
@@ -56,7 +56,7 @@ def main() -> None:
         sys.stdout.write(json.dumps({"injectSteps": []}) + "\n")
         return
 
-    runtime = TavernFusionRuntime(st_data_root=discovered)
+    runtime = RuntimeContext(st_data_root=discovered)
     try:
         runtime.save_plugin_settings({"last_st_data_root": discovered})
         cards_dir = runtime.st_data_root / "characters"
@@ -65,7 +65,7 @@ def main() -> None:
         world_names = [p.stem for p in sorted(worlds_dir.glob("*.json"))[:8]] if worlds_dir.exists() else []
         web_online = check_st_web_alive(os.environ.get("ST_WEB_URL", "http://127.0.0.1:8000"))
 
-        active_sess = runtime.load_active_session()
+        active_sess = runtime.sessions.load()
         is_bound_rp = (
             bool(conv_id)
             and bool(active_sess.get("active"))
