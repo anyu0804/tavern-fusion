@@ -163,7 +163,8 @@
         "key_source": "none",
         "last_usage": null,
         "model": "",
-        "ready": false
+        "ready": false,
+        "stream": true
       },
       "ok": true
     }

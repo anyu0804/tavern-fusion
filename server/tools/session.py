@@ -331,6 +331,8 @@ def st_switch_profile(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
         backend_patch["byok_cache_mode"] = str(args["byok_cache_mode"])
     if "byok_cache_control" in args and args["byok_cache_control"] is not None:
         backend_patch["byok_cache_control"] = bool(args["byok_cache_control"])
+    if "byok_stream" in args and args["byok_stream"] is not None:
+        backend_patch["byok_stream"] = bool(args["byok_stream"])
     if backend_patch:
         ctx.save_plugin_settings(backend_patch)
 

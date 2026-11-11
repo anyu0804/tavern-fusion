@@ -1966,5 +1966,135 @@ export class SidecarApp {
                 else:
                     os.environ[k] = v
 
+    def test_15_byok_streaming_preview(self) -> None:
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        from server.byok_backend import STREAM_PREVIEW_FILE, byok_chat_completion_stream
+
+        state = {"mode": "sse", "preview_seen": []}
+        pieces = ["*The lamp ", "flickers.* ", "\"Stay a while.\""]
+
+        class _H(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:  # noqa: N802
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))).decode("utf-8"))
+                mode = state["mode"]
+                if mode == "reject_stream" and body.get("stream"):
+                    out = json.dumps({"error": {"message": "stream_options not supported"}}).encode("utf-8")
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(out)))
+                    self.end_headers()
+                    self.wfile.write(out)
+                    return
+                if mode == "reject_stream":
+                    out = json.dumps({"choices": [{"message": {"content": "plain reply"}}]}).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(out)))
+                    self.end_headers()
+                    self.wfile.write(out)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                for i, piece in enumerate(pieces):
+                    if mode == "break" and i == 2:
+                        ev = {"error": {"message": "upstream reset"}}
+                    else:
+                        ev = {"choices": [{"delta": {"content": piece}}]}
+                    self.wfile.write(f"data: {json.dumps(ev)}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                    if state.get("preview_path"):
+                        time.sleep(0.15)
+                        p = state["preview_path"]
+                        if p.exists():
+                            try:
+                                state["preview_seen"].append(json.loads(p.read_text(encoding="utf-8"))["text"])
+                            except ValueError:
+                                pass
+                usage = {"choices": [], "usage": {"prompt_tokens": 500, "prompt_tokens_details": {"cached_tokens": 384}}}
+                self.wfile.write(f"data: {json.dumps(usage)}\n\ndata: [DONE]\n\n".encode("utf-8"))
+                self.wfile.flush()
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+                return
+
+        srv = HTTPServer(("127.0.0.1", 0), _H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{srv.server_port}/v1"
+        msgs = [{"role": "user", "content": "hi"}]
+        try:
+            # 1. SSE deltas accumulate, usage arrives in the final chunk
+            seen: list[str] = []
+            text, usage = byok_chat_completion_stream(base, "k", "m", msgs, on_delta=seen.append)
+            self.assertEqual(text, "".join(pieces).strip())
+            self.assertEqual(seen[-1], "".join(pieces))
+            self.assertEqual(len(seen), 3)
+            self.assertEqual(usage["cached_tokens"], 384)
+
+            # 2. Endpoint refusing the streaming request -> one non-streaming retry
+            state["mode"] = "reject_stream"
+            seen = []
+            text, _ = byok_chat_completion_stream(base, "k", "m", msgs, on_delta=seen.append)
+            self.assertEqual(text, "plain reply")
+            self.assertEqual(seen, ["plain reply"])
+
+            # 3. Error after tokens started -> raised, never silently truncated
+            state["mode"] = "break"
+            with self.assertRaises(ValueError) as ctx:
+                byok_chat_completion_stream(base, "k", "m", msgs, on_delta=lambda _t: None)
+            self.assertIn("upstream reset", str(ctx.exception))
+
+            # 4. End to end: preview file grows during the turn, is removed afterwards,
+            #    and a failed stream commits nothing
+            state["mode"] = "sse"
+            saved = {k: os.environ.pop(k, None) for k in ("TAVERN_BYOK_API_KEY", "TAVERN_BYOK_BASE_URL", "TAVERN_BYOK_MODEL")}
+            os.environ["TAVERN_BYOK_API_KEY"] = "sk-stream-test"
+            try:
+                with tempfile.TemporaryDirectory() as tmp:
+                    tdir = Path(tmp)
+                    st_root = make_sandbox_st_root(tdir)
+                    rt = TavernFusionRuntime(st_data_root=st_root, state_dir=tdir / "state")
+                    try:
+                        rt.tool_st_session_bootstrap({"character_name": "Seraphina", "mode": "play"})
+                        rt.handle_sidecar_op("switch_profile", {
+                            "generation_backend": "byok", "byok_base_url": base, "byok_model": "mock-model",
+                        })
+                        self.assertTrue(rt.handle_sidecar_op("byok_status", {})["stream"])
+                        state["preview_path"] = Path(rt.state_dir) / STREAM_PREVIEW_FILE
+                        res = rt.handle_sidecar_op("byok_turn", {"action_kind": "send_turn", "user_text": "Hello"})
+                        self.assertEqual(res["usage"]["cached_tokens"], 384)
+                        self.assertTrue(state["preview_seen"])
+                        self.assertTrue(any(t.startswith("*The lamp") for t in state["preview_seen"]))
+                        self.assertFalse(state["preview_path"].exists())
+                        _, chat = read_jsonl_chat(rt.load_active_session()["chat_path"])
+                        self.assertIn("Stay a while.", chat[-1]["mes"])
+                        floors = len(chat)
+
+                        state["mode"] = "break"
+                        with self.assertRaises(ValueError):
+                            rt.handle_sidecar_op("byok_turn", {"action_kind": "swipe_reroll"})
+                        self.assertFalse(state["preview_path"].exists())
+                        _, chat2 = read_jsonl_chat(rt.load_active_session()["chat_path"])
+                        self.assertEqual(len(chat2), floors)
+                        self.assertEqual(len(chat2[-1].get("swipes") or [chat2[-1]["mes"]]), len(chat[-1].get("swipes") or [chat[-1]["mes"]]))
+                        self.assertFalse(rt.load_active_session().get("stage_busy"))
+
+                        # Streaming can be switched off from the Stage config
+                        rt.handle_sidecar_op("switch_profile", {"byok_stream": False})
+                        self.assertFalse(rt.handle_sidecar_op("byok_status", {})["stream"])
+                    finally:
+                        rt.close()
+            finally:
+                for k, v in saved.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

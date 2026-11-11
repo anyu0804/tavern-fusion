@@ -114,13 +114,126 @@ async function dispatchByokTurn(actionKind, extraArgs = {}) {
   }
   byokInFlight = true;
   showToast(`正在通过自有 API（${appState.byok.model}）生成…`, false);
+  const stopPreview = appState.byok.stream === false ? () => {} : startStreamPreview(actionKind);
   try {
     const res = await callOp('byok_turn', { action_kind: actionKind, ...extraArgs });
     if (res?.gentle_notice) showToast(res.gentle_notice, false);
     else showToast('');
   } finally {
+    stopPreview();
     byokInFlight = false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Live Streaming Preview (BYOK) & Typewriter Reveal (host backend)
+// ---------------------------------------------------------------------------
+let streamDraftText = null;
+let streamDraftKind = '';
+let lastCharFloorSig = null;
+let typewriterTimer = null;
+
+function startStreamPreview(actionKind) {
+  let stopped = false;
+  streamDraftText = '';
+  streamDraftKind = actionKind;
+  renderStreamDraft();
+  const tick = async () => {
+    if (stopped) return;
+    try {
+      const p = await sidecarFetchJson('/api/stream_preview', { method: 'GET' });
+      if (!stopped && p?.active && typeof p.text === 'string' && p.text !== streamDraftText) {
+        streamDraftText = p.text;
+        renderStreamDraft();
+      }
+    } catch {
+      // Cosmetic only; the committed floor arrives through the normal state poll.
+    }
+    if (!stopped) setTimeout(tick, 150);
+  };
+  setTimeout(tick, 150);
+  return () => {
+    stopped = true;
+    streamDraftText = null;
+    renderStreamDraft();
+  };
+}
+
+function renderStreamDraft() {
+  const stream = $('chat-stream');
+  if (!stream) return;
+  let el = $('stream-draft');
+  if (streamDraftText === null) {
+    el?.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement('article');
+    el.id = 'stream-draft';
+    el.className = 'floor-card stream-draft';
+  }
+  const nearBottom = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 90;
+  const who = escapeHtml(appState?.session?.character_name || '');
+  const label = streamDraftKind === 'swipe_reroll' ? '重演中' : '正在书写';
+  el.innerHTML = `
+    <div class="floor-hdr"><div><span class="floor-author">${who}</span> <span class="brand-sub">${label}…</span></div></div>
+    <div class="floor-body">${formatRpProse(streamDraftText)}<span class="stream-caret"></span></div>`;
+  if (el.parentNode !== stream || stream.lastElementChild !== el) stream.appendChild(el);
+  if (nearBottom) stream.scrollTop = stream.scrollHeight;
+}
+
+function typewriterEnabled() {
+  try {
+    return localStorage.getItem('tf_typewriter') !== '0';
+  } catch {
+    return true; // Storage blocked in some sandboxed webviews.
+  }
+}
+
+function finishTypewriter() {
+  if (typewriterTimer) {
+    clearInterval(typewriterTimer.id);
+    typewriterTimer.body.innerHTML = typewriterTimer.finalHtml;
+    typewriterTimer = null;
+  }
+}
+
+function maybeTypewriteLastFloor(sess, messages) {
+  const last = messages[messages.length - 1];
+  const isCharFloor = Boolean(last && !last.is_user && !last.extra?.is_backstage);
+  const swipes = Array.isArray(last?.swipes) && last.swipes.length ? last.swipes : [last?.mes || ''];
+  const text = isCharFloor ? swipes[Math.min(Math.max(Number(last.swipe_id || 0), 0), swipes.length - 1)] ?? last.mes ?? '' : '';
+  const cur = { chat: sess.chat_file, len: messages.length, swipes: swipes.length };
+  const prev = lastCharFloorSig;
+  lastCharFloorSig = cur;
+  // The live BYOK draft is still on screen when the committed floor first renders.
+  const skip = streamDraftText !== null;
+  // Only animate a reply that just arrived (a new floor, or a new swipe on the last floor):
+  // not the first render, a chat switch, a deletion, a swipe browse, an edit, or text the
+  // BYOK stream already showed live.
+  if (!prev || prev.chat !== cur.chat || !isCharFloor || skip || !typewriterEnabled() || editingFloorIdx !== null) return;
+  const arrived = cur.len > prev.len || (cur.len === prev.len && cur.swipes > prev.swipes);
+  if (!arrived) return;
+  const bodies = $('chat-stream')?.querySelectorAll('.floor-body');
+  const body = bodies?.[bodies.length - 1];
+  if (!body || !text) return;
+  finishTypewriter();
+  const chars = Array.from(text);
+  // ~45 chars/s like a typical stream, capped at 12 s so long replies don't drag.
+  const totalMs = Math.min(chars.length * 22, 12000);
+  const step = Math.max(1, Math.ceil(chars.length / (totalMs / 30)));
+  let shown = 0;
+  const state = { id: 0, body, finalHtml: body.innerHTML };
+  body.textContent = '';
+  state.id = setInterval(() => {
+    shown = Math.min(chars.length, shown + step);
+    body.innerHTML = formatRpProse(chars.slice(0, shown).join('')) + (shown < chars.length ? '<span class="stream-caret"></span>' : '');
+    const stream = $('chat-stream');
+    if (stream && stream.scrollHeight - stream.scrollTop - stream.clientHeight < 140) stream.scrollTop = stream.scrollHeight;
+    if (shown >= chars.length) finishTypewriter();
+  }, 30);
+  typewriterTimer = state;
+  body.addEventListener('click', finishTypewriter, { once: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -423,6 +536,7 @@ function renderChatStream(sess, messages) {
   if (sig === lastRenderedFloorSig) return;
   const wasNearBottom = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 90;
   lastRenderedFloorSig = sig;
+  finishTypewriter();
 
   if (messages.length === 0) {
     stream.innerHTML = '<div class="muted-label">剧场帷幕已启，发送第一句台词开始演绎。</div>';
@@ -519,6 +633,8 @@ function renderChatStream(sess, messages) {
   if (wasNearBottom) {
     stream.scrollTop = stream.scrollHeight;
   }
+  renderStreamDraft();
+  maybeTypewriteLastFloor(sess, messages);
 }
 
 function renderSuggestions(sugObj) {
@@ -642,6 +758,12 @@ function renderInspector(sess) {
   }
   if ($('cfg-byok-cache-control') && activeEl !== $('cfg-byok-cache-control')) {
     $('cfg-byok-cache-control').checked = Boolean(pcfg.byok_cache_control);
+  }
+  if ($('cfg-byok-stream') && activeEl !== $('cfg-byok-stream')) {
+    $('cfg-byok-stream').checked = pcfg.byok_stream !== false;
+  }
+  if ($('cfg-typewriter') && activeEl !== $('cfg-typewriter')) {
+    $('cfg-typewriter').checked = typewriterEnabled();
   }
   if ($('cfg-byok-status')) {
     const b = appState.byok || {};
@@ -1159,7 +1281,13 @@ $('btn-save-config').addEventListener('click', async () => {
       byok_model: $('cfg-byok-model')?.value ?? '',
       byok_cache_mode: $('cfg-byok-cache-mode')?.value || 'off',
       byok_cache_control: Boolean($('cfg-byok-cache-control')?.checked),
+      byok_stream: $('cfg-byok-stream') ? Boolean($('cfg-byok-stream').checked) : true,
     });
+    try {
+      localStorage.setItem('tf_typewriter', $('cfg-typewriter')?.checked === false ? '0' : '1');
+    } catch {
+      // Storage blocked: the typewriter simply stays on.
+    }
     showToast('文风预设、Author\'s Note 与叙事边界已保存');
   } catch (err) {
     showToast(err.message, true);

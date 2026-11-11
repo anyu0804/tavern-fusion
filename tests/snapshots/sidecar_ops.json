@@ -144,7 +144,8 @@
           "key_source": "none",
           "last_usage": null,
           "model": "m1",
-          "ready": false
+          "ready": false,
+          "stream": true
         },
         "ok": true
       }
@@ -641,7 +642,8 @@
             "key_source": "none",
             "last_usage": null,
             "model": "m1",
-            "ready": false
+            "ready": false,
+            "stream": true
           },
           "cards": [
             {
@@ -890,7 +892,8 @@
             "key_source": "none",
             "last_usage": null,
             "model": "m1",
-            "ready": false
+            "ready": false,
+            "stream": true
           },
           "cards": [
             {
