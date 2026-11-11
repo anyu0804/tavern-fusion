@@ -195,6 +195,33 @@ def remember_st_data_root(st_root: Path | None, user_handle: str = "default-user
     return chosen
 
 
+def emit_one_time_cli_notice() -> None:
+    from server.fs_safety import atomic_write_json
+    from server.mcp_server import FIRST_RUN_NOTICE_V1
+
+    st_dir = unified_state_dir()
+    cfg_file = st_dir / "plugin_settings.json"
+    cfg: dict = {}
+    if cfg_file.exists():
+        try:
+            loaded = json.loads(cfg_file.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                cfg = loaded
+        except Exception:
+            cfg = {}
+    if cfg.get("first_run_notice_ack_v1") or cfg.get("first_run_cli_shown_v1"):
+        return
+
+    print("\n" + "=" * 68)
+    print(f"[NOTICE] {FIRST_RUN_NOTICE_V1['title']}")
+    for idx, item in enumerate(FIRST_RUN_NOTICE_V1["items"], start=1):
+        print(f"  {idx}. {item}")
+    print("=" * 68 + "\n")
+
+    cfg["first_run_cli_shown_v1"] = True
+    atomic_write_json(cfg_file, cfg, indent=2)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Install or register Tavern Fusion 3.0 locally")
     parser.add_argument("--workspace", default=None, help="Workspace directory to register .agents/plugins.json")
@@ -231,6 +258,8 @@ def main() -> None:
         ws_target = Path(args.workspace) if args.workspace else PLUGIN_ROOT.parent
         p_json = register_workspace_plugin(ws_target)
         print(f"[OK] Registered workspace plugin config: {p_json.name} (workspace: {ws_target.name})")
+
+    emit_one_time_cli_notice()
 
 
 if __name__ == "__main__":

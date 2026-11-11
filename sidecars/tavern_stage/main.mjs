@@ -65,6 +65,8 @@ const ALLOWED_OPS = new Set([
   'manage_variables',
   'import_card',
   'clear_suggestions',
+  'ack_first_run_notice',
+  'ack_minor_risk_warn',
 ]);
 
 // ---------------------------------------------------------------------------

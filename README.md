@@ -4,7 +4,7 @@
 > **早期工程版本声明（Early Engineering Preview）**  
 > 本项目目前处于**非常早期的工程探索版本**，可能还存在较多 Bug 或边缘环境兼容问题。如果你在使用过程中遇到任何故障、或者有想要补充的功能建议，欢迎直接在仓库提交 [**Issues**](https://github.com/anyu0804/tavern-fusion/issues)，我会尽可能持续跟进完善！
 
-**Tavern Fusion 3.0** 是一款面向 **Google Antigravity (AGY)** 构建的 SillyTavern 本地角色扮演与世界观编排插件。它在不修改 SillyTavern 源码、不开启高权限 `enableServerPlugins`、且**无需额外配置外部大模型 API Key** 的前提下，通过宿主官方插件与 Sidecar 接口驱动 **Antigravity 内置推理模型** 直接读写本地酒馆数据目录（`characters/*.png`、`worlds/*.json`、`chats/<avatar_stem>/*.jsonl`、`OpenAI Settings/*.json`、`settings.json`），并在 IDE 右侧辅助面板提供常驻可视化的 **`Tavern Stage`** 剧场工作台。
+**Tavern Fusion 3.0** 是一款面向 **Google Antigravity (AGY)** 的 SillyTavern 本地数据编排与角色扮演工作台插件。它在不修改 SillyTavern 源码、不开启高权限 `enableServerPlugins` 的前提下，使用宿主官方插件扩展点（MCP、生命周期钩子与 `sidecar_sdk`）直接读写本地酒馆数据目录（`characters/*.png`、`worlds/*.json`、`chats/<avatar_stem>/*.jsonl`、`OpenAI Settings/*.json`、`settings.json`），并在 IDE 右侧辅助面板提供常驻可视化的 **`Tavern Stage`** 剧场工作台。
 
 ---
 
@@ -36,12 +36,12 @@
 4. **兼容酒馆常用数据格式与 Card Doctor 静态体检**
    - 解析并同步双写 PNG `chara`（CCv2）+ `ccv3`（CCv3）数据块，落实 **Card-is-Data** 字段清洗。
    - 支持按头像文件名（`avatar_stem`）对齐 SillyTavern `chats/` 目录，兼容 `settings.json` 全局变量（`extension_settings.variables.global`）、全局世界书（`world_info_settings.world_info.globalSelect`）、JS 风格正则捕获组替换（`$1` / `$&`）、`OpenAI Settings/*.json` 的 `prompt_order` 顺序栈与 4 种 `selectiveLogic` 次级词门控。
-   - 内置 **Card & Lore Doctor (`st_lint_card_and_lore`)**：静态检查缺失 `ccv3` 块、缺失 `<START>` 示例、未带 `{{original}}` 覆盖预设的 `system_prompt`、`selective: false` 次级词失效与半括号残缺宏。
+   - 内置 **Card & Lore Doctor (`st_lint_card_and_lore`)**：除静态检查缺失 `ccv3` 块、缺失 `<START>` 示例、未带 `{{original}}` 覆盖预设的 `system_prompt`、`selective: false` 次级词失效与残缺宏外，内置 **未成年风险闸（`evaluate_minor_risk_gate`）**——扫描年龄字段/文本（`<18` 岁）、学年/校服/低龄身高阈值、`loli/shota` 类标签及“外表看起来未成年/合法萝莉”启发式特征，命中高危或多项叠加时**默认拒绝导入与装载**，单一模糊特征触发**强制红屏警告**。
 
-5. **内置双档安全合规护栏 (`policy_mode`)**
-   - `host_gentle`（默认）：对绝对安全红线执行零 Token 硬熔断；对暗黑奇幻/悬疑冲突题材附加温和的平台边界内敛引导，不误伤正常文学创作。
+5. **内置双档内容安全护栏 (`policy_mode`)**
+   - `host_gentle`（默认）：对绝对安全红线执行零 Token 硬熔断；对暗黑奇幻/悬疑冲突题材附加温和的边界内敛引导，不误伤正常文学创作。
    - `strict_block`：对绝对安全红线与成人敏感边界词统一执行零 Token 硬熔断。
-   - 宿主 MCP 模式下**不开放**环境变量或配置文件级的无过滤透传（`passthrough`）开关，任何未识别或篡改的配置值均自动回落至 `host_gentle`。
+   - 宿主 MCP 模式下**不开放**环境变量或配置文件级的无过滤透传（`passthrough`）开关，任何未识别或篡改的配置值均自动回落至 `host_gentle`（注：本地护栏仅作输入侧基础前置拦截，无法替代或绕过云端模型服务端的强制过滤）。
 
 ---
 
@@ -94,15 +94,13 @@ node scripts/run_py.mjs tests/test_full_suite.py
 
 ---
 
-## 合规性、安全边界与免责声明 (Compliance & Disclaimer)
+## 架构边界、安全隔离与免责声明 (Technical Boundaries & Disclaimer)
 
-### 1. 宿主平台合规与正当使用边界 (Platform ToS Compliance)
+### 1. 接入边界、预设限制与风险承担 (Integration Scope & Risk Allocation)
 
-[Tavern Fusion](https://github.com/anyu0804/tavern-fusion) 严格遵循**“数据进官方宿主、算力不出官方客户端”**的原生插件设计原则，不涉及任何第三方客户端逆向或凭证中转：
-
-* **零凭证提取与零外部反代**：本项目完全通过官方客户端内置的插件清单、本地 `stdio` MCP 服务与生命周期钩子运行，**不读取、不提取、不转发**任何 OAuth 登录令牌或会话 Cookie，亦不向外部程序暴露任何推理代理端口，严格遵守 [Google Antigravity 附加服务条款](https://antigravity.google/terms/) 中关于禁止使用第三方软件、包装器或 OAuth 代理访问服务的规定。
-* **内容安全与反越狱（Anti-Jailbreak）要求**：在宿主云端环境中使用本项目进行互动叙事、世界观推演或角色扮演测试时，用户须严格遵守 [Google 通用服务条款](https://policies.google.com/terms?hl=en-US) 与 [Google 生成式 AI 禁止使用政策](https://policies.google.com/terms/generative-ai/use-policy?hl=en-US)；若在宿主内切换使用 Claude 等第三方模型，须同时遵守 [Anthropic 商业条款](https://www.anthropic.com/legal/commercial-terms) 与 [Anthropic 使用政策](https://www-cdn.anthropic.com/files/4zrzovbb/website/6ae2f5bb8675bcd9fac006125817ba1393b396e4.pdf)。
-* **外部预设与角色卡导入警示**：**严禁**在连接云端商业订阅模型时导入包含越狱破限（Jailbreak / DAN / 安全过滤器规避指令）、色情露骨（NSFW / ERP）、极端暴力、仇恨言论、自残诱导或未成年人违法不良信息的预设（`OpenAI Settings/*.json`）及角色卡。[server/st_runtime_compat.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/st_runtime_compat.py) 默认启用 `host_gentle` 安全策略门禁与零容忍正则拦截（宿主 MCP 模式仅支持 `host_gentle` 与 `strict_block` 两档安全护栏，不提供任何通过环境变量或 JSON 配置文件关闭护栏的无过滤透传开关）。
+* **技术接入边界**：我们**不提取/不中转凭证、不架反代、不做多租户；使用官方插件扩展点**（插件清单、本地 `stdio` MCP 服务、生命周期钩子与 `sidecar_sdk` 面板接口）在本地运行；**内容政策与账号风险由使用者承担**（建议使用独立的专用/测试账号体验预览版本；首次运行将弹出一次性风险与边界告知）。
+* **预设与内容限制**：**不支持、不建议导入破限/NSFW 预设，云端模型侧无法绕过服务端强制过滤**。导入越狱破限（Jailbreak / DAN）或色情露骨（NSFW / ERP）等违规预设与角色卡，不仅无法突破云端模型的服务端安全拦截，还可能直接触发上游平台风控。[server/st_runtime_compat.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/st_runtime_compat.py) 默认启用 `host_gentle` 本地前置护栏（宿主 MCP 模式仅保留 `host_gentle` 与 `strict_block` 两档，不提供关闭护栏的 `passthrough` 开关），该机制仅用于本地输入侧自检，**不构成对任何上游平台合规性或账号安全的保证**。
+* **永不实现清单与 PR 红线**：本项目永久拒绝实现凭证读取、反向代理、多账号轮询、`passthrough` 透传与内容过滤关闭开关，相关 PR 一律不予合并；详见 **[POLICY.md](./POLICY.md)** 与 [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md)。
 
 ### 2. 本地数据安全与沙箱隔离 (Local Data & Sandbox Safety)
 
@@ -122,7 +120,7 @@ node scripts/run_py.mjs tests/test_full_suite.py
 ### 4. 商标声明与免责条款 (Trademark & Liability Disclaimer)
 
 * **非官方关联声明 (Non-Affiliation)**：Tavern Fusion 是由社区独立开发的开源工程项目，**与 Google LLC、Google Antigravity 团队、SillyTavern 官方团队或 Anthropic PBC 不存在任何隶属、合作、授权、赞助或官方背书关系**。文档中提及的 `Google Antigravity`、`SillyTavern`、`Claude` 等产品或项目名称仅用于客观说明技术兼容性与运行环境，相关商标及名称权利均归其各自所有者所有。
-* **使用风险自担 (Use at Your Own Risk)**：本软件按 [MIT License](https://github.com/anyu0804/tavern-fusion/blob/main/LICENSE) 规定的“原样（AS IS）”提供，不附带任何明示或暗示担保。使用者须自行确保所加载的角色卡、世界书、提示词预设及对话内容符合所在地法律法规及所接入模型服务商的服务条款；因用户导入违规内容、修改安全门禁配置或不当使用第三方服务而导致的账号受限、配额冻结或数据损失，项目作者与贡献者概不承担责任。
+* **使用风险自担 (Use at Your Own Risk)**：本软件按 [MIT License](https://github.com/anyu0804/tavern-fusion/blob/main/LICENSE) 规定的“原样（AS IS）”提供，不附带任何明示或暗示担保。使用者须自行确保所加载的角色卡、世界书、提示词预设及对话内容符合所在地法律法规及所接入模型服务商的内容与服务政策；因使用本插件、导入外部预设/角色卡或触发上游平台风控而导致的账号受限、配额冻结或数据损失，均由使用者自行承担，项目作者与贡献者概不承担责任。
 
 *Non-Affiliation Disclaimer: Tavern Fusion is an independent, community-driven open-source project and is not affiliated with, endorsed by, or sponsored by Google LLC, the SillyTavern project, or Anthropic PBC. All product names and trademarks mentioned in this repository are the property of their respective owners and are used solely to describe interoperability.*
 

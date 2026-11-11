@@ -714,6 +714,13 @@ html, body {
   gap: 3px;
 }
 
+.doctor-item.critical {
+  border-color: rgba(239, 68, 68, 0.85);
+  border-left: 4px solid #ef4444;
+  background: rgba(127, 29, 29, 0.38);
+  color: #fecaca;
+}
+
 .doctor-item.error {
   border-left: 3px solid var(--tf-danger);
 }
@@ -796,4 +803,86 @@ html, body {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
+}
+
+/* One-Time First-Run Modal & Card Doctor Red-Screen Gate (<=2 Container Layers) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(9, 11, 17, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.modal-backdrop.hidden {
+  display: none;
+}
+
+.modal-backdrop.red-screen {
+  z-index: 95;
+  background: rgba(105, 12, 18, 0.92);
+}
+
+.modal-panel {
+  width: 100%;
+  max-width: 440px;
+  background: var(--tf-card);
+  border: 1px solid var(--tf-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+}
+
+.modal-panel.red-alert-panel {
+  background: #2b090d;
+  border: 2px solid #f87171;
+  color: #fee2e2;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.modal-lead {
+  margin: 0;
+  font-size: 12px;
+  color: #fecaca;
+}
+
+.notice-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.badge-blocked {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(185, 28, 28, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+}
+
+.badge-warn-gate {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  background: rgba(217, 119, 6, 0.2);
+  color: var(--tf-accent-text);
 }

@@ -34,6 +34,7 @@ if str(PLUGIN_ROOT) not in sys.path:
 
 from server.card_codec import (
     detect_message_emotion,
+    evaluate_minor_risk_gate,
     lint_character_card,
     list_character_expressions,
     read_character_card,
@@ -1197,6 +1198,122 @@ class TavernFusionFullTestSuite(unittest.TestCase):
                 self.assertEqual(merged_sess["epistemic_level"], 50)
             finally:
                 rt.close()
+
+    def test_11_policy_first_run_notice_and_minor_risk_gate_e2e(self) -> None:
+        # 1. Verify POLICY.md, PR template, and README wording redlines
+        policy_text = (PLUGIN_ROOT / "POLICY.md").read_text(encoding="utf-8")
+        pr_tpl_text = (PLUGIN_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
+        readme_text = (PLUGIN_ROOT / "README.md").read_text(encoding="utf-8")
+
+        for must_have in ("凭证读取", "反向代理", "多账号", "passthrough", "内容过滤关闭开关"):
+            self.assertIn(must_have, policy_text)
+        self.assertIn("POLICY.md", pr_tpl_text)
+        self.assertIn("passthrough", pr_tpl_text)
+
+        # Marketing / false-safety phrases MUST NOT appear in README
+        for forbidden_phrase in ("无需额外配置外部大模型 API Key", "免费无限", "白嫖订阅", "严格遵守 [Google Antigravity"):
+            self.assertNotIn(forbidden_phrase, readme_text)
+        self.assertIn("我们**不提取/不中转凭证、不架反代、不做多租户；使用官方插件扩展点**", readme_text)
+        self.assertIn("内容政策与账号风险由使用者承担", readme_text)
+        self.assertIn("不支持、不建议导入破限/NSFW 预设，云端模型侧无法绕过服务端强制过滤", readme_text)
+
+        # 2. Verify One-Time First-Run Notice (pops up ONLY ONCE) & Minor Risk Gate enforcement
+        with tempfile.TemporaryDirectory() as tmp:
+            tdir = Path(tmp)
+            st_root = make_sandbox_st_root(tdir)
+            state_dir = tdir / "state"
+            rt = TavernFusionRuntime(st_data_root=st_root, state_dir=state_dir)
+            try:
+                snap0 = rt._sidecar_snapshot()
+                self.assertFalse(snap0["plugin_settings"]["first_run_notice_ack_v1"])
+                self.assertEqual(snap0["first_run_notice"]["version"], 1)
+
+                # First active bootstrap emits `first_run_notice`; second active bootstrap omits it
+                boot1 = rt.tool_st_session_bootstrap({"character_name": "Seraphina", "mode": "play"})
+                self.assertIn("first_run_notice", boot1)
+                boot2 = rt.tool_st_session_bootstrap({"character_name": "Seraphina", "mode": "play"})
+                self.assertNotIn("first_run_notice", boot2)
+
+                # Sidecar UI acknowledgment persists across fresh runtime instances
+                ack_res = rt.handle_sidecar_op("ack_first_run_notice", {"version": 1})
+                self.assertTrue(ack_res["acknowledged"])
+            finally:
+                rt.close()
+
+            rt2 = TavernFusionRuntime(st_data_root=st_root, state_dir=state_dir)
+            try:
+                self.assertTrue(rt2._sidecar_snapshot()["plugin_settings"]["first_run_notice_ack_v1"])
+
+                # 3a. Adult character with childhood backstory & weapon length (120cm) MUST NOT false-positive
+                adult_card = {
+                    "data": {
+                        "name": "Valeria",
+                        "age": 26,
+                        "description": "Age: 26. 她12岁那年离开故乡，如今是星界学院的讲师，随身佩剑剑长120cm。",
+                        "tags": ["fantasy", "knight"],
+                    }
+                }
+                self.assertEqual(evaluate_minor_risk_gate(adult_card)["gate_action"], "pass")
+
+                # 3b. "500-year-old who looks 12" loophole MUST be blocked (`block_load`)
+                loophole_card = {
+                    "data": {
+                        "name": "Nyx",
+                        "age": 500,
+                        "description": "实际年龄500岁的古龙，但外表看起来像12岁的小女孩，童颜幼体。",
+                        "first_mes": "Hi",
+                    }
+                }
+                g_loophole = evaluate_minor_risk_gate(loophole_card)
+                self.assertEqual(g_loophole["gate_action"], "block_load")
+
+                # `tool_st_build_export_card` & `_sidecar_import_card` MUST refuse `block_load` cards by default
+                with self.assertRaises(ValueError):
+                    rt2.tool_st_build_export_card({"card_v3_json": loophole_card, "output_filename": "Nyx.png"})
+                b64_loophole = json.dumps(loophole_card).encode("utf-8")
+                import base64 as _b64
+
+                with self.assertRaises(ValueError):
+                    rt2.handle_sidecar_op(
+                        "import_card",
+                        {"filename": "Nyx.json", "base64_data": _b64.b64encode(b64_loophole).decode("ascii")},
+                    )
+                self.assertFalse((st_root / "characters" / "Nyx.png").exists())
+
+                # Explicit underage height (<140cm) or middle-school grade -> `block_load`
+                self.assertEqual(
+                    evaluate_minor_risk_gate({"data": {"name": "Mio", "description": "初中二年级学生，身高136cm"}})["gate_action"],
+                    "block_load",
+                )
+
+                # 3c. Single ambiguous school-uniform heuristic -> `red_screen_warn` (Mandatory Red-Screen Warning)
+                warn_card = {
+                    "spec": "chara_card_v3",
+                    "spec_version": "3.0",
+                    "data": {
+                        "name": "Kazuha",
+                        "description": "身穿水手服站在天台望风的学姐。",
+                        "first_mes": "*微风吹起衣角。* \"放学了。\"",
+                        "mes_example": "<START>\n{{user}}: \"好巧。\"\n{{char}}: *微笑点头。* \"嗯。\"",
+                        "system_prompt": "{{original}}",
+                    },
+                }
+                warn_png = st_root / "characters" / "Kazuha.png"
+                write_character_card_png(warn_card, warn_png)
+                lint_warn = rt2.tool_st_lint_card_and_lore({"character_name": "Kazuha.png"})
+                self.assertEqual(lint_warn["minor_risk_gate"]["gate_action"], "red_screen_warn")
+                self.assertIn("MINOR_RISK_RED_SCREEN_WARN", {i["code"] for i in lint_warn["card_issues"]})
+
+                rt2.tool_st_session_bootstrap({"character_name": "Kazuha.png", "mode": "play"})
+                snap_warn = rt2._sidecar_snapshot()
+                self.assertEqual(snap_warn["minor_risk_gate"]["gate_action"], "red_screen_warn")
+                self.assertFalse(snap_warn["minor_risk_gate"]["warn_acked"])
+
+                rt2.handle_sidecar_op("ack_minor_risk_warn", {"card_file": "Kazuha.png"})
+                snap_acked = rt2._sidecar_snapshot()
+                self.assertTrue(snap_acked["minor_risk_gate"]["warn_acked"])
+            finally:
+                rt2.close()
 
 
 if __name__ == "__main__":

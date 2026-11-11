@@ -489,12 +489,301 @@ def detect_message_emotion(text: str, available_expressions: list[str]) -> str |
     return available_expressions[0]
 
 
+# ---------------------------------------------------------------------------
+# Card Doctor — Underage / Minor Risk Gate Heuristics
+# ---------------------------------------------------------------------------
+MINOR_HARD_TAG_RE = re.compile(
+    r"(?:^|[\s,;/|_-])(?:loli|lolicon|shota|shotacon|underage|preteen|prepubescent|"
+    r"minor[-_ ]?(?:char|girl|boy)?|child[-_ ]?(?:char|girl|boy)?|toddler|kiddie|"
+    r"elementary[-_ ]?school|middle[-_ ]?school)(?:$|[\s,;/|_-])|"
+    r"(?:萝莉|正太|幼女|幼童|未成年|小学生|初中生|国中生|幼稚园|幼儿园)",
+    re.IGNORECASE,
+)
+
+MINOR_HARD_TEXT_RE = re.compile(
+    r"\b(?:lolicon|shotacon|loli\s+(?:girl|body|char)|shota\s+(?:boy|body|char)|"
+    r"underage\s+(?:girl|boy|teen|character|student)|prepubescent)\b|"
+    r"(?:小萝莉|小正太|萝莉体[型态]|幼女|幼童|未成年(?:少女|少年|学生|角色))",
+    re.IGNORECASE,
+)
+
+MINOR_APPEARS_UNDERAGE_RE = re.compile(
+    r"(?:合法萝莉|万年萝莉|千年萝莉|童颜幼体|幼女体[型态]|幼女身[体躯]|孩童身[体躯]|小孩体型|"
+    r"未发育(?:完全)?的?(?:身体|身躯|体态|少女)|"
+    r"(?:外表|外貌|看起来|看上去|长相|容貌|体态|身形|体型|身体)[^\n。；！？!?]{0,12}"
+    r"(?:像|如同|宛如|停留在|保持在|只有|不过)?[^\n。；！？!?]{0,6}"
+    r"(?:幼女|幼童|小孩|儿童|小女孩|小男孩|小学生|初中生|(?:[4-9]|1[0-7])\s*岁))|"
+    r"\b(?:looks?|appears?|resembles?|shaped\s+like|body\s+of|physique\s+of)\s+"
+    r"(?:like\s+)?(?:a\s+|an\s+)?(?:little\s+(?:girl|boy)|young\s+child|small\s+child|"
+    r"preteen|child|kid|0*(?:[4-9]|1[0-7])(?:-|\s+)year(?:-|\s+)old)\b|"
+    r"\bchildlike\s+(?:body|physique|figure)\b",
+    re.IGNORECASE,
+)
+
+MINOR_HARD_SCHOOL_RE = re.compile(
+    r"(?:小学[一二三四五六1-6]?年级|小学生|红领巾|小学生书包|"
+    r"初中[一二三1-3]?年级|初中生|国中[一二三1-3]?年级|国中生|"
+    r"初[一二三](?:学生|女生|男生|生|班|年级)|"
+    r"高[一二](?:学生|女生|男生|生|班)|高中[一二]年级|"
+    r"\brandoseru\b|"
+    r"\b(?:elementary|primary|middle|junior\s+high)\s+school\s+(?:student|girl|boy|kid)\b|"
+    r"\bhigh\s+school\s+(?:freshman|sophomore|1st[- ]year|2nd[- ]year|first[- ]year|second[- ]year)\b|"
+    r"\b(?:[1-8](?:st|nd|rd|th)|9th|10th)\s+grader\b)",
+    re.IGNORECASE,
+)
+
+MINOR_WARN_SCHOOL_UNIFORM_RE = re.compile(
+    r"(?:女子高中生|高中生|高三(?:学生|女生|男生|生)?|中学生|"
+    r"校服|水手服|死库水|学生制服|百褶校服裙|学妹|"
+    r"\bJK\b|\bseifuku\b|\bsukumizu\b|"
+    r"\b(?:school|sailor)\s+uniform\b|"
+    r"\bhigh\s+school\s+(?:student|girl|boy|senior)\b)",
+    re.IGNORECASE,
+)
+
+MINOR_WARN_YOUTH_CUE_RE = re.compile(
+    r"(?:童颜|稚嫩(?:的)?(?:少女|少年|脸庞|面容|身躯)|娇小少女|青涩学[妹弟]|"
+    r"\bbaby[- ]?faced?\b|\bgothic\s+lolita\b)",
+    re.IGNORECASE,
+)
+
+LABELLED_AGE_RE = re.compile(
+    r"(?:^|[\n\r,，;；|｜(\[（【•*-])\s*"
+    r"(?:age|char(?:acter)?_?age|年龄|芳龄|年方|设定年龄|实际年龄|外表年龄|生理年龄)\s*"
+    r"[:：=为是]\s*0*(\d{1,3})(?:\s*(?:岁|周岁|years?\s*old|y/?o))?(?![0-9.])",
+    re.IGNORECASE,
+)
+
+PROSE_AGE_CN_RE = re.compile(
+    r"(?:\{\{char\}\}|她|他|少女|少年|女孩|男孩)\s*(?:今年|年仅|只有|才|刚满|芳龄)\s*"
+    r"0*(\d{1,2})\s*(?:岁|周岁)(?!半?前|时|那年|以前|之前|的时候|左右时)",
+)
+
+PROSE_AGE_EN_RE = re.compile(
+    r"\b(?:\{\{char\}\}|she|he)\s+is\s+(?:a\s+|an\s+|only\s+|just\s+)?0*(\d{1,2})(?:-|\s+)years?(?:-|\s+)old\b",
+    re.IGNORECASE,
+)
+
+ADULT_ROLE_EXEMPTION_RE = re.compile(
+    r"(?:大学|研究生|博士|教授|讲师|教师|班主任|老师|教官|校医|"
+    r"\buniversity\b|\bcollege\b|\bprofessor\b|\bteacher\b|\binstructor\b|\bfaculty\b)",
+    re.IGNORECASE,
+)
+
+HEIGHT_LABEL_RE = re.compile(
+    r"(?:height|身高|体长)\s*[:：=约为是]?\s*(\d{2,3})(?:\.\d+)?\s*(?:cm|厘米)\b",
+    re.IGNORECASE,
+)
+
+HEIGHT_INLINE_CM_RE = re.compile(
+    r"(?<![0-9.])(8\d|9\d|1[0-4]\d)(?:\.\d+)?\s*(?:cm|厘米)\b",
+    re.IGNORECASE,
+)
+
+NON_STATURE_PREFIX_RE = re.compile(
+    r"(?:胸围|腰围|臀围|三围|剑长|刀长|刃长|枪长|尾长|翼展|bust|waist|hip|blade|length)\s*[:：=约为是]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def evaluate_minor_risk_gate(card_or_bundle: dict[str, Any]) -> dict[str, Any]:
+    """Evaluates character card metadata & text for underage / minor risk signals.
+
+    Returns a structured verdict:
+    - `gate_action`: `"block_load"` (default load/import refusal) | `"red_screen_warn"` (mandatory red-screen warning) | `"pass"`
+    - `hard_signals`: unambiguous underage / child-coded triggers
+    - `warn_signals`: ambiguous school/uniform/stature triggers (2+ warn signals auto-escalate to `block_load`)
+    - `reasons`: human-readable Chinese explanations for Card Doctor & UI overlays
+    """
+    if "card" in card_or_bundle and isinstance(card_or_bundle["card"], dict):
+        card_v3 = card_or_bundle["card"]
+        raw_card = card_or_bundle.get("raw_card", {})
+    elif "data" in card_or_bundle and isinstance(card_or_bundle["data"], dict):
+        card_v3 = card_or_bundle
+        raw_card = card_or_bundle
+    else:
+        card_v3 = {"data": card_or_bundle if isinstance(card_or_bundle, dict) else {}}
+        raw_card = card_or_bundle if isinstance(card_or_bundle, dict) else {}
+
+    data = card_v3.get("data", {}) if isinstance(card_v3.get("data"), dict) else {}
+    raw_data = raw_card.get("data", raw_card) if isinstance(raw_card, dict) else {}
+    ext = data.get("extensions", {}) if isinstance(data.get("extensions"), dict) else {}
+
+    hard_reasons: list[str] = []
+    warn_reasons: list[str] = []
+    signals: list[str] = []
+    explicit_adult_age = False
+
+    # 1. Structured age fields in `data`, `raw_data`, or `data.extensions`
+    for src_label, mapping in (("data", data), ("raw_data", raw_data), ("extensions", ext)):
+        if not isinstance(mapping, dict):
+            continue
+        for k in ("age", "char_age", "character_age", "apparent_age"):
+            if k in mapping and mapping[k] is not None and str(mapping[k]).strip() != "":
+                m_num = re.search(r"(?<!\d)(\d{1,3})(?!\d)", str(mapping[k]))
+                if m_num:
+                    age_val = int(m_num.group(1))
+                    if 1 <= age_val < 18:
+                        signals.append(f"field:{src_label}.{k}={age_val}")
+                        hard_reasons.append(f"年龄字段未满 18 岁 ({k}={age_val})")
+                    elif 18 <= age_val <= 99 and k != "apparent_age":
+                        explicit_adult_age = True
+
+    # 2. Tags inspection (`loli`, `shota`, `underage`, etc.)
+    raw_tags = data.get("tags") or raw_data.get("tags") or []
+    if isinstance(raw_tags, str):
+        tag_list = [t.strip() for t in raw_tags.split(",") if t.strip()]
+    elif isinstance(raw_tags, list):
+        tag_list = [str(t).strip() for t in raw_tags if str(t).strip()]
+    else:
+        tag_list = []
+
+    for tag in tag_list:
+        t_low = tag.lower()
+        if MINOR_HARD_TAG_RE.search(tag):
+            signals.append(f"tag:{tag}")
+            hard_reasons.append(f"命中高危未成年/低幼标签「{tag}」")
+        elif "lolita" in t_low and "gothic" not in t_low:
+            signals.append(f"tag:{tag}")
+            warn_reasons.append(f"包含易混淆低幼风险标签「{tag}」")
+
+    # 3. Textual scan across character prompt fields
+    text_blob = "\n".join(
+        str(data.get(field, ""))
+        for field in ("name", "description", "personality", "scenario", "first_mes", "system_prompt")
+    )
+
+    for m in LABELLED_AGE_RE.finditer(text_blob):
+        age_val = int(m.group(1))
+        if 1 <= age_val < 18:
+            signals.append(f"labelled_age:{age_val}")
+            hard_reasons.append(f"设定文本声明年龄未满 18 岁 ({m.group(0).strip()})")
+        elif 18 <= age_val <= 99:
+            explicit_adult_age = True
+
+    for rx in (PROSE_AGE_CN_RE, PROSE_AGE_EN_RE):
+        for m in rx.finditer(text_blob):
+            age_val = int(m.group(1))
+            if 4 <= age_val < 18:
+                signals.append(f"prose_age:{age_val}")
+                hard_reasons.append(f"角色叙事年龄未满 18 岁 ({m.group(0).strip()})")
+            elif 18 <= age_val <= 99:
+                explicit_adult_age = True
+
+    m_hard_txt = MINOR_HARD_TEXT_RE.search(text_blob)
+    if m_hard_txt:
+        signals.append(f"hard_term:{m_hard_txt.group(0)}")
+        hard_reasons.append(f"包含明确未成年/低幼化设定词「{m_hard_txt.group(0)}」")
+
+    # 4. "Appears underage" / legal-loli loophole heuristic (NEVER exempted by adult numeric age!)
+    m_app = MINOR_APPEARS_UNDERAGE_RE.search(text_blob)
+    if m_app:
+        signals.append(f"appears_underage:{m_app.group(0)[:24]}")
+        hard_reasons.append(f"命中“外表/体型看起来未成年”启发式特征「{m_app.group(0).strip()}」")
+
+    # 5. School grade & uniform setting
+    has_adult_role = bool(ADULT_ROLE_EXEMPTION_RE.search(text_blob))
+    m_school_hard = MINOR_HARD_SCHOOL_RE.search(text_blob)
+    if m_school_hard:
+        if has_adult_role and explicit_adult_age:
+            signals.append(f"school_context_warn:{m_school_hard.group(0)}")
+            warn_reasons.append(f"虽声明成年身份，但包含低龄学段语境「{m_school_hard.group(0)}」")
+        else:
+            signals.append(f"school_minor:{m_school_hard.group(0)}")
+            hard_reasons.append(f"命中未成年学段设定「{m_school_hard.group(0)}」")
+    else:
+        m_school_warn = MINOR_WARN_SCHOOL_UNIFORM_RE.search(text_blob)
+        if m_school_warn and not (explicit_adult_age and has_adult_role):
+            signals.append(f"school_uniform:{m_school_warn.group(0)}")
+            warn_reasons.append(f"检出学年/校服/高中设定「{m_school_warn.group(0)}」且未明确成年职业身份")
+
+    # 6. Height / stature heuristic
+    detected_heights: list[int] = []
+    for k in ("height", "char_height"):
+        raw_h = data.get(k) or ext.get(k)
+        if raw_h is not None:
+            mh = re.search(r"(\d{2,3})", str(raw_h))
+            if mh:
+                detected_heights.append(int(mh.group(1)))
+    for m in HEIGHT_LABEL_RE.finditer(text_blob):
+        detected_heights.append(int(m.group(1)))
+    for m in HEIGHT_INLINE_CM_RE.finditer(text_blob):
+        prefix = text_blob[max(0, m.start() - 16) : m.start()]
+        if not NON_STATURE_PREFIX_RE.search(prefix):
+            detected_heights.append(int(m.group(1)))
+
+    for cm in detected_heights:
+        if 75 <= cm < 140:
+            signals.append(f"height_cm:{cm}")
+            hard_reasons.append(f"角色身高设定过低 ({cm}cm < 140cm)，触发低幼体格风险阈值")
+            break
+        if 140 <= cm <= 148 and not explicit_adult_age:
+            signals.append(f"height_borderline_cm:{cm}")
+            warn_reasons.append(f"角色身高处于低龄边缘区间 ({cm}cm) 且未声明满 18 岁")
+            break
+
+    # 7. Youthful appearance cues
+    m_youth = MINOR_WARN_YOUTH_CUE_RE.search(text_blob)
+    if m_youth and not explicit_adult_age:
+        signals.append(f"youth_cue:{m_youth.group(0)}")
+        warn_reasons.append(f"检出低龄外观暗示词「{m_youth.group(0)}」且未声明满 18 岁")
+
+    # Deduplicate reasons while preserving order
+    dedup_hard = list(dict.fromkeys(hard_reasons))
+    dedup_warn = list(dict.fromkeys(warn_reasons))
+
+    if dedup_hard:
+        gate_action = "block_load"
+        reasons = dedup_hard + dedup_warn
+    elif len(dedup_warn) >= 2:
+        gate_action = "block_load"
+        reasons = ["多项未成年启发式特征叠加触发拒载：" + "；".join(dedup_warn)]
+    elif len(dedup_warn) == 1:
+        gate_action = "red_screen_warn"
+        reasons = dedup_warn
+    else:
+        gate_action = "pass"
+        reasons = []
+
+    return {
+        "gate_action": gate_action,
+        "blocked": gate_action == "block_load",
+        "red_screen_warn": gate_action == "red_screen_warn",
+        "explicit_adult_age": explicit_adult_age,
+        "signals": signals,
+        "reasons": reasons,
+    }
+
+
 def lint_character_card(card_bundle: dict[str, Any]) -> list[dict[str, Any]]:
     """Card Doctor static analyzer inspired by `terva-sh/terva` (`packages/agent/card/lint.go`)."""
     issues: list[dict[str, Any]] = []
     card = card_bundle.get("card", {})
     raw_card = card_bundle.get("raw_card", {})
     data = card.get("data", {})
+
+    # 0. Underage / Minor Risk Gate (highest priority check)
+    minor_gate = evaluate_minor_risk_gate(card_bundle)
+    if minor_gate["gate_action"] == "block_load":
+        issues.append({
+            "code": "MINOR_RISK_BLOCKED",
+            "severity": "critical",
+            "gate_action": "block_load",
+            "field": "minor_risk_gate",
+            "signals": minor_gate["signals"],
+            "message": f"未成年风险闸【默认拒绝装载】：{'；'.join(minor_gate['reasons'])}",
+            "fix_hint": "本工具拒绝装载未成年或低幼化特征角色卡；请移除卡片，或将角色明确修正为年满 18 周岁的成年设定。",
+        })
+    elif minor_gate["gate_action"] == "red_screen_warn":
+        issues.append({
+            "code": "MINOR_RISK_RED_SCREEN_WARN",
+            "severity": "error",
+            "gate_action": "red_screen_warn",
+            "field": "minor_risk_gate",
+            "signals": minor_gate["signals"],
+            "message": f"未成年风险闸【强制红屏警告】：{'；'.join(minor_gate['reasons'])}",
+            "fix_hint": "若角色确系满 18 周岁成年人，请在 description 中补充明确成年年龄（如 Age: 20）以消除启发式告警。",
+        })
 
     if card_bundle.get("detected_chunk") == "chara" or not card_bundle.get("has_dual_chunks", False):
         if card_bundle.get("detected_chunk") != "json":

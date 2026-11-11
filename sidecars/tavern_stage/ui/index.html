@@ -268,6 +268,34 @@
     </main>
   </div>
 
+  <!-- One-Time First-Run Notice (pops up ONLY ONCE) -->
+  <div id="first-run-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="first-run-title">
+    <div class="modal-panel">
+      <h2 id="first-run-title" class="modal-title">首次运行须知（Preview）</h2>
+      <ul id="first-run-items" class="notice-list">
+        <li><strong>条款与风险摘要</strong>：本工具仅通过宿主官方扩展点在本地读写酒馆数据，不提取凭证、不架反代、不做多租户。模型调用受宿主平台及上游模型服务商条款约束，内容政策与账号风险由使用者自行承担。</li>
+        <li><strong>建议使用专用账号</strong>：当前处于早期预览版（Preview），建议使用独立的专用/测试账号运行，避免在主力生产账号上加载未经审阅的外部预设或角色卡。</li>
+        <li><strong>不支持破限 / ERP</strong>：不支持、不建议导入越狱破限（Jailbreak）或色情露骨（NSFW / ERP）预设与角色卡；云端模型侧无法绕过服务端强制安全过滤。</li>
+      </ul>
+      <div class="btn-row end">
+        <button id="btn-ack-first-run" class="ctrl-btn primary">我已知悉并继续</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Doctor Underage / Minor Risk Gate Red-Screen Alert -->
+  <div id="minor-risk-modal" class="modal-backdrop red-screen hidden" role="alertdialog" aria-modal="true" aria-labelledby="minor-risk-title">
+    <div class="modal-panel red-alert-panel">
+      <h2 id="minor-risk-title" class="modal-title">🛑 Card Doctor 未成年风险闸警告</h2>
+      <p id="minor-risk-lead" class="modal-lead">当前角色卡检出疑似未成年特征，请立即核查设定：</p>
+      <ul id="minor-risk-reasons" class="notice-list"></ul>
+      <div class="btn-row end">
+        <button id="btn-minor-ack-adult" class="ctrl-btn danger">确认角色已满 18 周岁（仅限误报）</button>
+        <button id="btn-minor-switch-card" class="ctrl-btn primary">前往卡库切换角色</button>
+      </div>
+    </div>
+  </div>
+
   <script defer src="/app.js"></script>
 </body>
 </html>

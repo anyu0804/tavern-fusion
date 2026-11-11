@@ -3,7 +3,7 @@
  *
  * Connects to `main.mjs` via ETag incremental polling (`GET /api/state`) and
  * dispatches stage turns through `window.sidecar.agent.sendMessage`
- * / `startConversation` without requiring any external LLM API keys.
+ * / `startConversation` over the official host Sidecar SDK.
  */
 
 const PLACEHOLDER_SVG =
@@ -19,6 +19,7 @@ let activeConvId = '';
 let editingFloorIdx = null;
 let loadedLorebook = { lorebook_name: '', entries: [] };
 let lastRenderedFloorSig = '';
+let localFirstRunAcked = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -79,11 +80,33 @@ function mediaUrl(params) {
   return `/api/media?${q.toString()}`;
 }
 
+function isFirstRunAcked() {
+  return localFirstRunAcked || Boolean(appState?.plugin_settings?.first_run_notice_ack_v1);
+}
+
+function isMinorGateBlockingTurn() {
+  const g = appState?.minor_risk_gate;
+  if (!g) return false;
+  if (g.gate_action === 'block_load') return true;
+  if (g.gate_action === 'red_screen_warn' && !g.warn_acked) return true;
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Stage Turn Dispatcher
 // ---------------------------------------------------------------------------
 async function dispatchAgentTurn(actionKind, extraArgs = {}) {
   try {
+    if (!isFirstRunAcked()) {
+      $('first-run-modal')?.classList.remove('hidden');
+      showToast('请先阅读并确认首次运行须知', false);
+      return;
+    }
+    if (isMinorGateBlockingTurn()) {
+      renderGateModals();
+      showToast('当前角色卡触发未成年风险闸，请先在红屏警告中处理', true);
+      return;
+    }
     const boundConvId = activeConvId || appState?.session?.rp_conv_id || '';
     const prep = await callOp('prepare_agent_turn', {
       action_kind: actionKind,
@@ -176,18 +199,54 @@ function renderAll() {
   renderCardsAndDoctor();
   renderInspector(sess);
   syncLorebookDropdown();
+  renderGateModals();
+}
+
+function renderGateModals() {
+  const firstModal = $('first-run-modal');
+  const acked = isFirstRunAcked();
+  if (firstModal) {
+    const noticeItems = appState?.first_run_notice?.items;
+    if (!acked && Array.isArray(noticeItems) && noticeItems.length > 0) {
+      $('first-run-items').innerHTML = noticeItems.map((t) => `<li>${escapeHtml(t)}</li>`).join('');
+    }
+    firstModal.classList.toggle('hidden', acked);
+  }
+
+  const minorModal = $('minor-risk-modal');
+  if (!minorModal) return;
+  const gate = appState?.minor_risk_gate;
+  const showMinor =
+    acked &&
+    gate &&
+    (gate.gate_action === 'block_load' || (gate.gate_action === 'red_screen_warn' && !gate.warn_acked));
+  minorModal.classList.toggle('hidden', !showMinor);
+  if (showMinor) {
+    const isHardBlock = gate.gate_action === 'block_load';
+    $('minor-risk-title').textContent = isHardBlock
+      ? '🛑 Card Doctor 未成年风险闸 · 默认拒绝装载'
+      : '🛑 Card Doctor 未成年风险闸 · 强制红屏警告';
+    $('minor-risk-lead').textContent = isHardBlock
+      ? `角色卡「${gate.character_name || gate.card_file}」命中未成年高危特征，已被拒绝装载：`
+      : `角色卡「${gate.character_name || gate.card_file}」检出疑似未成年启发式特征，默认暂停舞台交互：`;
+    $('minor-risk-reasons').innerHTML = (gate.reasons || [])
+      .map((r) => `<li>${escapeHtml(r)}</li>`)
+      .join('');
+    $('btn-minor-ack-adult').classList.toggle('hidden', isHardBlock);
+  }
 }
 
 function renderHero(sess) {
   const charSel = $('char-select');
   const cards = appState.cards || [];
   const charOptionsHtml = cards
-    .map(
-      (c) =>
-        `<option value="${escapeHtml(c.file)}" ${
-          c.name === sess.character_name || c.file === sess.card_file ? 'selected' : ''
-        }>${escapeHtml(c.name)} (${escapeHtml(c.spec)})</option>`
-    )
+    .map((c) => {
+      const blocked = c.minor_gate_action === 'block_load';
+      const prefix = blocked ? '[⛔ 拒载] ' : c.minor_gate_action === 'red_screen_warn' ? '[⚠️ 待核] ' : '';
+      return `<option value="${escapeHtml(c.file)}" ${blocked ? 'disabled' : ''} ${
+        c.name === sess.character_name || c.file === sess.card_file ? 'selected' : ''
+      }>${prefix}${escapeHtml(c.name)} (${escapeHtml(c.spec)})</option>`;
+    })
     .join('');
   if (charSel.innerHTML !== charOptionsHtml) {
     charSel.innerHTML = charOptionsHtml || '<option value="">无可用角色卡</option>';
@@ -466,20 +525,25 @@ function renderCardsAndDoctor() {
       (c.tags || []).some((t) => String(t).toLowerCase().includes(q))
   );
   $('cards-grid').innerHTML = filtered
-    .map(
-      (c) => `
+    .map((c) => {
+      const blocked = c.minor_gate_action === 'block_load';
+      const warn = c.minor_gate_action === 'red_screen_warn';
+      const actionHtml = blocked
+        ? '<span class="badge-blocked" title="Card Doctor 未成年风险闸默认拒绝装载">⛔ 未成年风险拒载</span>'
+        : `<button class="mini-btn accent" data-boot-card="${escapeHtml(c.file)}">登台演绎</button>${
+            warn ? ' <span class="badge-warn-gate">⚠️ 待核年龄</span>' : ''
+          }`;
+      return `
       <div class="gallery-card">
         <img class="gallery-thumb" src="${mediaUrl({ kind: 'avatar', file: c.file })}" alt="${escapeHtml(c.name)}" />
         <div class="gallery-meta">
           <div class="gallery-name">${escapeHtml(c.name)}</div>
           <div class="muted-label">${escapeHtml(c.spec)} · 差分 ${c.expressions_count || 0} 张</div>
           ${c.world ? `<div class="muted-label">🌍 ${escapeHtml(c.world)}</div>` : ''}
-          <div>
-            <button class="mini-btn accent" data-boot-card="${escapeHtml(c.file)}">登台演绎</button>
-          </div>
+          <div>${actionHtml}</div>
         </div>
-      </div>`
-    )
+      </div>`;
+    })
     .join('');
 }
 
@@ -1012,6 +1076,34 @@ $('btn-save-config').addEventListener('click', async () => {
       authors_note: $('cfg-an-text').value,
     });
     showToast('文风预设、Author\'s Note 与叙事边界已保存');
+  } catch (err) {
+    showToast(err.message, true);
+  }
+});
+
+// One-Time First-Run Notice & Minor Risk Red-Screen Gate Handlers
+$('btn-ack-first-run')?.addEventListener('click', async () => {
+  try {
+    await callOp('ack_first_run_notice', { version: 1 });
+    localFirstRunAcked = true;
+    $('first-run-modal')?.classList.add('hidden');
+    renderGateModals();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+});
+
+$('btn-minor-switch-card')?.addEventListener('click', () => {
+  $('minor-risk-modal')?.classList.add('hidden');
+  document.querySelector('[data-tab="cards"]')?.click();
+});
+
+$('btn-minor-ack-adult')?.addEventListener('click', async () => {
+  const cardFile = appState?.minor_risk_gate?.card_file;
+  if (!cardFile) return;
+  try {
+    await callOp('ack_minor_risk_warn', { card_file: cardFile });
+    showToast('已记录成年角色核实确认');
   } catch (err) {
     showToast(err.message, true);
   }

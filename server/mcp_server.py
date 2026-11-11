@@ -24,6 +24,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from server.card_codec import (
     detect_message_emotion,
+    evaluate_minor_risk_gate,
     lint_character_card,
     list_character_expressions,
     read_character_card,
@@ -66,6 +67,16 @@ from server.widget_compiler import compile_stage_widget_html
 
 
 DEFAULT_STATE_DIR = Path.home() / ".gemini" / "antigravity" / "tavern-fusion" / "state"
+
+FIRST_RUN_NOTICE_V1: dict[str, Any] = {
+    "version": 1,
+    "title": "首次运行须知（Preview）",
+    "items": [
+        "条款与风险摘要：本工具仅通过宿主官方扩展点在本地读写酒馆数据，不提取凭证、不架反代、不做多租户。模型调用受宿主平台及上游模型服务商条款约束，内容政策与账号风险由使用者自行承担。",
+        "建议使用专用账号：当前处于早期预览版（Preview），建议使用独立的专用/测试账号运行，避免在主力生产账号上加载未经审阅的外部预设或角色卡。",
+        "不支持破限 / ERP：不支持、不建议导入越狱破限（Jailbreak）或色情露骨（NSFW / ERP）预设与角色卡；云端模型侧无法绕过服务端强制安全过滤。",
+    ],
+}
 
 
 class TavernFusionRuntime:
@@ -170,6 +181,8 @@ class TavernFusionRuntime:
         defaults: dict[str, Any] = {
             "policy_mode": resolve_policy_mode(state_dir=self.state_dir),
             "inference_channel": "antigravity_builtin",
+            "first_run_notice_ack_v1": False,
+            "first_run_cli_shown_v1": False,
         }
         if not self.plugin_settings_file.exists():
             return defaults
@@ -180,6 +193,8 @@ class TavernFusionRuntime:
         except Exception:
             pass
         defaults["policy_mode"] = resolve_policy_mode(str(defaults.get("policy_mode", "")))
+        defaults["first_run_notice_ack_v1"] = bool(defaults.get("first_run_notice_ack_v1", False))
+        defaults["first_run_cli_shown_v1"] = bool(defaults.get("first_run_cli_shown_v1", False))
         return defaults
 
     def load_plugin_settings(self) -> dict[str, Any]:
@@ -353,6 +368,12 @@ class TavernFusionRuntime:
 
         prev = self.load_active_session()
         card_path, card_bundle, char_name, avatar_stem = self._resolve_card_and_identity(char_query, prev)
+        minor_gate = evaluate_minor_risk_gate(card_bundle)
+        if minor_gate["gate_action"] == "block_load":
+            raise ValueError(
+                f"[Card Doctor 未成年风险闸] 默认拒绝装载角色卡「{char_name}」 ({card_path.name})："
+                f"{'；'.join(minor_gate['reasons'])}"
+            )
         card_v3 = card_bundle["card"]
 
         persona = get_active_persona(self.st_data_root, args.get("persona_name"))
@@ -420,8 +441,20 @@ class TavernFusionRuntime:
             "bootstrapped_char": "",
         }
         self.save_active_session(session_state)
+        settings_updates: dict[str, Any] = {}
         if (self.st_data_root / "characters").exists() and "mock_st_data" not in str(self.st_data_root):
-            self.save_plugin_settings({"last_st_data_root": str(self.st_data_root)})
+            settings_updates["last_st_data_root"] = str(self.st_data_root)
+
+        cur_cfg = self.load_plugin_settings()
+        emit_first_run = bool(
+            activate_rp
+            and not cur_cfg.get("first_run_notice_ack_v1")
+            and not cur_cfg.get("first_run_cli_shown_v1")
+        )
+        if emit_first_run:
+            settings_updates["first_run_cli_shown_v1"] = True
+        if settings_updates:
+            self.save_plugin_settings(settings_updates)
 
         expressions = list_character_expressions(self.st_data_root, avatar_stem) or list_character_expressions(
             self.st_data_root, char_name
@@ -444,6 +477,10 @@ class TavernFusionRuntime:
             "available_expressions": expressions,
             "sidecar_pill": "[Tavern Stage](sidecar://tavern-fusion/tavern_stage/)",
         }
+        if emit_first_run:
+            result["first_run_notice"] = FIRST_RUN_NOTICE_V1
+        if minor_gate["gate_action"] == "red_screen_warn":
+            result["minor_risk_gate"] = minor_gate
         return result
 
     def tool_st_dump_prompt_frame(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -681,6 +718,11 @@ class TavernFusionRuntime:
         card_json = args["card_v3_json"]
         if isinstance(card_json, str):
             card_json = json.loads(card_json)
+        minor_gate = evaluate_minor_risk_gate(card_json)
+        if minor_gate["gate_action"] == "block_load":
+            raise ValueError(
+                f"[Card Doctor 未成年风险闸] 默认拒绝铸造/导出未成年风险角色卡：{'；'.join(minor_gate['reasons'])}"
+            )
         out_name = sanitize_filename_stem(Path(str(args["output_filename"]).strip()).stem) + ".png"
         char_dir = (self.st_data_root / "characters").resolve()
         char_dir.mkdir(parents=True, exist_ok=True)
@@ -710,10 +752,18 @@ class TavernFusionRuntime:
             sess = self.load_active_session()
             char_q = str(sess.get("character_name") or "")
 
+        minor_gate: dict[str, Any] = {
+            "gate_action": "pass",
+            "blocked": False,
+            "red_screen_warn": False,
+            "signals": [],
+            "reasons": [],
+        }
         if char_q:
             c_path = self.find_character_card_path(char_q)
             bundle = read_character_card(c_path, include_avatar_data_uri=False)
             inspected_card = c_path.name
+            minor_gate = evaluate_minor_risk_gate(bundle)
             card_issues = lint_character_card(bundle)
             linked = str(bundle["card"]["data"].get("extensions", {}).get("world", "")).strip()
             if linked and not lore_q:
@@ -731,6 +781,7 @@ class TavernFusionRuntime:
             "total_issues": total,
             "inspected_card": inspected_card,
             "inspected_lorebook": inspected_lore,
+            "minor_risk_gate": minor_gate,
             "card_issues": card_issues,
             "lorebook_issues": lore_issues,
         }
@@ -1071,6 +1122,30 @@ class TavernFusionRuntime:
         if op == "clear_suggestions":
             self.stage_suggestions_file.unlink(missing_ok=True)
             return {"cleared": True}
+        if op == "ack_first_run_notice":
+            updated = self.save_plugin_settings({
+                "first_run_notice_ack_v1": True,
+                "first_run_cli_shown_v1": True,
+                "first_run_ack_at": int(time.time()),
+            })
+            return {
+                "acknowledged": True,
+                "first_run_notice_ack_v1": bool(updated.get("first_run_notice_ack_v1")),
+            }
+        if op == "ack_minor_risk_warn":
+            card_file = str(args.get("card_file") or "").strip()
+            if not card_file:
+                raise ValueError("Missing card_file for ack_minor_risk_warn.")
+            c_path = self.find_character_card_path(card_file)
+            gate = evaluate_minor_risk_gate(read_character_card(c_path, include_avatar_data_uri=False))
+            if gate["gate_action"] == "block_load":
+                raise ValueError("硬拦截角色卡不允许解除未成年风险闸。")
+            cur_cfg = self.load_plugin_settings()
+            acked = list(cur_cfg.get("minor_warn_acked_cards") or [])
+            if c_path.name not in acked:
+                acked.append(c_path.name)
+            self.save_plugin_settings({"minor_warn_acked_cards": acked})
+            return {"acknowledged": True, "card_file": c_path.name}
         raise ValueError(f"Unknown sidecar operation: {op}")
 
     def _sidecar_snapshot(self) -> dict[str, Any]:
@@ -1084,6 +1159,7 @@ class TavernFusionRuntime:
                         b = read_character_card(p, include_avatar_data_uri=False)
                         d = b["card"]["data"]
                         c_name = d["name"]
+                        c_gate = evaluate_minor_risk_gate(b)
                         cards_summary.append({
                             "file": p.name,
                             "name": c_name,
@@ -1093,16 +1169,19 @@ class TavernFusionRuntime:
                             "spec": b["detected_chunk"],
                             "has_dual_chunks": b["has_dual_chunks"],
                             "expressions_count": len(list_character_expressions(self.st_data_root, c_name)),
+                            "minor_gate_action": c_gate["gate_action"],
+                            "minor_gate_reasons": c_gate["reasons"],
                         })
                     except Exception:
                         continue
 
         session = self.load_active_session()
-        if not session.get("character_name") and cards_summary:
-            # Auto-select first available card for Sidecar display without claiming an active global RP chat
+        loadable_cards = [c for c in cards_summary if c.get("minor_gate_action") != "block_load"]
+        if not session.get("character_name") and loadable_cards:
+            # Auto-select first safe card for Sidecar display without claiming an active global RP chat
             try:
                 self.tool_st_session_bootstrap({
-                    "character_name": cards_summary[0]["file"],
+                    "character_name": loadable_cards[0]["file"],
                     "mode": "play",
                     "activate_rp": False,
                 })
@@ -1170,10 +1249,24 @@ class TavernFusionRuntime:
             except Exception:
                 suggestions_obj = {}
 
+        plugin_cfg = self.load_plugin_settings()
+        acked_warn_cards = set(plugin_cfg.get("minor_warn_acked_cards") or [])
+        active_minor_gate = dict(
+            doctor_data.get("minor_risk_gate")
+            or {"gate_action": "pass", "blocked": False, "red_screen_warn": False, "signals": [], "reasons": []}
+        )
+        active_minor_gate["card_file"] = active_card_file
+        active_minor_gate["character_name"] = active_char
+        active_minor_gate["warn_acked"] = bool(
+            active_minor_gate.get("gate_action") == "red_screen_warn" and active_card_file in acked_warn_cards
+        )
+
         meta = header.get("chat_metadata", {})
         return {
             "data_root_name": self.st_data_root.name,
-            "plugin_settings": self.load_plugin_settings(),
+            "plugin_settings": plugin_cfg,
+            "first_run_notice": FIRST_RUN_NOTICE_V1,
+            "minor_risk_gate": active_minor_gate,
             "presets": list_openai_presets(self.st_data_root),
             "lorebooks": lorebooks,
             "groups": list_groups(self.st_data_root),
@@ -1224,6 +1317,16 @@ class TavernFusionRuntime:
         if session.get("character_name") != char_name or not session.get("chat_path"):
             self.tool_st_session_bootstrap({"character_name": char_name, "mode": args.get("mode", "play")})
             session = self.load_active_session()
+
+        c_check_path, c_check_bundle, _, _ = self._resolve_card_and_identity(
+            str(session.get("card_file") or char_name), session
+        )
+        prep_minor_gate = evaluate_minor_risk_gate(c_check_bundle)
+        if prep_minor_gate["gate_action"] == "block_load":
+            raise ValueError(
+                f"[Card Doctor 未成年风险闸] 角色卡「{char_name}」({c_check_path.name}) 触发拒载保护："
+                f"{'；'.join(prep_minor_gate['reasons'])}"
+            )
 
         action_kind = str(args.get("action_kind", "send_turn"))
         user_text = str(args.get("user_text", "")).strip()
@@ -1417,6 +1520,11 @@ class TavernFusionRuntime:
 
         if filename.lower().endswith(".json") or raw_bytes.lstrip().startswith(b"{"):
             card_obj = json.loads(raw_bytes.decode("utf-8"))
+            minor_gate = evaluate_minor_risk_gate(card_obj)
+            if minor_gate["gate_action"] == "block_load":
+                raise ValueError(
+                    f"[Card Doctor 未成年风险闸] 默认拒绝导入该角色卡：{'；'.join(minor_gate['reasons'])}"
+                )
             res = write_character_card_png(card_obj, out_png)
         else:
             # Parse & re-export through Seppä codec so dual chunks & Card-is-Data sanitization apply!
@@ -1424,11 +1532,17 @@ class TavernFusionRuntime:
             try:
                 tmp_in.write_bytes(raw_bytes)
                 parsed = read_character_card(tmp_in, include_avatar_data_uri=False)
+                minor_gate = evaluate_minor_risk_gate(parsed)
+                if minor_gate["gate_action"] == "block_load":
+                    raise ValueError(
+                        f"[Card Doctor 未成年风险闸] 默认拒绝导入该角色卡：{'；'.join(minor_gate['reasons'])}"
+                    )
                 res = write_character_card_png(parsed["card"], out_png, base_png_bytes=raw_bytes)
             finally:
                 tmp_in.unlink(missing_ok=True)
 
         self.tool_st_session_bootstrap({"character_name": out_png.name, "mode": "play"})
+        res["minor_risk_gate"] = minor_gate
         return res
 
 
@@ -1679,7 +1793,7 @@ class StdioMCPServer:
                 "result": {
                     "protocolVersion": client_proto,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.1"},
+                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.2-preview"},
                 },
             }
 
