@@ -43,6 +43,11 @@
    - `strict_block`：对绝对安全红线与成人敏感边界词统一执行零 Token 硬熔断。
    - 宿主 MCP 模式下**不开放**环境变量或配置文件级的无过滤透传（`passthrough`）开关，任何未识别或篡改的配置值均自动回落至 `host_gentle`（注：本地护栏仅作输入侧基础前置拦截，无法替代或绕过云端模型服务端的强制过滤）。
 
+6. **可选“自有 API Key”生成后端（BYOK）**
+   - 在 `Tavern Stage` →「⚙️ 文风预设、Author's Note 与内容边界」中把「生成后端」切换为「自有 API Key」，回合将不再经过宿主内置模型，而是把同一份 `ST_RUNTIME_FRAME` 发送到任意 OpenAI 兼容的 `/chat/completions` 接口（默认 Google AI Studio 的 Gemini OpenAI 兼容端点 `https://generativelanguage.googleapis.com/v1beta/openai`），并直接落盘到 `.jsonl`。
+   - **密钥只从环境变量 `TAVERN_BYOK_API_KEY` 读取**（或你手动创建的插件状态目录 `byok_api_key` 文件第一行）；插件不会保存、回显或上传密钥。远程端点强制 `https://`。可选环境变量：`TAVERN_BYOK_BASE_URL`、`TAVERN_BYOK_MODEL`。
+   - 当前版本支持「发送回合」与「重抽（Swipe）」；回复灵感、意图扩写、Kartoittaja 分支与导演模式仍需宿主后端，BYOK 模式下不会静默回退到宿主模型。
+
 ---
 
 ## 专家子代理组（Specialist Subagents）与 Slash 技能
@@ -79,6 +84,8 @@ node scripts/run_py.mjs tests/test_full_suite.py
 
 ## 已知限制（Known Limitations）
 
+- **与正在运行的 SillyTavern 同时编辑同一存档**：SillyTavern 把当前聊天保存在浏览器内存中、保存时整文件重写。Tavern Fusion 每次写盘都会轮换 `chat_metadata.integrity`，因此旧标签页再保存时会被 SillyTavern 自身的完整性校验拒绝并弹出“是否覆盖”提示——**请选择不覆盖并重新载入聊天**，否则 Antigravity 侧写入的楼层会被覆盖。安装 `st-ag-sync` 扩展可在标签页重新可见时自动重新载入。
+
 - **宿主环境依赖**：插件依赖 Google Antigravity 2.0+ 的 Lifecycle Hooks（`SessionStart` / `PreInvocation` / `PreToolUse` / `Stop`）与 `sidecar_sdk` 右侧面板协议，无法脱离 Antigravity 在普通独立 MCP 客户端中直接获得完整的舞台联动与自动落盘体验。
 - **单活跃舞台状态**：`active_session.json` 当前设计为维护单个绑定 RP 会话（`rp_conv_id`）；其他工程对话与该 RP 会话完全隔离，但暂不支持在同一工作区内同时并行开启两个不同角色的自动落盘 RP 会话。
 - **SillyTavern 特性覆盖范围**：目前已覆盖主流单人角色卡（CCv2/CCv3）、世界书门控、`OpenAI Settings` 顺序栈、常用宏与正则替换，但尚未完整复刻 SillyTavern 前端全部 STscript 斜杠脚本命令、复杂群聊发言调度器及第三方前端 UI 扩展。
@@ -102,12 +109,17 @@ node scripts/run_py.mjs tests/test_full_suite.py
 * **预设与内容限制**：**不支持、不建议导入破限/NSFW 预设，云端模型侧无法绕过服务端强制过滤**。导入越狱破限（Jailbreak / DAN）或色情露骨（NSFW / ERP）等违规预设与角色卡，不仅无法突破云端模型的服务端安全拦截，还可能直接触发上游平台风控。[server/st_runtime_compat.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/st_runtime_compat.py) 默认启用 `host_gentle` 本地前置护栏（宿主 MCP 模式仅保留 `host_gentle` 与 `strict_block` 两档，不提供关闭护栏的 `passthrough` 开关），该机制仅用于本地输入侧自检，**不构成对任何上游平台合规性或账号安全的保证**。
 * **永不实现清单与 PR 红线**：本项目永久拒绝实现凭证读取、反向代理、多账号轮询、`passthrough` 透传与内容过滤关闭开关，相关 PR 一律不予合并；详见 **[POLICY.md](./POLICY.md)** 与 [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md)。
 
-### 2. 本地数据安全与沙箱隔离 (Local Data & Sandbox Safety)
+### 2. Antigravity 条款与对话隐私 (Antigravity Terms & Conversation Privacy)
+
+* **条款风险**：[Google Antigravity 附加条款](https://antigravity.google/terms)第 6 条禁止“将本服务与非 Google 提供的产品结合使用”，违反可能导致 Antigravity 及 Gemini CLI 账号被暂停或终止。使用宿主内置模型运行 SillyTavern 角色扮演存在被认定违规的风险，本项目无法消除这一风险；如需规避，请使用上文的「自有 API Key」后端。
+* **交互数据会被记录**：依据同一条款，宿主会记录交互数据，Google 员工或承包商可能人工审阅，并可能用于改进产品和训练模型。角色扮演对话通常较为私密，请勿输入不希望被审阅的内容，并建议在 Antigravity 设置中关闭交互数据用于改进的选项（即使关闭，Google 仍会为提供服务和安全目的使用数据）。
+
+### 3. 本地数据安全与沙箱隔离 (Local Data & Sandbox Safety)
 
 * **Card-is-Data 零特权原则**：外部导入的角色卡与世界书均被视为不可信纯数据，在解析阶段自动剥离潜在的命令执行钩子与危险扩展字段。
 * **文件系统边界锁定**：所有文件读写均受 [server/fs_safety.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/fs_safety.py) 目录包含校验（`ensure_under_dir`）与生命周期拦截钩子保护，严格限制在用户显式配置的本地 `ST_DATA_ROOT` 目录及本地回环地址（`127.0.0.1`）范围内。
 
-### 3. 开源许可证与洁净室隔离声明 (Open-Source Licensing & Clean-Room Notice)
+### 4. 开源许可证与洁净室隔离声明 (Open-Source Licensing & Clean-Room Notice)
 
 本项目核心代码基于 [MIT License](https://github.com/anyu0804/tavern-fusion/blob/main/LICENSE) 开源，完整第三方致谢与协议文本详见 [THIRD_PARTY_NOTICES.md](https://github.com/anyu0804/tavern-fusion/blob/main/THIRD_PARTY_NOTICES.md)：
 
@@ -117,7 +129,7 @@ node scripts/run_py.mjs tests/test_full_suite.py
 | [Terva (terva-sh/terva)](https://github.com/terva-sh/terva) | MIT | 致谢并沿用其芬兰语叙事专家角色命名体系与上下文分层理念，所有业务代码均在 [Tavern Fusion](https://github.com/anyu0804/tavern-fusion) 内以 Python / ESM 独立重写，并完整保留上游 MIT 版权声明。 |
 | [Character Card Spec V2 / V3](https://github.com/kwaroran/character-card-spec-v3) | 公开格式规范 | 依据公开规范利用 Python 标准库（`struct` / `zlib` / `base64` / `json`）独立实现 PNG `tEXt` / `zTXt` / `iTXt` 双区块无损读写。 |
 
-### 4. 商标声明与免责条款 (Trademark & Liability Disclaimer)
+### 5. 商标声明与免责条款 (Trademark & Liability Disclaimer)
 
 * **非官方关联声明 (Non-Affiliation)**：Tavern Fusion 是由社区独立开发的开源工程项目，**与 Google LLC、Google Antigravity 团队、SillyTavern 官方团队或 Anthropic PBC 不存在任何隶属、合作、授权、赞助或官方背书关系**。文档中提及的 `Google Antigravity`、`SillyTavern`、`Claude` 等产品或项目名称仅用于客观说明技术兼容性与运行环境，相关商标及名称权利均归其各自所有者所有。
 * **使用风险自担 (Use at Your Own Risk)**：本软件按 [MIT License](https://github.com/anyu0804/tavern-fusion/blob/main/LICENSE) 规定的“原样（AS IS）”提供，不附带任何明示或暗示担保。使用者须自行确保所加载的角色卡、世界书、提示词预设及对话内容符合所在地法律法规及所接入模型服务商的内容与服务政策；因使用本插件、导入外部预设/角色卡或触发上游平台风控而导致的账号受限、配额冻结或数据损失，均由使用者自行承担，项目作者与贡献者概不承担责任。

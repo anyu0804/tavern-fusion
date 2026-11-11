@@ -57,6 +57,8 @@ const ALLOWED_OPS = new Set([
   'bind_rp_conv',
   'floor_op',
   'prepare_agent_turn',
+  'byok_turn',
+  'byok_status',
   'read_lorebook',
   'evolve_lore',
   'query_lore',
@@ -112,6 +114,19 @@ const STANDALONE_PRELOAD_SHIM = `
 })();
 `;
 
+const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
+
+function isLoopbackHostHeader(hostHeader) {
+  if (!hostHeader) return false;
+  let hostname;
+  try {
+    hostname = new URL(`http://${hostHeader}`).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return LOOPBACK_HOSTNAMES.has(hostname);
+}
+
 class StandaloneSidecarApp {
   #pages = new Map();
   #apis = new Map();
@@ -136,6 +151,14 @@ class StandaloneSidecarApp {
     }));
 
     const server = createServer(async (req, res) => {
+      // DNS-rebinding guard: a rebound attacker page reaches us with its own domain in
+      // `Host` (and a matching `Origin`), so the same-origin check alone is not enough.
+      // Only loopback host names are ever accepted, for pages, media and the op bridge.
+      if (!isLoopbackHostHeader(req.headers.host)) {
+        res.writeHead(421, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Misdirected request: non-loopback Host header rejected' }));
+        return;
+      }
       const url = new URL(req.url || '/', 'http://127.0.0.1');
       if (req.method === 'GET' && this.#pages.has(url.pathname)) {
         const out = await this.#pages.get(url.pathname)();
@@ -545,7 +568,12 @@ function serveMediaAsset(data, ResponseClass) {
 // ---------------------------------------------------------------------------
 // Python Control-Plane RPC Bridge
 // ---------------------------------------------------------------------------
+// BYOK turns wait on a remote model; every other op is a fast local file operation.
+const SLOW_OP_TIMEOUT_MS = { byok_turn: 180000 };
+const DEFAULT_OP_TIMEOUT_MS = 20000;
+
 function invokePythonOp(op, argsObj, dataRoot) {
+  const timeoutMs = SLOW_OP_TIMEOUT_MS[op] || DEFAULT_OP_TIMEOUT_MS;
   return new Promise((resolvePromise, rejectPromise) => {
     let pySpec;
     try {
@@ -583,8 +611,8 @@ function invokePythonOp(op, argsObj, dataRoot) {
     const errChunks = [];
     const timer = setTimeout(() => {
       child.kill();
-      rejectPromise(new Error(`Python sidecar-op '${op}' timed out after 20s`));
-    }, 20000);
+      rejectPromise(new Error(`Python sidecar-op '${op}' timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
 
     child.stdout.on('data', (chunk) => outChunks.push(chunk));
     child.stderr.on('data', (chunk) => errChunks.push(chunk));

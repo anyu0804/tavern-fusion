@@ -22,6 +22,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from server.mcp_server import TavernFusionRuntime
+from server.net_utils import open_url
 
 
 def discover_st_data_from_workspaces(workspace_paths: list[str]) -> str | None:
@@ -37,7 +38,7 @@ def discover_st_data_from_workspaces(workspace_paths: list[str]) -> str | None:
 def check_st_web_alive(url: str = "http://127.0.0.1:8000") -> bool:
     try:
         req = urllib.request.Request(url, method="HEAD")
-        with urllib.request.urlopen(req, timeout=0.3) as resp:
+        with open_url(req, timeout=0.3) as resp:
             return 200 <= resp.status < 500
     except (urllib.error.URLError, TimeoutError, OSError):
         return False
@@ -78,7 +79,7 @@ def main() -> None:
         )
 
         msg = (
-            f"[Tavern Fusion v3.0.2-preview Ready] Data profile: `{runtime.st_data_root.name}` "
+            f"[Tavern Fusion v3.0.3-preview Ready] Data profile: `{runtime.st_data_root.name}` "
             f"(cards={card_count}, lorebooks={world_names or ['none']}, st_web_8000={'online' if web_online else 'offline'}). "
             f"{mode_note}"
         )

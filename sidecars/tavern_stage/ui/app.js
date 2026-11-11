@@ -93,6 +93,37 @@ function isMinorGateBlockingTurn() {
 }
 
 // ---------------------------------------------------------------------------
+// BYOK (own API key) Turn Dispatcher
+// ---------------------------------------------------------------------------
+const BYOK_ACTIONS = new Set(['send_turn', 'swipe_reroll']);
+let byokInFlight = false;
+
+async function dispatchByokTurn(actionKind, extraArgs = {}) {
+  if (!BYOK_ACTIONS.has(actionKind)) {
+    // Never silently fall back to the host model: that would spend host quota the user opted out of.
+    showToast('自有 API Key 后端暂只支持发送与重抽；如需此功能请在配置中切回宿主模型。', true);
+    return;
+  }
+  if (!appState?.byok?.ready) {
+    showToast('自有 API Key 后端未配置完整：请设置 TAVERN_BYOK_API_KEY 并填写模型名。', true);
+    return;
+  }
+  if (byokInFlight) {
+    showToast('上一轮仍在生成中，请稍候。', false);
+    return;
+  }
+  byokInFlight = true;
+  showToast(`正在通过自有 API（${appState.byok.model}）生成…`, false);
+  try {
+    const res = await callOp('byok_turn', { action_kind: actionKind, ...extraArgs });
+    if (res?.gentle_notice) showToast(res.gentle_notice, false);
+    else showToast('');
+  } finally {
+    byokInFlight = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stage Turn Dispatcher
 // ---------------------------------------------------------------------------
 async function dispatchAgentTurn(actionKind, extraArgs = {}) {
@@ -105,6 +136,10 @@ async function dispatchAgentTurn(actionKind, extraArgs = {}) {
     if (isMinorGateBlockingTurn()) {
       renderGateModals();
       showToast('当前角色卡触发未成年风险闸，请先在红屏警告中处理', true);
+      return;
+    }
+    if (appState?.plugin_settings?.generation_backend === 'byok') {
+      await dispatchByokTurn(actionKind, extraArgs);
       return;
     }
     const boundConvId = activeConvId || appState?.session?.rp_conv_id || '';
@@ -152,6 +187,8 @@ async function dispatchAgentTurn(actionKind, extraArgs = {}) {
 // ---------------------------------------------------------------------------
 // State Polling & Rendering
 // ---------------------------------------------------------------------------
+let pollErrorStreak = 0;
+
 async function pollState(force = false) {
   try {
     const q = new URLSearchParams();
@@ -161,10 +198,23 @@ async function pollState(force = false) {
     if (resp.unchanged) return;
     currentEtag = resp.etag || '';
     appState = resp.state;
+    pollErrorStreak = 0;
     renderAll();
   } catch (err) {
-    console.warn('[Tavern Stage poll]', err);
+    pollErrorStreak += 1;
+    // Log once per outage instead of on every retry.
+    if (pollErrorStreak === 1) console.warn('[Tavern Stage poll]', err);
   }
+}
+
+
+function nextPollDelay() {
+  if (pollErrorStreak > 0) {
+    // Exponential back-off with full jitter while the control plane is unreachable.
+    const cap = Math.min(30000, 1000 * 2 ** Math.min(pollErrorStreak, 5));
+    return cap / 2 + Math.random() * (cap / 2);
+  }
+  return appState?.session?.stage_busy ? 1100 : 2500;
 }
 
 function renderAll() {
@@ -575,6 +625,23 @@ function renderInspector(sess) {
   const policyMode = appState.plugin_settings?.policy_mode || 'host_gentle';
   if (activeEl !== $('cfg-policy-select')) {
     $('cfg-policy-select').value = policyMode;
+  }
+  const pcfg = appState.plugin_settings || {};
+  if ($('cfg-backend-select') && activeEl !== $('cfg-backend-select')) {
+    $('cfg-backend-select').value = pcfg.generation_backend === 'byok' ? 'byok' : 'host';
+  }
+  if ($('cfg-byok-base-url') && activeEl !== $('cfg-byok-base-url')) {
+    $('cfg-byok-base-url').value = pcfg.byok_base_url || '';
+    $('cfg-byok-base-url').placeholder = appState.byok?.base_url || '';
+  }
+  if ($('cfg-byok-model') && activeEl !== $('cfg-byok-model')) {
+    $('cfg-byok-model').value = pcfg.byok_model || '';
+  }
+  if ($('cfg-byok-status')) {
+    const b = appState.byok || {};
+    $('cfg-byok-status').textContent = b.key_present
+      ? `已检测到 API Key（来源：${b.key_source === 'env' ? '环境变量' : '状态目录文件'}）${b.model ? '' : '，尚未填写模型名'}`
+      : '未检测到 API Key：请设置环境变量 TAVERN_BYOK_API_KEY（插件不会保存或回显密钥）';
   }
   if (activeEl !== $('cfg-an-depth')) {
     $('cfg-an-depth').value = String(sess.an_depth ?? 4);
@@ -1074,6 +1141,9 @@ $('btn-save-config').addEventListener('click', async () => {
       policy_mode: $('cfg-policy-select').value,
       an_depth: Number($('cfg-an-depth').value || 4),
       authors_note: $('cfg-an-text').value,
+      generation_backend: $('cfg-backend-select')?.value || 'host',
+      byok_base_url: $('cfg-byok-base-url')?.value ?? '',
+      byok_model: $('cfg-byok-model')?.value ?? '',
     });
     showToast('文风预设、Author\'s Note 与叙事边界已保存');
   } catch (err) {
@@ -1084,7 +1154,7 @@ $('btn-save-config').addEventListener('click', async () => {
 // One-Time First-Run Notice & Minor Risk Red-Screen Gate Handlers
 $('btn-ack-first-run')?.addEventListener('click', async () => {
   try {
-    await callOp('ack_first_run_notice', { version: 1 });
+    await callOp('ack_first_run_notice', { version: appState?.first_run_notice?.version || 2 });
     localFirstRunAcked = true;
     $('first-run-modal')?.classList.add('hidden');
     renderGateModals();
@@ -1138,7 +1208,7 @@ async function initWorkbench() {
   await pollState(true);
 
   const scheduleNext = () => {
-    const delay = appState?.session?.stage_busy ? 1100 : 2500;
+    const delay = nextPollDelay();
     setTimeout(async () => {
       await pollState(false);
       scheduleNext();

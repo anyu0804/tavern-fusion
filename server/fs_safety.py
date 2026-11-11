@@ -32,7 +32,15 @@ def ensure_under_dir(target_path: str | Path, base_dir: str | Path) -> Path:
     """Ensures `target_path` resolves strictly inside `base_dir` (blocks traversal/symlinks)."""
     resolved_base = Path(base_dir).resolve()
     resolved_target = Path(target_path).resolve()
-    if not resolved_target.is_relative_to(resolved_base):
+    # Compare on `normcase` strings so Windows drive-letter / path case differences
+    # (`c:\\ST` vs `C:\\st`) never cause a false containment violation.
+    norm_base = os.path.normcase(str(resolved_base))
+    norm_target = os.path.normcase(str(resolved_target))
+    try:
+        contained = os.path.commonpath([norm_base, norm_target]) == norm_base
+    except ValueError:  # different drives on Windows
+        contained = False
+    if not contained:
         raise ValueError(
             f"Path containment violation: '{resolved_target.name}' escapes '{resolved_base.name}'."
         )
@@ -89,8 +97,13 @@ def atomic_write_bytes(target_path: str | Path, payload: bytes) -> Path:
         if last_err is not None:
             raise last_err
         return dst
-    except Exception:
-        tmp_path.unlink(missing_ok=True)
+    except BaseException:
+        # Best-effort cleanup: on Windows an antivirus scanner may still hold the temp
+        # file; a failed unlink must never mask the original error.
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
         raise
 
 

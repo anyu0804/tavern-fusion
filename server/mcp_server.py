@@ -63,20 +63,33 @@ from server.st_runtime_compat import (
     resolve_st_macros,
     run_regex_pipeline,
 )
+from server.byok_backend import (
+    build_byok_messages,
+    byok_chat_completion,
+    read_byok_api_key,
+    resolve_byok_config,
+)
 from server.widget_compiler import compile_stage_widget_html
 
 
 DEFAULT_STATE_DIR = Path.home() / ".gemini" / "antigravity" / "tavern-fusion" / "state"
 
-FIRST_RUN_NOTICE_V1: dict[str, Any] = {
-    "version": 1,
+FIRST_RUN_NOTICE_VERSION = 2
+
+FIRST_RUN_NOTICE: dict[str, Any] = {
+    "version": FIRST_RUN_NOTICE_VERSION,
     "title": "首次运行须知（Preview）",
     "items": [
         "条款与风险摘要：本工具仅通过宿主官方扩展点在本地读写酒馆数据，不提取凭证、不架反代、不做多租户。模型调用受宿主平台及上游模型服务商条款约束，内容政策与账号风险由使用者自行承担。",
         "建议使用专用账号：当前处于早期预览版（Preview），建议使用独立的专用/测试账号运行，避免在主力生产账号上加载未经审阅的外部预设或角色卡。",
         "不支持破限 / ERP：不支持、不建议导入越狱破限（Jailbreak）或色情露骨（NSFW / ERP）预设与角色卡；云端模型侧无法绕过服务端强制安全过滤。",
+        "Antigravity 条款风险：Google Antigravity 附加条款第 6 条禁止“将本服务与非 Google 提供的产品结合使用”，违反可能导致 Antigravity 及 Gemini CLI 账号被暂停或终止。使用宿主内置模型运行酒馆角色扮演存在被认定违规的风险；如需规避，可在舞台配置中切换为“自有 API Key”后端。",
+        "对话隐私：依据 Antigravity 条款，宿主会记录交互数据，Google 员工或承包商可能人工审阅，并可能用于改进产品和训练模型。角色扮演对话通常较为私密，请勿输入不希望被审阅的内容，并建议在 Antigravity 设置中关闭交互数据用于改进的选项（即使关闭，Google 仍会为提供服务和安全目的使用数据）。",
     ],
 }
+
+# Backwards-compatible alias (older imports / tests).
+FIRST_RUN_NOTICE_V1 = FIRST_RUN_NOTICE
 
 
 class TavernFusionRuntime:
@@ -193,8 +206,16 @@ class TavernFusionRuntime:
         except Exception:
             pass
         defaults["policy_mode"] = resolve_policy_mode(str(defaults.get("policy_mode", "")))
-        defaults["first_run_notice_ack_v1"] = bool(defaults.get("first_run_notice_ack_v1", False))
-        defaults["first_run_cli_shown_v1"] = bool(defaults.get("first_run_cli_shown_v1", False))
+        # `first_run_notice_ack_v1` / `first_run_cli_shown_v1` keep their historical names for
+        # UI/test compatibility, but now mean "the CURRENT notice version was acknowledged/shown".
+        # Settings written before versioning count as version 1, so a materially changed notice
+        # (version bump) is shown again once.
+        ack_ver = int(defaults.get("first_run_notice_ack_version") or (1 if defaults.get("first_run_notice_ack_v1") else 0))
+        shown_ver = int(defaults.get("first_run_cli_shown_version") or (1 if defaults.get("first_run_cli_shown_v1") else 0))
+        defaults["first_run_notice_ack_version"] = ack_ver
+        defaults["first_run_cli_shown_version"] = shown_ver
+        defaults["first_run_notice_ack_v1"] = ack_ver >= FIRST_RUN_NOTICE_VERSION
+        defaults["first_run_cli_shown_v1"] = shown_ver >= FIRST_RUN_NOTICE_VERSION
         return defaults
 
     def load_plugin_settings(self) -> dict[str, Any]:
@@ -453,6 +474,7 @@ class TavernFusionRuntime:
         )
         if emit_first_run:
             settings_updates["first_run_cli_shown_v1"] = True
+            settings_updates["first_run_cli_shown_version"] = FIRST_RUN_NOTICE_VERSION
         if settings_updates:
             self.save_plugin_settings(settings_updates)
 
@@ -478,7 +500,7 @@ class TavernFusionRuntime:
             "sidecar_pill": "[Tavern Stage](sidecar://tavern-fusion/tavern_stage/)",
         }
         if emit_first_run:
-            result["first_run_notice"] = FIRST_RUN_NOTICE_V1
+            result["first_run_notice"] = FIRST_RUN_NOTICE
         if minor_gate["gate_action"] == "red_screen_warn":
             result["minor_risk_gate"] = minor_gate
         return result
@@ -954,6 +976,15 @@ class TavernFusionRuntime:
             patch["bootstrapped_conv_id"] = ""
         if args.get("policy_mode"):
             self.save_plugin_settings({"policy_mode": str(args["policy_mode"])})
+        backend_patch: dict[str, Any] = {}
+        if args.get("generation_backend") in ("host", "byok"):
+            backend_patch["generation_backend"] = str(args["generation_backend"])
+        if "byok_base_url" in args and args["byok_base_url"] is not None:
+            backend_patch["byok_base_url"] = str(args["byok_base_url"]).strip()
+        if "byok_model" in args and args["byok_model"] is not None:
+            backend_patch["byok_model"] = str(args["byok_model"]).strip()
+        if backend_patch:
+            self.save_plugin_settings(backend_patch)
 
         session = self.update_active_session(patch) if patch else self.load_active_session()
         chat_path = session.get("chat_path")
@@ -1105,6 +1136,10 @@ class TavernFusionRuntime:
             return self.tool_st_stage_floor_op(args)
         if op == "prepare_agent_turn":
             return self._sidecar_prepare_agent_turn(args)
+        if op == "byok_turn":
+            return self._sidecar_byok_turn(args)
+        if op == "byok_status":
+            return resolve_byok_config(self.load_plugin_settings(), self.state_dir)
         if op == "read_lorebook":
             return self._sidecar_read_lorebook(args)
         if op == "evolve_lore":
@@ -1126,6 +1161,8 @@ class TavernFusionRuntime:
             updated = self.save_plugin_settings({
                 "first_run_notice_ack_v1": True,
                 "first_run_cli_shown_v1": True,
+                "first_run_notice_ack_version": FIRST_RUN_NOTICE_VERSION,
+                "first_run_cli_shown_version": FIRST_RUN_NOTICE_VERSION,
                 "first_run_ack_at": int(time.time()),
             })
             return {
@@ -1265,7 +1302,8 @@ class TavernFusionRuntime:
         return {
             "data_root_name": self.st_data_root.name,
             "plugin_settings": plugin_cfg,
-            "first_run_notice": FIRST_RUN_NOTICE_V1,
+            "byok": resolve_byok_config(plugin_cfg, self.state_dir),
+            "first_run_notice": FIRST_RUN_NOTICE,
             "minor_risk_gate": active_minor_gate,
             "presets": list_openai_presets(self.st_data_root),
             "lorebooks": lorebooks,
@@ -1463,6 +1501,77 @@ class TavernFusionRuntime:
             "action_kind": action_kind,
             "prompt": prompt_to_agent,
             "gentle_notice": detail.removeprefix("gentle_notice:") if detail.startswith("gentle_notice:") else "",
+        }
+
+    BYOK_SUPPORTED_ACTIONS = ("send_turn", "swipe_reroll")
+
+    def _sidecar_byok_turn(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Runs one stage turn through the user's own OpenAI-compatible API key instead of the host model.
+
+        Reuses `_sidecar_prepare_agent_turn` (policy gate, minor-risk gate, user floor append) and
+        `tool_st_dump_prompt_frame` (the same ST_RUNTIME_FRAME the PreInvocation hook injects), then
+        commits the reply directly via `tool_st_commit_turn` -- no host conversation, no Stop hook.
+        """
+        action_kind = str(args.get("action_kind", "send_turn"))
+        if action_kind not in self.BYOK_SUPPORTED_ACTIONS:
+            raise ValueError(f"BYOK 后端暂只支持发送回合与重抽（Swipe），不支持「{action_kind}」。")
+        if self.load_active_session().get("director_mode"):
+            raise ValueError("BYOK 后端暂不支持导演穿梭模式，请先关闭导演模式或切回宿主后端。")
+
+        cfg = resolve_byok_config(self.load_plugin_settings(), self.state_dir)
+        api_key = read_byok_api_key(self.state_dir)
+        if not cfg["ready"]:
+            missing = []
+            if not cfg["key_present"]:
+                missing.append("API Key（环境变量 TAVERN_BYOK_API_KEY 或状态目录 byok_api_key 文件）")
+            if not cfg["model"]:
+                missing.append("模型名")
+            raise ValueError("BYOK 后端未配置完整：缺少 " + "、".join(missing))
+
+        prep_args = {k: v for k, v in args.items() if k != "rp_conv_id"}
+        prep_args["action_kind"] = action_kind
+        prep = self._sidecar_prepare_agent_turn(prep_args)
+        # Withdraw the host launch claim right away so a concurrent host invocation in the bound
+        # conversation cannot pick up this BYOK prompt while the API call is in flight.
+        self.update_active_session({"pending_sidecar_launch": None})
+        try:
+            session = self.load_active_session()
+            frame = self.tool_st_dump_prompt_frame({
+                "character_name": session.get("card_file") or prep["character_name"],
+                "user_input": str(args.get("user_text", "")),
+                "agentic_hands": False,
+            })
+            preset = load_openai_preset(self.st_data_root, session.get("preset_name"))
+            reply = byok_chat_completion(
+                base_url=cfg["base_url"],
+                api_key=api_key,
+                model=cfg["model"],
+                messages=build_byok_messages(frame["ephemeral_frame"], prep["prompt"]),
+                temperature=preset.get("temperature"),
+                max_tokens=int(args["max_tokens"]) if args.get("max_tokens") else None,
+            )
+            commit = self.tool_st_commit_turn({
+                "character_name": session.get("card_file") or prep["character_name"],
+                "user_mes": None,
+                "char_mes": reply,
+                "swipe_mode": action_kind == "swipe_reroll",
+                "extra_meta": {"generation_backend": "byok", "byok_model": cfg["model"]},
+            })
+        finally:
+            # Never leave the stage busy or a pending turn for the host Stop hook to pick up.
+            self.update_active_session({
+                "pending_uncommitted_turn": False,
+                "user_floor_already_appended": False,
+                "stage_busy": False,
+                "pending_sidecar_launch": None,
+            })
+        return {
+            "committed": True,
+            "backend": "byok",
+            "model": cfg["model"],
+            "character_name": prep["character_name"],
+            "turn_hash": commit.get("turn_hash"),
+            "gentle_notice": prep.get("gentle_notice", ""),
         }
 
     def _sidecar_read_lorebook(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -1793,7 +1902,7 @@ class StdioMCPServer:
                 "result": {
                     "protocolVersion": client_proto,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.2-preview"},
+                    "serverInfo": {"name": "st-antigravity-mcp", "version": "3.0.3-preview"},
                 },
             }
 
