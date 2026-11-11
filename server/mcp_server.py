@@ -38,8 +38,8 @@ from server.runtime import (  # noqa: F401  (re-exported for backwards-compatibl
     RuntimeContext,
     SessionStore,
 )
-from server.tools import MCP_TOOL_SCHEMAS, TOOL_REGISTRY, ToolSpec  # noqa: F401
-from server.tools import _common, card, chat, lore, session, stage
+from server.tools import MCP_TOOL_SCHEMAS, TOOL_REGISTRY, ToolSpec, call_tool  # noqa: F401
+from server.tools import _common, stage
 
 
 class TavernFusionRuntime(RuntimeContext):
@@ -94,46 +94,46 @@ class TavernFusionRuntime(RuntimeContext):
 
     # -- 14 MCP tools --------------------------------------------------
     def tool_st_session_bootstrap(self, args: dict[str, Any]) -> dict[str, Any]:
-        return session.st_session_bootstrap(self, args)
+        return call_tool(self, "st_session_bootstrap", args)
 
     def tool_st_dump_prompt_frame(self, args: dict[str, Any]) -> dict[str, Any]:
-        return session.st_dump_prompt_frame(self, args)
+        return call_tool(self, "st_dump_prompt_frame", args)
 
     def tool_st_commit_turn(self, args: dict[str, Any]) -> dict[str, Any]:
-        return chat.st_commit_turn(self, args)
+        return call_tool(self, "st_commit_turn", args)
 
     def tool_st_publish_stage_suggestions(self, args: dict[str, Any]) -> dict[str, Any]:
-        return stage.st_publish_stage_suggestions(self, args)
+        return call_tool(self, "st_publish_stage_suggestions", args)
 
     def tool_st_read_card(self, args: dict[str, Any]) -> dict[str, Any]:
-        return card.st_read_card(self, args)
+        return call_tool(self, "st_read_card", args)
 
     def tool_st_build_export_card(self, args: dict[str, Any]) -> dict[str, Any]:
-        return card.st_build_export_card(self, args)
+        return call_tool(self, "st_build_export_card", args)
 
     def tool_st_lint_card_and_lore(self, args: dict[str, Any]) -> dict[str, Any]:
-        return card.st_lint_card_and_lore(self, args)
+        return call_tool(self, "st_lint_card_and_lore", args)
 
     def tool_st_query_lorebook(self, args: dict[str, Any]) -> dict[str, Any]:
-        return lore.st_query_lorebook(self, args)
+        return call_tool(self, "st_query_lorebook", args)
 
     def tool_st_evolve_lore_entry(self, args: dict[str, Any]) -> dict[str, Any]:
-        return lore.st_evolve_lore_entry(self, args)
+        return call_tool(self, "st_evolve_lore_entry", args)
 
     def tool_st_manage_chat_branch(self, args: dict[str, Any]) -> dict[str, Any]:
-        return chat.st_manage_chat_branch(self, args)
+        return call_tool(self, "st_manage_chat_branch", args)
 
     def tool_st_stage_floor_op(self, args: dict[str, Any]) -> dict[str, Any]:
-        return chat.st_stage_floor_op(self, args)
+        return call_tool(self, "st_stage_floor_op", args)
 
     def tool_st_switch_profile(self, args: dict[str, Any]) -> dict[str, Any]:
-        return session.st_switch_profile(self, args)
+        return call_tool(self, "st_switch_profile", args)
 
     def tool_st_manage_variables(self, args: dict[str, Any]) -> dict[str, Any]:
-        return chat.st_manage_variables(self, args)
+        return call_tool(self, "st_manage_variables", args)
 
     def tool_st_compile_stage_widget(self, args: dict[str, Any]) -> dict[str, Any]:
-        return stage.st_compile_stage_widget(self, args)
+        return call_tool(self, "st_compile_stage_widget", args)
 
     # -- Sidecar control plane (`--sidecar-op`) -------------------------
     def handle_sidecar_op(self, op: str, args: dict[str, Any]) -> dict[str, Any]:

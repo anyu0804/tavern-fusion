@@ -21,6 +21,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from server import __version__
 from server.runtime.context import RuntimeContext
 from server.net_utils import open_url
 
@@ -62,7 +63,11 @@ def main() -> None:
         cards_dir = runtime.st_data_root / "characters"
         worlds_dir = runtime.st_data_root / "worlds"
         card_count = len([p for p in cards_dir.glob("*.png") if p.is_file()]) if cards_dir.exists() else 0
-        world_names = [p.stem for p in sorted(worlds_dir.glob("*.json"))[:8]] if worlds_dir.exists() else []
+        world_names = (
+            [p.stem for p in sorted(worlds_dir.glob("*.json"), key=lambda item: (item.name.lower(), item.name))[:8]]
+            if worlds_dir.exists()
+            else []
+        )
         web_online = check_st_web_alive(os.environ.get("ST_WEB_URL", "http://127.0.0.1:8000"))
 
         active_sess = runtime.sessions.load()
@@ -79,7 +84,7 @@ def main() -> None:
         )
 
         msg = (
-            f"[Tavern Fusion v3.0.3-preview Ready] Data profile: `{runtime.st_data_root.name}` "
+            f"[Tavern Fusion v{__version__} Ready] Data profile: `{runtime.st_data_root.name}` "
             f"(cards={card_count}, lorebooks={world_names or ['none']}, st_web_8000={'online' if web_online else 'offline'}). "
             f"{mode_note}"
         )

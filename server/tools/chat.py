@@ -335,13 +335,14 @@ def st_manage_variables(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, 
 
     if scope == "global":
         settings_path = ctx.st_data_root / "settings.json"
-        settings = load_st_settings(ctx.st_data_root)
-        if op in ("set", "inc", "del") and settings_path.exists() and not settings:
-            # `load_st_settings` returns {} on a parse error; writing back would wipe the user's settings.json.
-            raise ValueError("settings.json exists but could not be parsed; refusing to overwrite it.")
-        # Serialize the read-modify-write so a concurrently running SillyTavern server
-        # (or a parallel hook process) cannot clobber the update mid-flight.
+        # Serialize the full read-modify-write inside the lock so a concurrently running
+        # SillyTavern server (or a parallel hook/tool process) never clobbers updates with
+        # a stale pre-lock snapshot.
         with exclusive_file_lock(settings_path):
+            settings = load_st_settings(ctx.st_data_root)
+            if op in ("set", "inc", "del") and settings_path.exists() and not settings:
+                # `load_st_settings` returns {} on a parse error; writing back would wipe the user's settings.json.
+                raise ValueError("settings.json exists but could not be parsed; refusing to overwrite it.")
             # SillyTavern keeps global variables at `extension_settings.variables.global`.
             ext_settings = settings.setdefault("extension_settings", {})
             g_vars = ext_settings.setdefault("variables", {}).setdefault("global", {})

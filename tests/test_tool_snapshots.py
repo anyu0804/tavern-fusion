@@ -183,7 +183,7 @@ class ToolSnapshotTest(unittest.TestCase):
         if UPDATE or not path.exists():
             if not UPDATE:
                 self.fail(f"Missing golden {path.name}; run with UPDATE_SNAPSHOTS=1 to create it.")
-            path.write_text(rendered, encoding="utf-8")
+            path.write_text(rendered, encoding="utf-8", newline="\n")
             return
         expected = path.read_text(encoding="utf-8")
         if expected != rendered:

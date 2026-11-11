@@ -183,7 +183,7 @@ def list_groups(st_data_root: str | Path) -> list[dict[str, Any]]:
     if not groups_dir.exists():
         return []
     out: list[dict[str, Any]] = []
-    for p in sorted(groups_dir.glob("*.json")):
+    for p in sorted(groups_dir.glob("*.json"), key=lambda item: (item.name.lower(), item.name)):
         try:
             raw = json.loads(p.read_text(encoding="utf-8"))
             out.append({

@@ -21,7 +21,7 @@ def list_openai_presets(st_data_root: str | Path) -> list[str]:
     preset_dir = Path(st_data_root) / "OpenAI Settings"
     if not preset_dir.exists():
         return ["BuiltIn-Carbon-RP"]
-    names = sorted(p.stem for p in preset_dir.glob("*.json") if p.is_file())
+    names = sorted((p.stem for p in preset_dir.glob("*.json") if p.is_file()), key=lambda s: (s.lower(), s))
     return names or ["BuiltIn-Carbon-RP"]
 
 
@@ -39,7 +39,7 @@ def load_openai_preset(st_data_root: str | Path, preset_name: str | None = None)
             if default_cand.exists():
                 chosen_file = default_cand
             else:
-                json_files = sorted(preset_dir.glob("*.json"))
+                json_files = sorted(preset_dir.glob("*.json"), key=lambda item: (item.name.lower(), item.name))
                 if json_files:
                     chosen_file = json_files[0]
 

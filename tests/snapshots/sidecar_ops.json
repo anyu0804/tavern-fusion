@@ -640,6 +640,20 @@
           "cards": [
             {
               "expressions_count": 0,
+              "file": "evil.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Snapshot Bard",
+              "scenario": "A tavern.",
+              "spec": "ccv3",
+              "tags": [
+                "music"
+              ],
+              "world": ""
+            },
+            {
+              "expressions_count": 0,
               "file": "Seraphina.png",
               "has_dual_chunks": true,
               "minor_gate_action": "pass",
@@ -657,20 +671,6 @@
             {
               "expressions_count": 0,
               "file": "Snapshot Bard.png",
-              "has_dual_chunks": true,
-              "minor_gate_action": "pass",
-              "minor_gate_reasons": [],
-              "name": "Snapshot Bard",
-              "scenario": "A tavern.",
-              "spec": "ccv3",
-              "tags": [
-                "music"
-              ],
-              "world": ""
-            },
-            {
-              "expressions_count": 0,
-              "file": "evil.png",
               "has_dual_chunks": true,
               "minor_gate_action": "pass",
               "minor_gate_reasons": [],
@@ -886,6 +886,20 @@
           "cards": [
             {
               "expressions_count": 0,
+              "file": "evil.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Snapshot Bard",
+              "scenario": "A tavern.",
+              "spec": "ccv3",
+              "tags": [
+                "music"
+              ],
+              "world": ""
+            },
+            {
+              "expressions_count": 0,
               "file": "Imported Sage.png",
               "has_dual_chunks": true,
               "minor_gate_action": "pass",
@@ -917,20 +931,6 @@
             {
               "expressions_count": 0,
               "file": "Snapshot Bard.png",
-              "has_dual_chunks": true,
-              "minor_gate_action": "pass",
-              "minor_gate_reasons": [],
-              "name": "Snapshot Bard",
-              "scenario": "A tavern.",
-              "spec": "ccv3",
-              "tags": [
-                "music"
-              ],
-              "world": ""
-            },
-            {
-              "expressions_count": 0,
-              "file": "evil.png",
               "has_dual_chunks": true,
               "minor_gate_action": "pass",
               "minor_gate_reasons": [],
