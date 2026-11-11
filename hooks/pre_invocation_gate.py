@@ -43,29 +43,12 @@ STAGE_PREFIXES = (
 UTILITY_SLASHES = ("/dump-prompt", "/lore-weaver", "/card-forge", "/tavern-stage")
 
 
-class _LazyToolRuntime:
-    """Opens the tool runtime (lore engine, card codec, prompt compiler) only when a tool must run.
+def _run_tool(ctx: RuntimeContext, name: str, args: dict) -> dict:
+    """Runs one MCP tool in-process. The tool modules (card codec, lore engine, prompt compiler)
+    are imported only here, so session-state-only paths of this hook stay light."""
+    from server.tools import call_tool
 
-    Session-state-only paths of this hook never pay for it. Transitional: the tool calls move to
-    the `server.tools` registry in the next refactor step.
-    """
-
-    def __init__(self, ctx: RuntimeContext) -> None:
-        self._ctx = ctx
-        self._rt = None
-
-    def get(self):
-        if self._rt is None:
-            from server.mcp_server import TavernFusionRuntime
-
-            rt = TavernFusionRuntime(st_data_root=self._ctx._explicit_data_root, state_dir=self._ctx.state_dir)
-            rt.st_data_root = self._ctx.st_data_root
-            self._rt = rt
-        return self._rt
-
-    def close(self) -> None:
-        if self._rt is not None:
-            self._rt.close()
+    return call_tool(ctx, name, args)
 
 
 def main() -> None:
@@ -83,7 +66,6 @@ def main() -> None:
 
     discovered = discover_st_data_from_workspaces(ws_paths)
     runtime = RuntimeContext(st_data_root=discovered)
-    tools = _LazyToolRuntime(runtime)
     try:
         session = runtime.sessions.load()
 
@@ -168,7 +150,7 @@ def main() -> None:
             mode_arg = rp_match.group(2) or session.get("mode", "play")
             trailing_msg = (rp_match.group(3) or "").strip()
             try:
-                tools.get().tool_st_session_bootstrap({
+                _run_tool(runtime, "st_session_bootstrap", {
                     "character_name": char_arg,
                     "mode": mode_arg,
                     "rp_conv_id": conv_id,
@@ -275,7 +257,7 @@ def main() -> None:
             and not is_bootstrap_turn
         )
 
-        frame_info = tools.get().tool_st_dump_prompt_frame({
+        frame_info = _run_tool(runtime, "st_dump_prompt_frame", {
             "character_name": char_ref,
             "user_input": effective_user_input,
             "mode": session.get("mode", "play"),
@@ -410,7 +392,6 @@ def main() -> None:
             + "\n"
         )
     finally:
-        tools.close()
         runtime.close()
 
 

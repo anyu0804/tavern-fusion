@@ -32,29 +32,12 @@ NORMAL_COMPLETION_REASONS = frozenset({"NO_TOOL_CALL", "model_stop", ""})
 MAX_PERSISTENCE_FAILURES = 3
 
 
-class _LazyToolRuntime:
-    """Opens the tool runtime (lore engine, card codec, prompt compiler) only when a tool must run.
+def _run_tool(ctx: RuntimeContext, name: str, args: dict) -> dict:
+    """Runs one MCP tool in-process. The tool modules (card codec, lore engine, prompt compiler)
+    are imported only here, so session-state-only paths of this hook stay light."""
+    from server.tools import call_tool
 
-    Session-state-only paths of this hook never pay for it. Transitional: the tool calls move to
-    the `server.tools` registry in the next refactor step.
-    """
-
-    def __init__(self, ctx: RuntimeContext) -> None:
-        self._ctx = ctx
-        self._rt = None
-
-    def get(self):
-        if self._rt is None:
-            from server.mcp_server import TavernFusionRuntime
-
-            rt = TavernFusionRuntime(st_data_root=self._ctx._explicit_data_root, state_dir=self._ctx.state_dir)
-            rt.st_data_root = self._ctx.st_data_root
-            self._rt = rt
-        return self._rt
-
-    def close(self) -> None:
-        if self._rt is not None:
-            self._rt.close()
+    return call_tool(ctx, name, args)
 
 
 def _clear_persistence_failure_state(runtime, sess: dict) -> None:
@@ -157,7 +140,6 @@ def main() -> None:
 
     discovered = discover_st_data_from_workspaces(ws_paths)
     runtime = RuntimeContext(st_data_root=discovered)
-    tools = _LazyToolRuntime(runtime)
     try:
         sess = runtime.sessions.load()
         rp_conv_id = str(sess.get("rp_conv_id") or "").strip()
@@ -229,7 +211,7 @@ def main() -> None:
                         "extra_meta": extra_meta,
                     }
                     try:
-                        tools.get().tool_st_commit_turn(commit_payload)
+                        _run_tool(runtime, "st_commit_turn", commit_payload)
                         _clear_persistence_failure_state(runtime, sess)
                         sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
                         return
@@ -240,7 +222,7 @@ def main() -> None:
                         # point that the Stage inspector can surface and replay.
                         time.sleep(0.5)
                         try:
-                            tools.get().tool_st_commit_turn(commit_payload)
+                            _run_tool(runtime, "st_commit_turn", commit_payload)
                             _clear_persistence_failure_state(runtime, sess)
                             sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
                             return
@@ -298,7 +280,6 @@ def main() -> None:
             })
         sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
     finally:
-        tools.close()
         runtime.close()
 
 

@@ -1,8 +1,9 @@
 """Runtime context: plugin paths, `state_dir`, SillyTavern data-root resolution and plugin settings.
 
 `RuntimeContext` is the light-weight core shared by the MCP server, the sidecar control plane and
-the lifecycle hooks. It owns no heavy resources: the lore vector cache (SQLite) is only opened
-by `TavernFusionRuntime` / tool execution, so hooks that only read or write session state stay cheap.
+the lifecycle hooks, and the `ctx` argument of every tool handler in `server.tools`. The lore
+vector cache (SQLite) is opened lazily on first use (`TavernFusionRuntime` opens it eagerly, as
+before), so hooks that only read or write session state stay cheap.
 """
 
 from __future__ import annotations
@@ -82,9 +83,25 @@ class RuntimeContext:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.st_data_root = self._resolve_data_root(st_data_root, self.state_dir)
         self.sessions = SessionStore(self.state_dir)
+        self._lore_engine: Any = None
+
+    @property
+    def lore_engine(self) -> Any:
+        """`HybridLoreEngine` backed by `state_dir/lore_vectors.sqlite`, opened on first use."""
+        if self._lore_engine is None:
+            from ..lore_engine import HybridLoreEngine
+
+            self._lore_engine = HybridLoreEngine(self.state_dir / "lore_vectors.sqlite")
+        return self._lore_engine
+
+    @lore_engine.setter
+    def lore_engine(self, engine: Any) -> None:
+        self._lore_engine = engine
 
     def close(self) -> None:
-        """Releases held resources (none for the bare context)."""
+        """Releases held resources (the lore vector cache, if it was opened)."""
+        if self._lore_engine is not None:
+            self._lore_engine.close()
 
     _resolve_data_root = staticmethod(resolve_data_root)
 
