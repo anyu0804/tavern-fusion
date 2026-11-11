@@ -27,13 +27,12 @@
 - sidecar 进程 = Antigravity.exe 以 Electron-as-Node 方式拉起（`--import=sidecar_sdk/register_loader.js`），日志在 `~/.gemini/antigravity/sidecar_data/tavern-fusion/tavern_stage/logs/sidecar.log`。
 - 调试运行中的面板：Antigravity 的 CDP 端口在 `%APPDATA%/Antigravity/DevToolsActivePort`，Tavern Stage 面板是 `plugin://tavern-fusion--tavern_stage-<port>` iframe 目标，可用 `Runtime.evaluate` 只读探查。
 
-## 4. 已知陈旧副本（禁止当权威源，待清理）
+## 4. 陈旧副本清理记录
 
-| 路径 | 性质 |
-| :--- | :--- |
-| `D:\SillyTavern\tavern-fusion\` | 2026-11-12 02:37 旧快照，缺防缓存修复 |
-| `D:\WB-Workspaces\_archive\sidecar-legacy-tavern-fusion-20261111-130122\` | 2026-11-11 归档副本 |
-| `%TEMP%\tavern-fusion-inspect\`、`%TEMP%\tavern-fusion-review-20261111\` | 临时检查副本 |
-| `%TEMP%\tavern-fusion-isolate-20261111-130122\`、`%TEMP%\tavern-fusion-reinstall-20261111-124631\` | 临时隔离/重装副本 |
+以下散落副本已于 2026-11-12 逐一核验（无独有提交/修复，权威源全量领先）后**永久删除**：
 
-同步/回灌时若发现与上表路径不一致的第三份副本，先停下核对新副本的角色，再决定是否纳入本表。
+- `D:\SillyTavern\tavern-fusion\` — git 旧快照，头提交 `a7cf070` 经核验为主线祖先且存在于 GitHub 远端，删除无历史损失
+- `D:\WB-Workspaces\_archive\sidecar-legacy-tavern-fusion-20261111-130122\` — 2026-11-11 归档副本
+- `%TEMP%\tavern-fusion-{inspect, review-20261111, fix-20261111-122453, isolate-20261111-130122, reinstall-20261111-124631}\` — 临时检查/修复/隔离/重装片段（`fix` 片段为删除时新发现，属同批产物一并清理）
+
+再次发现新的散落副本时：先核对其角色与内容差异（有无独有提交、有无领先修复），确认无独有内容后删除，并更新本节记录。
