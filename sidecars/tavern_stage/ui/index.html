@@ -265,6 +265,16 @@
           <label>自有 API 模型名
             <input id="cfg-byok-model" type="text" class="ctrl-input" spellcheck="false" autocomplete="off" placeholder="例如 gemini-2.5-flash" />
           </label>
+          <label>前缀缓存模式（仅自有 API）
+            <select id="cfg-byok-cache-mode" class="ctrl-select">
+              <option value="off">关闭：严格还原酒馆插入位置（默认）</option>
+              <option value="prefix_pinned">开启：触发词条、@Depth、Author's Note 移到末尾，历史只追加</option>
+            </select>
+          </label>
+          <label class="inline-check">
+            <input id="cfg-byok-cache-control" type="checkbox" />
+            附加 Claude 式 cache_control 断点（仅在网关支持时开启）
+          </label>
         </div>
         <div id="cfg-byok-status" class="hint-text"></div>
         <label class="block-label">当前对话 Author's Note

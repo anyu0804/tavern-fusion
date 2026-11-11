@@ -1830,5 +1830,141 @@ export class SidecarApp {
             self.assertEqual(ext_ver, expected_ver)
 
 
+    def test_14_byok_prefix_cache_mode(self) -> None:
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        from server.byok_backend import build_byok_cached_messages, extract_cache_usage
+        from server.prompt.frame import HISTORY_CHUNK, HISTORY_WINDOW, compile_st_prompt_frame, history_window_start
+
+        # 1. Window start: sliding in default mode, chunked (stable) in prefix_pinned mode
+        self.assertEqual(history_window_start(5, "prefix_pinned"), 0)
+        starts = {history_window_start(n, "prefix_pinned") for n in range(HISTORY_WINDOW + 1, HISTORY_WINDOW + HISTORY_CHUNK)}
+        self.assertEqual(starts, {0})
+        self.assertEqual(history_window_start(HISTORY_WINDOW + HISTORY_CHUNK, "prefix_pinned"), HISTORY_CHUNK)
+        self.assertEqual(history_window_start(20, "off"), 20 - HISTORY_WINDOW)
+
+        card = {"data": {
+            "name": "Mira",
+            "description": "Mira keeps the lighthouse. Local time: {{time}}. Mood: {{getvar::mood}}.",
+            "personality": "dry humour",
+        }}
+        persona = {"name": "Ash", "description": "a traveller"}
+        preset = {"preset_name": "T", "temperature": 0.8}
+
+        def lore(n_msgs: int, triggered: bool) -> dict:
+            msgs = [{"name": "Ash" if i % 2 == 0 else "Mira", "is_user": i % 2 == 0, "mes": f"line {i}"} for i in range(n_msgs)]
+            trace = [{"uid": 1, "comment": "blue", "position": "before_char", "constant": True,
+                      "content": "The sea is cold.", "trigger": "constant", "order": 1, "tokens": 5}]
+            spliced = list(msgs)
+            if triggered:
+                trace.append({"uid": 2, "comment": "green", "position": "after_char", "constant": False,
+                              "content": "The bell rings at dusk.", "trigger": "keyword", "order": 2, "tokens": 6})
+                trace.append({"uid": 3, "comment": "depth", "position": "@D2(system)", "constant": False,
+                              "content": "A storm is coming.", "trigger": "keyword", "order": 3, "tokens": 5})
+                spliced.insert(max(0, len(spliced) - 2), {"role": "system", "name": "WorldInfo", "mes": "A storm is coming.", "lore_uid": 3})
+            return {"active_trace": trace, "spliced_chat": spliced, "slots": {}, "outlets": {},
+                    "used_tokens": 10, "token_budget": 2048, "evicted_trace": []}
+
+        def header(mood: str) -> dict:
+            return {"chat_metadata": {"variables": {"mood": mood}, "note_prompt": "Keep it terse.", "note_depth": 3}}
+
+        f1 = compile_st_prompt_frame(card, persona, preset, lore(15, False), header("calm"), cache_mode="prefix_pinned")
+        f2 = compile_st_prompt_frame(card, persona, preset, lore(16, True), header("angry"), cache_mode="prefix_pinned")
+        # Static prefix byte-identical despite a new trigger, a new floor and a changed variable
+        self.assertEqual(f1["static_prefix_block"], f2["static_prefix_block"])
+        self.assertIn("The sea is cold.", f1["static_prefix_block"])
+        self.assertNotIn("The bell rings", f2["static_prefix_block"])
+        self.assertNotIn("calm", f1["static_prefix_block"])
+        # History append-only: turn-1 history is an exact prefix of turn-2 history, no lore/AN inside
+        self.assertEqual(f2["history_messages"][: len(f1["history_messages"])], f1["history_messages"])
+        self.assertFalse(any("storm" in h["content"] or "terse" in h["content"] for h in f2["history_messages"]))
+        # Moved items and live values land in the tail
+        for needle in ("The bell rings at dusk.", "A storm is coming.", "Keep it terse.", "mood=angry", "[Live Context]"):
+            self.assertIn(needle, f2["dynamic_tail_block"])
+        # Default mode is unchanged: green lore stays in the prefix and AN is spliced into history
+        f_off = compile_st_prompt_frame(card, persona, preset, lore(16, True), header("angry"))
+        self.assertIn("The bell rings at dusk.", f_off["static_prefix_block"])
+        self.assertTrue(any(h["name"].startswith("AuthorsNote") for h in f_off["history_messages"]))
+        self.assertEqual(f_off["cache_mode"], "off")
+
+        # 2. Message builder + usage normalisation
+        msgs = build_byok_cached_messages(f2, "Go on.", cache_control=True)
+        self.assertEqual(msgs[0]["role"], "system")
+        self.assertEqual(msgs[0]["content"][0]["cache_control"], {"type": "ephemeral"})
+        self.assertEqual(msgs[-2]["content"][0]["cache_control"], {"type": "ephemeral"})
+        self.assertTrue(msgs[-1]["content"].endswith("Go on."))
+        self.assertEqual(extract_cache_usage({"usage": {"prompt_tokens": 100, "prompt_tokens_details": {"cached_tokens": 80}}})["cached_tokens"], 80)
+        self.assertEqual(extract_cache_usage({"usage": {"prompt_tokens": 100, "prompt_cache_hit_tokens": 64}})["cached_tokens"], 64)
+        self.assertIsNone(extract_cache_usage({})["cached_tokens"])
+
+        # 3. End to end through the sidecar op with a mock OpenAI-compatible server
+        seen: list[dict] = []
+
+        class _H(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:  # noqa: N802
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))).decode("utf-8"))
+                seen.append(body)
+                out = json.dumps({
+                    "choices": [{"message": {"role": "assistant", "content": f"*Reply {len(seen)}.*"}}],
+                    "usage": {"prompt_tokens": 900, "completion_tokens": 20, "prompt_tokens_details": {"cached_tokens": 700}},
+                }).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+                return
+
+        srv = HTTPServer(("127.0.0.1", 0), _H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        saved = {k: os.environ.pop(k, None) for k in ("TAVERN_BYOK_API_KEY", "TAVERN_BYOK_BASE_URL", "TAVERN_BYOK_MODEL")}
+        os.environ["TAVERN_BYOK_API_KEY"] = "sk-cache-test"
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                tdir = Path(tmp)
+                st_root = make_sandbox_st_root(tdir)
+                rt = TavernFusionRuntime(st_data_root=st_root, state_dir=tdir / "state")
+                try:
+                    rt.tool_st_session_bootstrap({"character_name": "Seraphina", "mode": "play"})
+                    rt.handle_sidecar_op("switch_profile", {
+                        "generation_backend": "byok",
+                        "byok_base_url": f"http://127.0.0.1:{srv.server_port}/v1",
+                        "byok_model": "mock-model",
+                        "byok_cache_mode": "prefix_pinned",
+                    })
+                    r1 = rt.handle_sidecar_op("byok_turn", {"action_kind": "send_turn", "user_text": "First"})
+                    rt.handle_sidecar_op("byok_turn", {"action_kind": "send_turn", "user_text": "Second"})
+                    self.assertEqual(r1["cache_mode"], "prefix_pinned")
+                    self.assertEqual(r1["usage"]["cached_tokens"], 700)
+                    m1, m2 = seen[0]["messages"], seen[1]["messages"]
+                    self.assertEqual(m1[0], m2[0])
+                    self.assertNotIn("<ST_RUNTIME_FRAME", m1[0]["content"])
+                    # Everything except the final tail message is reused verbatim on the next turn
+                    self.assertEqual(m2[: len(m1) - 1], m1[:-1])
+                    self.assertEqual(m2[-2], {"role": "user", "content": "Second"})
+                    self.assertEqual(sum(1 for m in m2 if m["content"] == "Second"), 1)
+                    self.assertIn("[Live Context]", m2[-1]["content"])
+                    self.assertTrue(all(isinstance(m["content"], str) for m in m2))  # cache_control off by default
+
+                    _, chat = read_jsonl_chat(rt.load_active_session()["chat_path"])
+                    self.assertEqual(chat[-1]["extra"]["byok_cached_tokens"], 700)
+                    self.assertEqual(chat[-1]["extra"]["byok_cache_mode"], "prefix_pinned")
+                    status = rt.handle_sidecar_op("byok_status", {})
+                    self.assertEqual(status["last_usage"]["cached_tokens"], 700)
+                    self.assertEqual(rt._sidecar_snapshot()["byok"]["last_usage"]["prompt_tokens"], 900)
+                finally:
+                    rt.close()
+        finally:
+            srv.shutdown()
+            srv.server_close()
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

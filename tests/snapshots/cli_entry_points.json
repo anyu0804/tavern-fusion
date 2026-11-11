@@ -157,8 +157,11 @@
     "stdout": {
       "data": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "cache_control": false,
+        "cache_mode": "off",
         "key_present": false,
         "key_source": "none",
+        "last_usage": null,
         "model": "",
         "ready": false
       },

@@ -33,6 +33,7 @@ KEY_ENV_VAR = "TAVERN_BYOK_API_KEY"
 BASE_URL_ENV_VAR = "TAVERN_BYOK_BASE_URL"
 MODEL_ENV_VAR = "TAVERN_BYOK_MODEL"
 KEY_FILE_NAME = "byok_api_key"
+BYOK_CACHE_MODES = ("off", "prefix_pinned")
 
 
 def _is_loopback_host(host: str) -> bool:
@@ -75,9 +76,14 @@ def resolve_byok_config(plugin_settings: dict[str, Any], state_dir: str | Path |
     )
     model = os.environ.get(MODEL_ENV_VAR, "").strip() or str(plugin_settings.get("byok_model") or "").strip()
     key_present = bool(read_byok_api_key(state_dir))
+    cache_mode = str(plugin_settings.get("byok_cache_mode") or "off")
+    if cache_mode not in BYOK_CACHE_MODES:
+        cache_mode = "off"
     return {
         "base_url": base_url,
         "model": model,
+        "cache_mode": cache_mode,
+        "cache_control": bool(plugin_settings.get("byok_cache_control", False)),
         "key_present": key_present,
         "key_source": "env" if os.environ.get(KEY_ENV_VAR, "").strip() else ("file" if key_present else "none"),
         "ready": key_present and bool(model),
@@ -90,16 +96,107 @@ def build_byok_messages(system_frame: str, user_prompt: str) -> list[dict[str, s
     return messages
 
 
+def _with_cache_breakpoint(message: dict[str, Any]) -> dict[str, Any]:
+    """Anthropic-style `cache_control` breakpoint on a message (passed through by some
+    OpenAI-compatible gateways; strict ones may reject it, hence opt-in)."""
+    return {
+        "role": message["role"],
+        "content": [{"type": "text", "text": str(message["content"]), "cache_control": {"type": "ephemeral"}}],
+    }
+
+
+def build_byok_cached_messages(
+    frame_parts: dict[str, Any],
+    user_prompt: str,
+    cache_control: bool = False,
+) -> list[dict[str, Any]]:
+    """Prefix-cache friendly request: [system: static prefix] + history turns + [user: tail + prompt].
+
+    Providers with automatic prefix caching (DeepSeek, OpenAI-style, Gemini implicit caching) match
+    on the leading tokens, so the static prefix and the append-only history are reused turn to turn.
+    Mid-conversation system items are sent as user turns, because some OpenAI-compatible layers hoist
+    every system message into the system instruction, which would change the prefix.
+    """
+    messages: list[dict[str, Any]] = [{"role": "system", "content": str(frame_parts.get("static_prefix_block", ""))}]
+    for h in frame_parts.get("history_messages") or []:
+        content = str(h.get("content", ""))
+        if not content.strip():
+            continue
+        role = h.get("role")
+        if role == "system":
+            messages.append({"role": "user", "content": f"[{h.get('name') or 'System'}] {content}"})
+        else:
+            messages.append({"role": "assistant" if role == "assistant" else "user", "content": content})
+    if cache_control:
+        messages[0] = _with_cache_breakpoint(messages[0])
+        if len(messages) > 1:
+            messages[-1] = _with_cache_breakpoint(messages[-1])
+    tail = str(frame_parts.get("dynamic_tail_block", "")).strip()
+    final = (user_prompt or "").strip() or "(continue the scene)"
+    history = frame_parts.get("history_messages") or []
+    if history and history[-1].get("role") == "user" and str(history[-1].get("content", "")).strip() == final:
+        # The user's line is already the last history turn; don't repeat it after the tail.
+        final = "[Respond in character to the latest user message above.]"
+    messages.append({"role": "user", "content": f"{tail}\n\n{final}" if tail else final})
+    return messages
+
+
+def extract_cache_usage(data: Any) -> dict[str, int | None]:
+    """Normalises prompt / cached token counts across OpenAI-compatible providers."""
+    usage = data.get("usage") if isinstance(data, dict) else None
+    if not isinstance(usage, dict):
+        return {"prompt_tokens": None, "cached_tokens": None, "completion_tokens": None}
+
+    def _int(v: Any) -> int | None:
+        try:
+            return int(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    details = usage.get("prompt_tokens_details") if isinstance(usage.get("prompt_tokens_details"), dict) else {}
+    cached = None
+    for candidate in (
+        details.get("cached_tokens"),            # OpenAI-style (also Gemini OpenAI-compat, many gateways)
+        usage.get("prompt_cache_hit_tokens"),    # DeepSeek
+        usage.get("cache_read_input_tokens"),    # Anthropic-style gateways
+        usage.get("cached_tokens"),
+    ):
+        cached = _int(candidate)
+        if cached is not None:
+            break
+    return {
+        "prompt_tokens": _int(usage.get("prompt_tokens")),
+        "cached_tokens": cached,
+        "completion_tokens": _int(usage.get("completion_tokens")),
+    }
+
+
 def byok_chat_completion(
     base_url: str,
     api_key: str,
     model: str,
-    messages: list[dict[str, str]],
+    messages: list[dict[str, Any]],
     temperature: float | None = None,
     max_tokens: int | None = None,
     timeout: float = DEFAULT_BYOK_TIMEOUT_S,
 ) -> str:
     """Calls `<base_url>/chat/completions` (non-streaming) and returns the first choice's text."""
+    text, _usage = byok_chat_completion_with_usage(
+        base_url, api_key, model, messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout
+    )
+    return text
+
+
+def byok_chat_completion_with_usage(
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: list[dict[str, Any]],
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+    timeout: float = DEFAULT_BYOK_TIMEOUT_S,
+) -> tuple[str, dict[str, int | None]]:
+    """Same as `byok_chat_completion`, also returning normalised token usage (incl. cache hits)."""
     if not api_key:
         raise ValueError(f"未找到 BYOK API Key：请设置环境变量 {KEY_ENV_VAR}，或在插件状态目录创建 {KEY_FILE_NAME} 文件。")
     if not model:
@@ -156,4 +253,4 @@ def byok_chat_completion(
     text = str(content or "").strip()
     if not text:
         raise ValueError("BYOK 接口返回了空回复（可能被服务端安全策略拦截）。")
-    return text
+    return text, extract_cache_usage(data)

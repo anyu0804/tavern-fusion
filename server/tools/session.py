@@ -265,8 +265,9 @@ def st_dump_prompt_frame(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str,
         epistemic_level=epistemic_level,
         agentic_hands=agentic_hands,
         director_mode=director_mode,
+        cache_mode=str(args.get("cache_mode") or "off"),
     )
-    return {
+    result = {
         "character_name": char_name,
         "preset_name": frame["preset_name"],
         "epistemic_level": frame["epistemic_level"],
@@ -286,6 +287,15 @@ def st_dump_prompt_frame(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str,
         "ephemeral_frame": frame["ephemeral_frame"],
         "next_timed_state": lore_res["next_timed_state"],
     }
+    if args.get("_include_parts"):
+        # Internal (BYOK backend): structured frame parts for a multi-message request.
+        result["frame_parts"] = {
+            "cache_mode": frame["cache_mode"],
+            "static_prefix_block": frame["static_prefix_block"],
+            "history_messages": frame["history_messages"],
+            "dynamic_tail_block": frame["dynamic_tail_block"],
+        }
+    return result
 
 
 def st_switch_profile(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, Any]:
@@ -317,6 +327,10 @@ def st_switch_profile(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
         backend_patch["byok_base_url"] = str(args["byok_base_url"]).strip()
     if "byok_model" in args and args["byok_model"] is not None:
         backend_patch["byok_model"] = str(args["byok_model"]).strip()
+    if args.get("byok_cache_mode") in ("off", "prefix_pinned"):
+        backend_patch["byok_cache_mode"] = str(args["byok_cache_mode"])
+    if "byok_cache_control" in args and args["byok_cache_control"] is not None:
+        backend_patch["byok_cache_control"] = bool(args["byok_cache_control"])
     if backend_patch:
         ctx.save_plugin_settings(backend_patch)
 

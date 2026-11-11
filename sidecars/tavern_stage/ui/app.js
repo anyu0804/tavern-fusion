@@ -637,11 +637,24 @@ function renderInspector(sess) {
   if ($('cfg-byok-model') && activeEl !== $('cfg-byok-model')) {
     $('cfg-byok-model').value = pcfg.byok_model || '';
   }
+  if ($('cfg-byok-cache-mode') && activeEl !== $('cfg-byok-cache-mode')) {
+    $('cfg-byok-cache-mode').value = pcfg.byok_cache_mode === 'prefix_pinned' ? 'prefix_pinned' : 'off';
+  }
+  if ($('cfg-byok-cache-control') && activeEl !== $('cfg-byok-cache-control')) {
+    $('cfg-byok-cache-control').checked = Boolean(pcfg.byok_cache_control);
+  }
   if ($('cfg-byok-status')) {
     const b = appState.byok || {};
-    $('cfg-byok-status').textContent = b.key_present
+    let statusText = b.key_present
       ? `已检测到 API Key（来源：${b.key_source === 'env' ? '环境变量' : '状态目录文件'}）${b.model ? '' : '，尚未填写模型名'}`
       : '未检测到 API Key：请设置环境变量 TAVERN_BYOK_API_KEY（插件不会保存或回显密钥）';
+    const u = b.last_usage;
+    if (u && u.prompt_tokens) {
+      statusText += u.cached_tokens != null
+        ? ` | 上一回合缓存命中 ${u.cached_tokens} / ${u.prompt_tokens} 输入 tokens（${Math.round((u.cached_tokens / u.prompt_tokens) * 100)}%）`
+        : ` | 上一回合输入 ${u.prompt_tokens} tokens（接口未返回缓存命中数）`;
+    }
+    $('cfg-byok-status').textContent = statusText;
   }
   if (activeEl !== $('cfg-an-depth')) {
     $('cfg-an-depth').value = String(sess.an_depth ?? 4);
@@ -1144,6 +1157,8 @@ $('btn-save-config').addEventListener('click', async () => {
       generation_backend: $('cfg-backend-select')?.value || 'host',
       byok_base_url: $('cfg-byok-base-url')?.value ?? '',
       byok_model: $('cfg-byok-model')?.value ?? '',
+      byok_cache_mode: $('cfg-byok-cache-mode')?.value || 'off',
+      byok_cache_control: Boolean($('cfg-byok-cache-control')?.checked),
     });
     showToast('文风预设、Author\'s Note 与叙事边界已保存');
   } catch (err) {

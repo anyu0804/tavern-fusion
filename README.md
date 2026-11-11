@@ -50,6 +50,8 @@
    - 在 `Tavern Stage` →「⚙️ 文风预设、Author's Note 与内容边界」中把「生成后端」切换为「自有 API Key」，回合将不再经过宿主内置模型，而是把同一份 `ST_RUNTIME_FRAME` 发送到任意 OpenAI 兼容的 `/chat/completions` 接口（默认 Google AI Studio 的 Gemini OpenAI 兼容端点 `https://generativelanguage.googleapis.com/v1beta/openai`），并直接落盘到 `.jsonl`。
    - **密钥只从环境变量 `TAVERN_BYOK_API_KEY` 读取**（或你手动创建的插件状态目录 `byok_api_key` 文件第一行）；插件不会保存、回显或上传密钥。远程端点强制 `https://`。可选环境变量：`TAVERN_BYOK_BASE_URL`、`TAVERN_BYOK_MODEL`。
    - 当前版本支持「发送回合」与「重抽（Swipe）」；回复灵感、意图扩写、Kartoittaja 分支与导演模式仍需宿主后端，BYOK 模式下不会静默回退到宿主模型。
+   - **前缀缓存模式（可选，默认关闭）**：在同一面板把「前缀缓存模式」设为开启后，请求会拆成「静态前缀 system + 只追加的历史轮次 + 末尾动态块」，便于 DeepSeek、OpenAI 式接口和 Gemini 隐式缓存等按前缀自动缓存的服务复用前文。代价是不再严格还原酒馆插入位置：关键词触发的世界书、`@Depth` 词条和 Author's Note 会移到末尾，`{{time}}`、`{{date}}`、`{{getvar}}` 在前缀中改为指向末尾的实时值，历史按每 12 条整块截断。面板会显示上一回合接口返回的缓存命中 token 数（接口不返回时只显示输入 token 数）。实际命中率和折扣取决于服务商与中转站。
+   - 「附加 Claude 式 cache_control 断点」只在你的网关明确支持该字段时开启，部分严格的 OpenAI 兼容接口会因此报错。
 
 7. **浏览器端实时同步扩展（`st-ag-sync`，可选）**
    - 安装至 SillyTavern 的 `extensions/third-party/st-ag-sync/` 后（无需 `enableServerPlugins`），Antigravity 侧每提交一层，打开中的酒馆标签页会自动重新载入聊天：变更检测走 `/api/chats/search` 增量比对（消息条数 / 时间 / 预览，不再整文件下载），轮询频率自适应、出错带抖动退避、标签页隐藏与生成期间自动暂停、重新可见时立即复查。
