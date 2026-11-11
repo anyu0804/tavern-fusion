@@ -1,10 +1,12 @@
-# Tavern Fusion 3.0 — Antigravity × SillyTavern Native Workbench
+# Tavern Fusion 3.0.3-preview（预览版）— Antigravity × SillyTavern Native Workbench
 
 > [!WARNING]
 > **早期工程版本声明（Early Engineering Preview）**  
 > 本项目目前处于**非常早期的工程探索版本**，可能还存在较多 Bug 或边缘环境兼容问题。如果你在使用过程中遇到任何故障、或者有想要补充的功能建议，欢迎直接在仓库提交 [**Issues**](https://github.com/anyu0804/tavern-fusion/issues)，我会尽可能持续跟进完善！
 
-**Tavern Fusion 3.0** 是一款面向 **Google Antigravity (AGY)** 的 SillyTavern 本地数据编排与角色扮演工作台插件。它在不修改 SillyTavern 源码、不开启高权限 `enableServerPlugins` 的前提下，使用宿主官方插件扩展点（MCP、生命周期钩子与 `sidecar_sdk`）直接读写本地酒馆数据目录（`characters/*.png`、`worlds/*.json`、`chats/<avatar_stem>/*.jsonl`、`OpenAI Settings/*.json`、`settings.json`），并在 IDE 右侧辅助面板提供常驻可视化的 **`Tavern Stage`** 剧场工作台。
+**当前版本：`v3.0.3-preview`（预览版）** · 更新内容见 [Release Notes](https://github.com/anyu0804/tavern-fusion/releases/tag/v3.0.3-preview)。
+
+**Tavern Fusion 3.0.3-preview** 是一款面向 **Google Antigravity (AGY)** 的 SillyTavern 本地数据编排与角色扮演工作台插件。它在不修改 SillyTavern 源码、不开启高权限 `enableServerPlugins` 的前提下，使用宿主官方插件扩展点（MCP、生命周期钩子与 `sidecar_sdk`）直接读写本地酒馆数据目录（`characters/*.png`、`worlds/*.json`、`chats/<avatar_stem>/*.jsonl`、`OpenAI Settings/*.json`、`settings.json`），并在 IDE 右侧辅助面板提供常驻可视化的 **`Tavern Stage`** 剧场工作台。
 
 ---
 
@@ -47,6 +49,10 @@
    - 在 `Tavern Stage` →「⚙️ 文风预设、Author's Note 与内容边界」中把「生成后端」切换为「自有 API Key」，回合将不再经过宿主内置模型，而是把同一份 `ST_RUNTIME_FRAME` 发送到任意 OpenAI 兼容的 `/chat/completions` 接口（默认 Google AI Studio 的 Gemini OpenAI 兼容端点 `https://generativelanguage.googleapis.com/v1beta/openai`），并直接落盘到 `.jsonl`。
    - **密钥只从环境变量 `TAVERN_BYOK_API_KEY` 读取**（或你手动创建的插件状态目录 `byok_api_key` 文件第一行）；插件不会保存、回显或上传密钥。远程端点强制 `https://`。可选环境变量：`TAVERN_BYOK_BASE_URL`、`TAVERN_BYOK_MODEL`。
    - 当前版本支持「发送回合」与「重抽（Swipe）」；回复灵感、意图扩写、Kartoittaja 分支与导演模式仍需宿主后端，BYOK 模式下不会静默回退到宿主模型。
+
+7. **浏览器端实时同步扩展（`st-ag-sync`，可选）**
+   - 安装至 SillyTavern 的 `extensions/third-party/st-ag-sync/` 后（无需 `enableServerPlugins`），Antigravity 侧每提交一层，打开中的酒馆标签页会自动重新载入聊天：变更检测走 `/api/chats/search` 增量比对（消息条数 / 时间 / 预览，不再整文件下载），轮询频率自适应、出错带抖动退避、标签页隐藏与生成期间自动暂停、重新可见时立即复查。
+   - 与服务端每次写盘轮换 `chat_metadata.integrity` 的防覆盖机制配合，构成「过期标签页拒绝静默覆盖 + 恢复可见自动刷新」的双向保护（详见下方已知限制第一条）。
 
 ---
 
