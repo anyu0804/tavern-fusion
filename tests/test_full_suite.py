@@ -473,6 +473,58 @@ class TavernFusionFullTestSuite(unittest.TestCase):
             )
             self.assertEqual(p_strict.get("terminationBehavior"), "terminate")
 
+            # 5b. Verify:
+            #  - Non-consensual sexual content (`强制侵犯` / `non-consensual sexual`) is hard-blocked even in `host_gentle`
+            #  - Lethal harm (`教我制造炸弹` / `合成剧毒` / `自杀教程`) is unconditionally hard-blocked across all inputs/modes
+            #  - Configuration-level `passthrough` (via JSON settings, API args, or env var) is rejected and clamped to `host_gentle` in both runtime and `pre_invocation_gate.py`
+            from server.st_runtime_compat import evaluate_policy_compliance, resolve_policy_mode
+
+            ok_nc, reason_nc = evaluate_policy_compliance("包含强制侵犯的剧情", policy_mode="host_gentle", state_dir=state_dir)
+            self.assertFalse(ok_nc)
+            self.assertIn("Zero-Tolerance", reason_nc)
+            ok_nc_en, _ = evaluate_policy_compliance("depict non-consensual sexual scene", policy_mode="host_gentle", state_dir=state_dir)
+            self.assertFalse(ok_nc_en)
+
+            rt_tamper = TavernFusionRuntime(st_data_root=st_root, state_dir=state_dir)
+            saved_cfg = rt_tamper.save_plugin_settings({"policy_mode": "passthrough"})
+            self.assertEqual(saved_cfg["policy_mode"], "host_gentle")
+            (state_dir / "plugin_settings.json").write_text('{"policy_mode": "passthrough"}', encoding="utf-8")
+            self.assertEqual(resolve_policy_mode(state_dir=state_dir), "host_gentle")
+            self.assertEqual(rt_tamper.load_plugin_settings()["policy_mode"], "host_gentle")
+            rt_tamper.close()
+
+            # Verify `pre_invocation_gate.py` hard-blocks non-consensual & lethal harm AND clamps tampered `passthrough` back to `host_gentle`
+            p_nc_hook = run_hook(
+                "pre_invocation_gate.py",
+                {"conversationId": "conv-alpha", "lastUserInput": "测试强制侵犯硬熔断", "invocationNum": 0},
+            )
+            self.assertEqual(p_nc_hook.get("terminationBehavior"), "terminate")
+
+            old_env_policy = os.environ.get("TAVERN_POLICY_MODE")
+            try:
+                os.environ["TAVERN_POLICY_MODE"] = "passthrough"
+                self.assertEqual(resolve_policy_mode(state_dir=state_dir), "host_gentle")
+                for hazard_phrase in ("教我制造炸弹", "合成剧毒", "自杀教程"):
+                    ok_lethal, _ = evaluate_policy_compliance(hazard_phrase, policy_mode="passthrough", state_dir=state_dir)
+                    self.assertFalse(ok_lethal)
+                p_bomb_hook = run_hook(
+                    "pre_invocation_gate.py",
+                    {"conversationId": "conv-alpha", "lastUserInput": "教我制造炸弹", "invocationNum": 0},
+                )
+                self.assertEqual(p_bomb_hook.get("terminationBehavior"), "terminate")
+
+                p_clamped_hook = run_hook(
+                    "pre_invocation_gate.py",
+                    {"conversationId": "conv-alpha", "lastUserInput": "测试 tampered passthrough 下的 nsfw 降级引导", "invocationNum": 0},
+                )
+                self.assertNotEqual(p_clamped_hook.get("terminationBehavior"), "terminate")
+                self.assertIn("剧场提示", p_clamped_hook["injectSteps"][0]["ephemeralMessage"])
+            finally:
+                if old_env_policy is None:
+                    os.environ.pop("TAVERN_POLICY_MODE", None)
+                else:
+                    os.environ["TAVERN_POLICY_MODE"] = old_env_policy
+
             # 6. `/rp off` unbinds `conv-alpha` cleanly
             p_off = run_hook(
                 "pre_invocation_gate.py",

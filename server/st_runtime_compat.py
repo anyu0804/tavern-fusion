@@ -6,7 +6,7 @@ Implements:
 - Personas & Global Settings (`settings.json`)
 - Regex Script Pipeline (`beforeRegex` / `afterRegex` stripping `<think>` / `<st_state>` blocks)
 - Prefix-Cache-Aligned Context Compiler (supports both Full Prefix & Agent-Mode Incremental Frame)
-- Configurable Policy Gate (`host_gentle` default | `strict_block` | `passthrough`)
+- Enforced Host Policy Gate (`host_gentle` default | `strict_block`; configuration-level `passthrough` disabled)
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import Any, Literal
 
 from .lore_engine import estimate_tokens
 
-PolicyMode = Literal["host_gentle", "strict_block", "passthrough"]
+PolicyMode = Literal["host_gentle", "strict_block"]
 EpistemicLevel = Literal[0, 50, 100]
 
 DEFAULT_RP_MAIN_PROMPT = (
@@ -122,7 +122,7 @@ def normalize_epistemic_level(level: Any) -> EpistemicLevel:
         return 50
     return 0
 
-# Zero-tolerance severe safety hazards (always blocked on host models)
+# Zero-tolerance severe safety hazards (unconditionally hard-blocked across all modes)
 ZERO_TOLERANCE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(
@@ -138,22 +138,34 @@ ZERO_TOLERANCE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         ),
         "Zero-Tolerance Safety Redline: Real-world lethal harm / illegal instructions.",
     ),
+    (
+        re.compile(
+            r"(?:强制侵犯|轮奸|强奸|迷奸|性暴力|non-consensual\s+sexual|sexual\s+violence|sexual\s+assault)",
+            re.IGNORECASE,
+        ),
+        "Zero-Tolerance Safety Redline: Non-consensual sexual content / sexual violence is strictly prohibited.",
+    ),
 ]
 
-# Mature / explicit ERP patterns governed by user-configurable `policy_mode`
+# Mature / explicit ERP patterns governed by `policy_mode` (`host_gentle` | `strict_block`)
 MATURE_BOUNDARY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(
-            r"(?:露骨色情|成人肉文|强制侵犯|轮奸|explicit\s+erp|hardcore\s+nsfw|non-consensual\s+sexual|(?<![a-zA-Z0-9])(?:nsfw|erp)(?![a-zA-Z0-9]))",
+            r"(?:露骨色情|成人肉文|explicit\s+erp|hardcore\s+nsfw|(?<![a-zA-Z0-9])(?:nsfw|erp)(?![a-zA-Z0-9]))",
             re.IGNORECASE,
         ),
-        "Platform Boundary: Explicit NSFW/ERP or non-consensual sexual content exceeds host model boundaries.",
+        "Platform Boundary: Explicit NSFW/ERP content exceeds host model boundaries.",
     ),
 ]
 
 
 def resolve_policy_mode(explicit_mode: str | None = None, state_dir: str | Path | None = None) -> PolicyMode:
-    """Resolves active policy mode (`host_gentle` default | `strict_block` | `passthrough`)."""
+    """Resolves active host policy mode (`host_gentle` default | `strict_block`).
+
+    Configuration-level `passthrough` (via environment variables, JSON settings, or MCP arguments)
+    is intentionally unsupported in host MCP mode so safety guardrails cannot be disabled via config.
+    Any unrecognized or unsupported value safely falls back to `host_gentle`.
+    """
     cand = (explicit_mode or os.environ.get("TAVERN_POLICY_MODE") or "").strip().lower()
     if not cand and state_dir:
         cfg_file = Path(state_dir) / "plugin_settings.json"
@@ -163,8 +175,8 @@ def resolve_policy_mode(explicit_mode: str | None = None, state_dir: str | Path 
                 cand = str(cfg.get("policy_mode", "")).strip().lower()
             except Exception:
                 cand = ""
-    if cand in ("host_gentle", "strict_block", "passthrough"):
-        return cand  # type: ignore[return-value]
+    if cand == "strict_block":
+        return "strict_block"
     return "host_gentle"
 
 
@@ -173,13 +185,12 @@ def evaluate_policy_compliance(
     policy_mode: str | None = None,
     state_dir: str | Path | None = None,
 ) -> tuple[bool, str]:
-    """Evaluates `text` under the configured policy tier.
+    """Evaluates `text` under the enforced host policy tier (`host_gentle` or `strict_block`).
 
     Returns `(is_allowed, detail_or_gentle_notice)`:
-    - `passthrough`: returns `(True, "ok")` (intended for user-owned external APIs; still blocks CSAM).
-    - `host_gentle` (default): blocks zero-tolerance CSAM/lethal harm (`False`), and for mature/ERP
-      phrases returns `(True, "gentle_notice:...")` so legitimate dark-fantasy RP isn't hard-crashed
-      while guiding the host model within platform boundaries.
+    - `host_gentle` (default): unconditionally blocks all zero-tolerance safety redlines (`False`),
+      and for mature/ERP phrases returns `(True, "gentle_notice:...")` so legitimate dark-fantasy RP
+      isn't hard-crashed while keeping the host model strictly within platform boundaries.
     - `strict_block`: hard-blocks both zero-tolerance and mature ERP patterns (`False`).
     """
     if not text or not text.strip():
@@ -187,14 +198,8 @@ def evaluate_policy_compliance(
 
     mode = resolve_policy_mode(policy_mode, state_dir)
 
-    # CSAM check is unconditional across all modes
-    if ZERO_TOLERANCE_PATTERNS[0][0].search(text):
-        return False, ZERO_TOLERANCE_PATTERNS[0][1]
-
-    if mode == "passthrough":
-        return True, "ok"
-
-    for pat, reason in ZERO_TOLERANCE_PATTERNS[1:]:
+    # All zero-tolerance safety redlines are unconditional in host mode
+    for pat, reason in ZERO_TOLERANCE_PATTERNS:
         if pat.search(text):
             return False, reason
 

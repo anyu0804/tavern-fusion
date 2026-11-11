@@ -38,10 +38,10 @@
    - 完整解析 `OpenAI Settings/*.json` 的 `prompt_order` 顺序栈與全部 4 种 `selectiveLogic` 次级词门控。
    - 内置 **Card & Lore Doctor (`st_lint_card_and_lore`)**：静态检出缺失 `ccv3` 双块、缺失 `<START>` 词表收敛样本、未带 `{{original}}` 覆盖预设的 `system_prompt`、`selective: false` 次级词失效陷阱与损坏宏。
 
-5. **可配置分级合规策略 (`policy_mode`)**
-   - `host_gentle`（默认）：对绝对安全红线执行零 Token 熔断；对暗黑奇幻/悬疑冲突题材仅附加温和的平台边界内敛提醒，不误伤正常文学创作。
-   - `strict_block`：严格关键词熔断。
-   - `passthrough`：仅保留绝对安全底线检查。
+5. **内置双档安全合规护栏 (`policy_mode`)**
+   - `host_gentle`（默认）：对绝对安全红线执行零 Token 硬熔断；对暗黑奇幻/悬疑冲突题材附加温和的平台边界内敛引导，不误伤正常文学创作。
+   - `strict_block`：对绝对安全红线与成人敏感边界词统一执行零 Token 硬熔断。
+   - 宿主 MCP 模式下**不开放**环境变量或配置文件级的无过滤透传（`passthrough`）开关，任何未识别或篡改的配置值均自动回落至 `host_gentle`。
 
 ---
 
@@ -94,7 +94,7 @@ node scripts/run_py.mjs tests/test_full_suite.py
 
 * **零凭证提取与零外部反代**：本项目完全通过官方客户端内置的插件清单、本地 `stdio` MCP 服务与生命周期钩子运行，**不读取、不提取、不转发**任何 OAuth 登录令牌或会话 Cookie，亦不向外部程序暴露任何推理代理端口，严格遵守 [Google Antigravity 附加服务条款](https://antigravity.google/terms/) 中关于禁止使用第三方软件、包装器或 OAuth 代理访问服务的规定。
 * **内容安全与反越狱（Anti-Jailbreak）要求**：在宿主云端环境中使用本项目进行互动叙事、世界观推演或角色扮演测试时，用户须严格遵守 [Google 通用服务条款](https://policies.google.com/terms?hl=en-US) 与 [Google 生成式 AI 禁止使用政策](https://policies.google.com/terms/generative-ai/use-policy?hl=en-US)；若在宿主内切换使用 Claude 等第三方模型，须同时遵守 [Anthropic 商业条款](https://www.anthropic.com/legal/commercial-terms) 与 [Anthropic 使用政策](https://www-cdn.anthropic.com/files/4zrzovbb/website/6ae2f5bb8675bcd9fac006125817ba1393b396e4.pdf)。
-* **外部预设与角色卡导入警示**：**严禁**在连接云端商业订阅模型时导入包含越狱破限（Jailbreak / DAN / 安全过滤器规避指令）、色情露骨（NSFW / ERP）、极端暴力、仇恨言论、自残诱导或未成年人违法不良信息的预设（`OpenAI Settings/*.json`）及角色卡。[server/st_runtime_compat.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/st_runtime_compat.py) 默认启用 `host_gentle` 安全策略门禁与零容忍正则拦截；`passthrough` 模式仅限用户在自有硬件上对接本地开源模型时测试使用，请勿用于云端商业模型会话。
+* **外部预设与角色卡导入警示**：**严禁**在连接云端商业订阅模型时导入包含越狱破限（Jailbreak / DAN / 安全过滤器规避指令）、色情露骨（NSFW / ERP）、极端暴力、仇恨言论、自残诱导或未成年人违法不良信息的预设（`OpenAI Settings/*.json`）及角色卡。[server/st_runtime_compat.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/st_runtime_compat.py) 默认启用 `host_gentle` 安全策略门禁与零容忍正则拦截（宿主 MCP 模式仅支持 `host_gentle` 与 `strict_block` 两档安全护栏，不提供任何通过环境变量或 JSON 配置文件关闭护栏的无过滤透传开关）。
 
 ### 2. 本地数据安全与沙箱隔离 (Local Data & Sandbox Safety)
 

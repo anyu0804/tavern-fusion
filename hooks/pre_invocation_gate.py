@@ -26,7 +26,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from hooks.session_init import discover_st_data_from_workspaces
 from server.mcp_server import TavernFusionRuntime
-from server.st_runtime_compat import evaluate_policy_compliance
+from server.st_runtime_compat import evaluate_policy_compliance, resolve_policy_mode
 
 RP_SLASH_RE = re.compile(
     r"^\s*/rp(?:\s+((?!--)\S+))?(?:\s+--(play|chat))?(?:\s+(.*))?$",
@@ -166,8 +166,21 @@ def main() -> None:
             sys.stdout.write(json.dumps({"injectSteps": []}) + "\n")
             return
 
-        # 5. Configurable Policy Gate (evaluated ONLY inside RP / Tavern utility turns)
-        compliant, policy_detail = evaluate_policy_compliance(effective_raw_input, state_dir=runtime.state_dir)
+        # 5. Enforced Host Policy Gate (evaluated ONLY inside RP / Tavern utility turns;
+        #    defense-in-depth clamp ensures host hooks never enter `passthrough` via env or JSON)
+        host_policy_mode = resolve_policy_mode(state_dir=runtime.state_dir)
+        if host_policy_mode not in ("host_gentle", "strict_block"):
+            host_policy_mode = "host_gentle"
+        gate_check_text = (
+            f"{effective_raw_input}\n{effective_user_input}".strip()
+            if effective_user_input and effective_user_input != effective_raw_input
+            else effective_raw_input
+        )
+        compliant, policy_detail = evaluate_policy_compliance(
+            gate_check_text,
+            policy_mode=host_policy_mode,
+            state_dir=runtime.state_dir,
+        )
         if not compliant:
             if session.get("stage_busy") or session.get("pending_uncommitted_turn"):
                 session["stage_busy"] = False

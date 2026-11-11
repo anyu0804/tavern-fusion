@@ -155,11 +155,13 @@ class TavernFusionRuntime:
                 defaults.update(loaded)
         except Exception:
             pass
+        defaults["policy_mode"] = resolve_policy_mode(str(defaults.get("policy_mode", "")))
         return defaults
 
     def save_plugin_settings(self, updates: dict[str, Any]) -> dict[str, Any]:
         cur = self.load_plugin_settings()
         cur.update(updates)
+        cur["policy_mode"] = resolve_policy_mode(str(cur.get("policy_mode", "")))
         atomic_write_json(self.plugin_settings_file, cur, indent=2)
         return cur
 
@@ -1413,7 +1415,7 @@ MCP_TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "epistemic_level": {"type": "integer", "enum": [0, 50, 100]},
                 "agentic_hands": {"type": "boolean"},
                 "director_mode": {"type": "boolean"},
-                "policy_mode": {"type": "string", "enum": ["host_gentle", "strict_block", "passthrough"]},
+                "policy_mode": {"type": "string", "enum": ["host_gentle", "strict_block"]},
                 "authors_note": {"type": "string"},
                 "an_depth": {"type": "integer"},
             },
