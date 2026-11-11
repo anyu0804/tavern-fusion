@@ -26,10 +26,18 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from hooks.session_init import discover_st_data_from_workspaces
-from server.mcp_server import TavernFusionRuntime
+from server.runtime.context import RuntimeContext
 
 NORMAL_COMPLETION_REASONS = frozenset({"NO_TOOL_CALL", "model_stop", ""})
 MAX_PERSISTENCE_FAILURES = 3
+
+
+def _run_tool(ctx: RuntimeContext, name: str, args: dict) -> dict:
+    """Runs one MCP tool in-process. The tool modules (card codec, lore engine, prompt compiler)
+    are imported only here, so session-state-only paths of this hook stay light."""
+    from server.tools import call_tool
+
+    return call_tool(ctx, name, args)
 
 
 def _clear_persistence_failure_state(runtime, sess: dict) -> None:
@@ -43,7 +51,7 @@ def _clear_persistence_failure_state(runtime, sess: dict) -> None:
     if not sess.get("persistence_failure_count"):
         return
     try:
-        runtime.update_active_session({"persistence_failure_count": 0})
+        runtime.sessions.update({"persistence_failure_count": 0})
     except Exception:
         pass
 
@@ -131,9 +139,9 @@ def main() -> None:
     ws_paths = payload.get("workspacePaths") or []
 
     discovered = discover_st_data_from_workspaces(ws_paths)
-    runtime = TavernFusionRuntime(st_data_root=discovered)
+    runtime = RuntimeContext(st_data_root=discovered)
     try:
-        sess = runtime.load_active_session()
+        sess = runtime.sessions.load()
         rp_conv_id = str(sess.get("rp_conv_id") or "").strip()
 
         # 1. Strict Isolation: NEVER block or mutate any conversation other than `rp_conv_id`!
@@ -147,7 +155,7 @@ def main() -> None:
         # 2. Circuit breaker on abnormal stop reasons (cancel/error)
         if term_reason not in NORMAL_COMPLETION_REASONS:
             if sess.get("pending_uncommitted_turn") or sess.get("stage_busy") or retries:
-                runtime.update_active_session({
+                runtime.sessions.update({
                     "pending_uncommitted_turn": False,
                     "user_floor_already_appended": False,
                     "stage_busy": False,
@@ -183,7 +191,7 @@ def main() -> None:
                         cur["stop_retry_count"] = 0
                         return cur
 
-                    runtime.update_active_session(_record_missing_prose)
+                    runtime.sessions.update(_record_missing_prose)
                     sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
                     return
                 if prose:
@@ -203,7 +211,7 @@ def main() -> None:
                         "extra_meta": extra_meta,
                     }
                     try:
-                        runtime.tool_st_commit_turn(commit_payload)
+                        _run_tool(runtime, "st_commit_turn", commit_payload)
                         _clear_persistence_failure_state(runtime, sess)
                         sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
                         return
@@ -214,7 +222,7 @@ def main() -> None:
                         # point that the Stage inspector can surface and replay.
                         time.sleep(0.5)
                         try:
-                            runtime.tool_st_commit_turn(commit_payload)
+                            _run_tool(runtime, "st_commit_turn", commit_payload)
                             _clear_persistence_failure_state(runtime, sess)
                             sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
                             return
@@ -241,12 +249,12 @@ def main() -> None:
                                     cur["stop_retry_count"] = 0
                                 return cur
 
-                            runtime.update_active_session(_record_persistence_failure)
+                            runtime.sessions.update(_record_persistence_failure)
                             sys.stdout.write(json.dumps({"decision": "allow"}) + "\n")
                             return
 
             elif turn_mode == "kartoittaja" and exec_num < 2 and retries < 1:
-                runtime.update_active_session({"stop_retry_count": retries + 1})
+                runtime.sessions.update({"stop_retry_count": retries + 1})
                 sys.stdout.write(
                     json.dumps(
                         {
@@ -264,7 +272,7 @@ def main() -> None:
 
         # 4. Always clean busy/pending flags cleanly so no session ever hangs
         if sess.get("pending_uncommitted_turn") or sess.get("stage_busy") or retries:
-            runtime.update_active_session({
+            runtime.sessions.update({
                 "pending_uncommitted_turn": False,
                 "user_floor_already_appended": False,
                 "stage_busy": False,

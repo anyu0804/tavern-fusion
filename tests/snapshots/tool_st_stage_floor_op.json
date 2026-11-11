@@ -1,0 +1,213 @@
+[
+  {
+    "args": {
+      "floor_index": -1,
+      "new_text": "*编辑后的回复*",
+      "operation": "edit_floor"
+    },
+    "call": "edit_last",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "floor_index": 4,
+                "mes": "*编辑后的回复*",
+                "operation": "edit_floor"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "floor_index": -1,
+      "operation": "switch_swipe",
+      "swipe_id": 0
+    },
+    "call": "switch_swipe",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "floor_index": 4,
+                "mes": "*编辑后的回复*",
+                "operation": "switch_swipe",
+                "swipe_id": 0,
+                "total_swipes": 1
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "new_text": "我先四处看看。",
+      "operation": "append_user_floor"
+    },
+    "call": "append_user",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "floor_count": 6,
+                "floor_index": 5,
+                "is_backstage": false,
+                "operation": "append_user_floor"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "floor_index": -1,
+      "operation": "toggle_backstage"
+    },
+    "call": "toggle_backstage",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "floor_index": 5,
+                "is_backstage": true,
+                "operation": "toggle_backstage"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "floor_index": -1,
+      "operation": "delete_floor"
+    },
+    "call": "delete_last",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "deleted_floor_index": 5,
+                "deleted_sender": "旅行者",
+                "operation": "delete_floor",
+                "remaining_floors": 5
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "floor_index": -1,
+      "operation": "prune_swipes"
+    },
+    "call": "prune",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "floor_index": 4,
+                "operation": "prune_swipes",
+                "pruned_count": 0
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "chat_file": "../x.jsonl",
+      "new_text": "x",
+      "operation": "edit_floor"
+    },
+    "call": "bad_chat_file",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_stage_floor_op: Invalid chat_file name.",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  },
+  {
+    "args": {
+      "activate_fork": false,
+      "floor_index": 1,
+      "operation": "fork_from_floor"
+    },
+    "call": "fork_inactive",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "branch_file": "<STAMP>_fork_f2_<STAMP>.jsonl",
+                "branch_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>_fork_f2_<STAMP>.jsonl",
+                "floors_copied": 2,
+                "operation": "fork_from_floor"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  }
+]

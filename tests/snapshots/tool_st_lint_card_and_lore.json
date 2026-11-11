@@ -1,0 +1,107 @@
+[
+  {
+    "args": {
+      "character_name": "Seraphina"
+    },
+    "call": "st_lint_card_and_lore",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "card_issues": [],
+                "healthy": true,
+                "inspected_card": "Seraphina.png",
+                "inspected_lorebook": "Eldoria.json",
+                "lorebook_issues": [],
+                "minor_risk_gate": {
+                  "blocked": false,
+                  "explicit_adult_age": false,
+                  "gate_action": "pass",
+                  "reasons": [],
+                  "red_screen_warn": false,
+                  "signals": []
+                },
+                "total_issues": 0
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "lorebook_name": "Eldoria"
+    },
+    "call": "lore_only",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "card_issues": [],
+                "healthy": true,
+                "inspected_card": null,
+                "inspected_lorebook": "Eldoria.json",
+                "lorebook_issues": [],
+                "minor_risk_gate": {
+                  "blocked": false,
+                  "gate_action": "pass",
+                  "reasons": [],
+                  "red_screen_warn": false,
+                  "signals": []
+                },
+                "total_issues": 0
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {},
+    "call": "from_session",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "card_issues": [],
+                "healthy": true,
+                "inspected_card": "Seraphina.png",
+                "inspected_lorebook": "Eldoria.json",
+                "lorebook_issues": [],
+                "minor_risk_gate": {
+                  "blocked": false,
+                  "explicit_adult_age": false,
+                  "gate_action": "pass",
+                  "reasons": [],
+                  "red_screen_warn": false,
+                  "signals": []
+                },
+                "total_issues": 0
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  }
+]

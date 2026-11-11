@@ -22,8 +22,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from hooks.session_init import discover_st_data_from_workspaces
-from server.mcp_server import TavernFusionRuntime
-from server.st_runtime_compat import evaluate_policy_compliance
+from server.runtime.context import RuntimeContext
+from server.policy import evaluate_policy_compliance
 
 FILE_MUTATION_TOOLS = frozenset({
     "write_file",
@@ -73,9 +73,9 @@ def main() -> None:
     # (`agentic_hands=False` and `director_mode=False`), physically deny any tool invocation.
     if conv_id:
         discovered = discover_st_data_from_workspaces(ws_paths)
-        runtime = TavernFusionRuntime(st_data_root=discovered)
+        runtime = RuntimeContext(st_data_root=discovered)
         try:
-            sess = runtime.load_active_session()
+            sess = runtime.sessions.load()
             if (
                 bool(sess.get("active"))
                 and str(sess.get("rp_conv_id") or "") == conv_id
@@ -150,7 +150,7 @@ def main() -> None:
                 return
 
         discovered = discover_st_data_from_workspaces(ws_paths)
-        runtime = TavernFusionRuntime(st_data_root=discovered)
+        runtime = RuntimeContext(st_data_root=discovered)
         try:
             serialized_args = json.dumps(tool_args, ensure_ascii=False)
             compliant, violation = evaluate_policy_compliance(serialized_args, state_dir=runtime.state_dir)

@@ -1,0 +1,238 @@
+[
+  {
+    "args": {
+      "character_name": "Seraphina",
+      "mode": "play"
+    },
+    "call": "first",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "available_expressions": [],
+                "avatar_stem": "Seraphina",
+                "card_file": "Seraphina.png",
+                "character_name": "Seraphina",
+                "chat_file": "<STAMP>.jsonl",
+                "detected_card_spec": "ccv3",
+                "first_run_notice": {
+                  "items": [
+                    "条款与风险摘要：本工具仅通过宿主官方扩展点在本地读写酒馆数据，不提取凭证、不架反代、不做多租户。模型调用受宿主平台及上游模型服务商条款约束，内容政策与账号风险由使用者自行承担。",
+                    "建议使用专用账号：当前处于早期预览版（Preview），建议使用独立的专用/测试账号运行，避免在主力生产账号上加载未经审阅的外部预设或角色卡。",
+                    "不支持破限 / ERP：不支持、不建议导入越狱破限（Jailbreak）或色情露骨（NSFW / ERP）预设与角色卡；云端模型侧无法绕过服务端强制安全过滤。",
+                    "Antigravity 条款风险：Google Antigravity 附加条款第 6 条禁止“将本服务与非 Google 提供的产品结合使用”，违反可能导致 Antigravity 及 Gemini CLI 账号被暂停或终止。使用宿主内置模型运行酒馆角色扮演存在被认定违规的风险；如需规避，可在舞台配置中切换为“自有 API Key”后端。",
+                    "对话隐私：依据 Antigravity 条款，宿主会记录交互数据，Google 员工或承包商可能人工审阅，并可能用于改进产品和训练模型。角色扮演对话通常较为私密，请勿输入不希望被审阅的内容，并建议在 Antigravity 设置中关闭交互数据用于改进的选项（即使关闭，Google 仍会为提供服务和安全目的使用数据）。"
+                  ],
+                  "title": "首次运行须知（Preview）",
+                  "version": 2
+                },
+                "mode": "--play",
+                "persona": {
+                  "avatar_key": "user-default.png",
+                  "description": "一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。",
+                  "name": "旅行者"
+                },
+                "preset_name": "Default",
+                "recent_messages": [
+                  {
+                    "extra": {
+                      "seeded_greeting": true
+                    },
+                    "is_system": false,
+                    "is_user": false,
+                    "mes": "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                    "name": "Seraphina",
+                    "send_date": "<VOLATILE>",
+                    "swipe_id": 0,
+                    "swipe_info": [
+                      {
+                        "extra": {},
+                        "send_date": "<VOLATILE>"
+                      },
+                      {
+                        "extra": {},
+                        "send_date": "<VOLATILE>"
+                      }
+                    ],
+                    "swipes": [
+                      "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                      "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+                    ]
+                  }
+                ],
+                "resumed_existing_chat": false,
+                "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+                "sidecar_pill": "[Tavern Stage](sidecar://tavern-fusion/tavern_stage/)",
+                "status": "active",
+                "total_floors": 1,
+                "variables": {}
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "character_name": "Seraphina",
+      "mode": "--chat"
+    },
+    "call": "resume",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "available_expressions": [],
+                "avatar_stem": "Seraphina",
+                "card_file": "Seraphina.png",
+                "character_name": "Seraphina",
+                "chat_file": "<STAMP>.jsonl",
+                "detected_card_spec": "ccv3",
+                "mode": "--chat",
+                "persona": {
+                  "avatar_key": "user-default.png",
+                  "description": "一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。",
+                  "name": "旅行者"
+                },
+                "preset_name": "Default",
+                "recent_messages": [
+                  {
+                    "extra": {
+                      "seeded_greeting": true
+                    },
+                    "is_system": false,
+                    "is_user": false,
+                    "mes": "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                    "name": "Seraphina",
+                    "send_date": "<VOLATILE>",
+                    "swipe_id": 0,
+                    "swipe_info": [
+                      {
+                        "extra": {},
+                        "send_date": "<VOLATILE>"
+                      },
+                      {
+                        "extra": {},
+                        "send_date": "<VOLATILE>"
+                      }
+                    ],
+                    "swipes": [
+                      "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                      "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+                    ]
+                  }
+                ],
+                "resumed_existing_chat": true,
+                "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+                "sidecar_pill": "[Tavern Stage](sidecar://tavern-fusion/tavern_stage/)",
+                "status": "active",
+                "total_floors": 1,
+                "variables": {}
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "character_name": "Seraphina",
+      "greeting_index": 1,
+      "new_chat": true
+    },
+    "call": "new_alt_greeting",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "available_expressions": [],
+                "avatar_stem": "Seraphina",
+                "card_file": "Seraphina.png",
+                "character_name": "Seraphina",
+                "chat_file": "<STAMP>.jsonl",
+                "detected_card_spec": "ccv3",
+                "mode": "--play",
+                "persona": {
+                  "avatar_key": "user-default.png",
+                  "description": "一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。",
+                  "name": "旅行者"
+                },
+                "preset_name": "Default",
+                "recent_messages": [
+                  {
+                    "extra": {
+                      "seeded_greeting": true
+                    },
+                    "is_system": false,
+                    "is_user": false,
+                    "mes": "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\"",
+                    "name": "Seraphina",
+                    "send_date": "<VOLATILE>",
+                    "swipe_id": 1,
+                    "swipe_info": [
+                      {
+                        "extra": {},
+                        "send_date": "<VOLATILE>"
+                      },
+                      {
+                        "extra": {},
+                        "send_date": "<VOLATILE>"
+                      }
+                    ],
+                    "swipes": [
+                      "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                      "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+                    ]
+                  }
+                ],
+                "resumed_existing_chat": false,
+                "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+                "sidecar_pill": "[Tavern Stage](sidecar://tavern-fusion/tavern_stage/)",
+                "status": "active",
+                "total_floors": 1,
+                "variables": {}
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {},
+    "call": "missing_required",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_session_bootstrap: 'character_name'",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  }
+]

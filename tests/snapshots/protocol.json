@@ -1,0 +1,481 @@
+{
+  "initialize": {
+    "id": 7,
+    "jsonrpc": "2.0",
+    "result": {
+      "capabilities": {
+        "tools": {
+          "listChanged": false
+        }
+      },
+      "protocolVersion": "2025-03-26",
+      "serverInfo": {
+        "name": "st-antigravity-mcp",
+        "version": "3.0.3-preview"
+      }
+    }
+  },
+  "no/such_method": {
+    "error": {
+      "code": -32601,
+      "message": "Method not found: no/such_method"
+    },
+    "id": 7,
+    "jsonrpc": "2.0"
+  },
+  "notification_returns": null,
+  "ping": {
+    "id": 7,
+    "jsonrpc": "2.0",
+    "result": {}
+  },
+  "prompts/list": {
+    "id": 7,
+    "jsonrpc": "2.0",
+    "result": {
+      "prompts": []
+    }
+  },
+  "resources/list": {
+    "id": 7,
+    "jsonrpc": "2.0",
+    "result": {
+      "resources": []
+    }
+  },
+  "tools/list": {
+    "id": 7,
+    "jsonrpc": "2.0",
+    "result": {
+      "tools": [
+        {
+          "description": "Bootstraps or resumes a SillyTavern character session (--play or --chat), loading CCv2/CCv3 card, Persona, Preset, and latest .jsonl chat log.",
+          "inputSchema": {
+            "properties": {
+              "character_name": {
+                "description": "Character name or PNG filename (e.g. 'Seraphina').",
+                "type": "string"
+              },
+              "chat_file": {
+                "description": "Optional specific .jsonl chat filename to activate.",
+                "type": "string"
+              },
+              "greeting_index": {
+                "default": 0,
+                "type": "integer"
+              },
+              "lorebooks": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "mode": {
+                "default": "play",
+                "enum": [
+                  "play",
+                  "chat"
+                ],
+                "type": "string"
+              },
+              "new_chat": {
+                "default": false,
+                "type": "boolean"
+              },
+              "persona_name": {
+                "type": "string"
+              },
+              "preset_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "character_name"
+            ],
+            "type": "object"
+          },
+          "name": "st_session_bootstrap"
+        },
+        {
+          "description": "Cleanses RP prose with SillyTavern Regex rules, substitutes macros, infers expression sprite, and atomically appends user + character messages (or a new Swipe) to the active .jsonl file.",
+          "inputSchema": {
+            "properties": {
+              "char_mes": {
+                "type": "string"
+              },
+              "character_name": {
+                "type": "string"
+              },
+              "extra_meta": {
+                "type": "object"
+              },
+              "swipe_mode": {
+                "default": false,
+                "type": "boolean"
+              },
+              "user_mes": {
+                "type": "string"
+              },
+              "variables_delta": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "char_mes"
+            ],
+            "type": "object"
+          },
+          "name": "st_commit_turn"
+        },
+        {
+          "description": "Publishes 3 in-character player reply options or expanded player intent directly to the Tavern Stage Sidecar composer without committing a character floor.",
+          "inputSchema": {
+            "properties": {
+              "kind": {
+                "default": "reply_suggestions",
+                "enum": [
+                  "reply_suggestions",
+                  "expanded_intent"
+                ],
+                "type": "string"
+              },
+              "suggestions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "suggestions"
+            ],
+            "type": "object"
+          },
+          "name": "st_publish_stage_suggestions"
+        },
+        {
+          "description": "Compiles a CSP-compliant Antigravity /generative_ui HTML Stage snapshot widget (inline <=500px or standalone) with theme variables, Swipes, and Lorebook drawer.",
+          "inputSchema": {
+            "properties": {
+              "character_name": {
+                "type": "string"
+              },
+              "output_html_path": {
+                "type": "string"
+              },
+              "placement": {
+                "default": "standalone",
+                "enum": [
+                  "inline",
+                  "standalone"
+                ],
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "name": "st_compile_stage_widget"
+        },
+        {
+          "description": "Dry-runs the Hybrid Lorebook Engine and full OpenAI Settings prompt_order compiler (--dump-prompt), returning active @D lore, budget usage, evicted entries, and assembled prompt.",
+          "inputSchema": {
+            "properties": {
+              "character_name": {
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "play",
+                  "chat"
+                ],
+                "type": "string"
+              },
+              "token_budget": {
+                "default": 2048,
+                "type": "integer"
+              },
+              "user_input": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "name": "st_dump_prompt_frame"
+        },
+        {
+          "description": "Losslessly parses a SillyTavern Character Card PNG (tEXt/zTXt/iTXt, preferring ccv3 over chara) or JSON file.",
+          "inputSchema": {
+            "properties": {
+              "card_filename": {
+                "type": "string"
+              },
+              "include_avatar_base64": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "card_filename"
+            ],
+            "type": "object"
+          },
+          "name": "st_read_card"
+        },
+        {
+          "description": "Seppä card forge: validates Character Card V3 schema, enforces Card-is-Data security sanitization, and atomically exports a PNG with synchronized chara (V2) + ccv3 (V3) chunks.",
+          "inputSchema": {
+            "properties": {
+              "card_v3_json": {
+                "type": "object"
+              },
+              "output_filename": {
+                "type": "string"
+              },
+              "portrait_image_path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "card_v3_json",
+              "output_filename"
+            ],
+            "type": "object"
+          },
+          "name": "st_build_export_card"
+        },
+        {
+          "description": "Card Doctor & World Info Doctor static linter: detects missing ccv3 chunks, system_prompt wiping presets without {{original}}, selective:false secondary-key traps, leaked creator_notes, and broken macros.",
+          "inputSchema": {
+            "properties": {
+              "character_name": {
+                "type": "string"
+              },
+              "lorebook_name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "name": "st_lint_card_and_lore"
+        },
+        {
+          "description": "Queries SillyTavern World Info JSON files using hybrid keyword/regex + selective secondary gates + local/dense semantic similarity.",
+          "inputSchema": {
+            "properties": {
+              "lorebook_names": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "query_text": {
+                "type": "string"
+              },
+              "token_budget": {
+                "default": 2048,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "query_text"
+            ],
+            "type": "object"
+          },
+          "name": "st_query_lorebook"
+        },
+        {
+          "description": "Dramaturgi Lore Evolution tool: inserts, updates, toggles, archives, or deletes entries in SillyTavern worlds/*.json.",
+          "inputSchema": {
+            "properties": {
+              "entry_payload": {
+                "type": "object"
+              },
+              "lorebook_name": {
+                "type": "string"
+              },
+              "operation": {
+                "default": "upsert",
+                "enum": [
+                  "upsert",
+                  "toggle",
+                  "archive",
+                  "delete"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "lorebook_name",
+              "entry_payload"
+            ],
+            "type": "object"
+          },
+          "name": "st_evolve_lore_entry"
+        },
+        {
+          "description": "Creates a new chat, switches Swipe index on the latest floor, forks a checkpoint branch .jsonl, or rolls back floors.",
+          "inputSchema": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "new",
+                  "switch_swipe",
+                  "fork_checkpoint",
+                  "rollback"
+                ],
+                "type": "string"
+              },
+              "character_name": {
+                "type": "string"
+              },
+              "target_id": {
+                "default": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "character_name",
+              "action"
+            ],
+            "type": "object"
+          },
+          "name": "st_manage_chat_branch"
+        },
+        {
+          "description": "Interactive Stage floor revision tool: edits any floor in-place, deletes a floor, switches or prunes Swipes on any floor, or forks a branch from any floor.",
+          "inputSchema": {
+            "properties": {
+              "activate_fork": {
+                "default": true,
+                "type": "boolean"
+              },
+              "character_name": {
+                "type": "string"
+              },
+              "chat_file": {
+                "type": "string"
+              },
+              "floor_index": {
+                "default": -1,
+                "type": "integer"
+              },
+              "new_text": {
+                "type": "string"
+              },
+              "operation": {
+                "enum": [
+                  "edit_floor",
+                  "delete_floor",
+                  "switch_swipe",
+                  "prune_swipes",
+                  "fork_from_floor",
+                  "append_user_floor",
+                  "toggle_backstage"
+                ],
+                "type": "string"
+              },
+              "swipe_id": {
+                "default": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "operation"
+            ],
+            "type": "object"
+          },
+          "name": "st_stage_floor_op"
+        },
+        {
+          "description": "Switches active OpenAI Preset, User Persona, --play/--chat mode, policy_mode, or per-chat Author's Note & @D depth.",
+          "inputSchema": {
+            "properties": {
+              "agentic_hands": {
+                "type": "boolean"
+              },
+              "an_depth": {
+                "type": "integer"
+              },
+              "authors_note": {
+                "type": "string"
+              },
+              "director_mode": {
+                "type": "boolean"
+              },
+              "epistemic_level": {
+                "enum": [
+                  0,
+                  50,
+                  100
+                ],
+                "type": "integer"
+              },
+              "mode": {
+                "enum": [
+                  "play",
+                  "chat"
+                ],
+                "type": "string"
+              },
+              "persona_name": {
+                "type": "string"
+              },
+              "policy_mode": {
+                "enum": [
+                  "host_gentle",
+                  "strict_block"
+                ],
+                "type": "string"
+              },
+              "preset_name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "name": "st_switch_profile"
+        },
+        {
+          "description": "Gets, sets, increments, deletes, or lists chat-scoped or global SillyTavern variables (compatible with /getvar and /setvar).",
+          "inputSchema": {
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "default": "list",
+                "enum": [
+                  "get",
+                  "set",
+                  "inc",
+                  "del",
+                  "list"
+                ],
+                "type": "string"
+              },
+              "scope": {
+                "default": "chat",
+                "enum": [
+                  "chat",
+                  "global"
+                ],
+                "type": "string"
+              },
+              "value": {}
+            },
+            "type": "object"
+          },
+          "name": "st_manage_variables"
+        }
+      ]
+    }
+  },
+  "unknown_tool": {
+    "error": {
+      "code": -32601,
+      "message": "Unknown tool: st_no_such_tool"
+    },
+    "id": 1,
+    "jsonrpc": "2.0"
+  }
+}

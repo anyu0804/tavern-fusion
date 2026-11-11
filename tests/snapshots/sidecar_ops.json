@@ -1,0 +1,1262 @@
+{
+  "ack_first_run_notice": [
+    {
+      "args": {},
+      "call": "ack_first_run_notice",
+      "result": {
+        "data": {
+          "acknowledged": true,
+          "first_run_notice_ack_v1": true
+        },
+        "ok": true
+      }
+    }
+  ],
+  "ack_minor_risk_warn": [
+    {
+      "args": {
+        "card_file": "Seraphina.png"
+      },
+      "call": "ack_minor_risk_warn",
+      "result": {
+        "data": {
+          "acknowledged": true,
+          "card_file": "Seraphina.png"
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {},
+      "call": "missing_card",
+      "result": {
+        "error": "ValueError: Missing card_file for ack_minor_risk_warn.",
+        "ok": false
+      }
+    }
+  ],
+  "bind_rp_conv": [
+    {
+      "args": {
+        "rp_conv_id": "conv-snap"
+      },
+      "call": "bind_rp_conv",
+      "result": {
+        "data": {
+          "rp_conv_id": "conv-snap"
+        },
+        "ok": true
+      }
+    }
+  ],
+  "bootstrap": [
+    {
+      "args": {
+        "activate_rp": false,
+        "character_name": "Seraphina"
+      },
+      "call": "bootstrap_inactive",
+      "result": {
+        "data": {
+          "available_expressions": [],
+          "avatar_stem": "Seraphina",
+          "card_file": "Seraphina.png",
+          "character_name": "Seraphina",
+          "chat_file": "<STAMP>.jsonl",
+          "detected_card_spec": "ccv3",
+          "mode": "--play",
+          "persona": {
+            "avatar_key": "user-default.png",
+            "description": "一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。",
+            "name": "旅行者"
+          },
+          "preset_name": "Default",
+          "recent_messages": [
+            {
+              "extra": {
+                "edited_at": "<DATETIME>",
+                "seeded_greeting": true
+              },
+              "is_system": false,
+              "is_user": false,
+              "mes": "*改写开场*",
+              "name": "Seraphina",
+              "send_date": "<VOLATILE>",
+              "swipe_id": 0,
+              "swipe_info": [
+                {
+                  "extra": {},
+                  "send_date": "<VOLATILE>"
+                },
+                {
+                  "extra": {},
+                  "send_date": "<VOLATILE>"
+                }
+              ],
+              "swipes": [
+                "*改写开场*",
+                "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+              ]
+            },
+            {
+              "extra": {
+                "source": "tavern_stage_sidecar"
+              },
+              "is_system": false,
+              "is_user": true,
+              "mes": "你好",
+              "name": "旅行者",
+              "send_date": "<VOLATILE>"
+            },
+            {
+              "extra": {
+                "is_backstage": true,
+                "source": "tavern_stage_director"
+              },
+              "is_system": false,
+              "is_user": true,
+              "mes": "导演：加快节奏",
+              "name": "旅行者",
+              "send_date": "<VOLATILE>"
+            }
+          ],
+          "resumed_existing_chat": true,
+          "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+          "sidecar_pill": "[Tavern Stage](sidecar://tavern-fusion/tavern_stage/)",
+          "status": "active",
+          "total_floors": 3,
+          "variables": {}
+        },
+        "ok": true
+      }
+    }
+  ],
+  "byok_status": [
+    {
+      "args": {},
+      "call": "byok_status",
+      "result": {
+        "data": {
+          "base_url": "https://api.example.com/v1",
+          "key_present": false,
+          "key_source": "none",
+          "model": "m1",
+          "ready": false
+        },
+        "ok": true
+      }
+    }
+  ],
+  "byok_turn": [
+    {
+      "args": {
+        "action_kind": "send_turn",
+        "user_text": "hi"
+      },
+      "call": "byok_unconfigured",
+      "result": {
+        "error": "ValueError: BYOK 后端未配置完整：缺少 API Key（环境变量 TAVERN_BYOK_API_KEY 或状态目录 byok_api_key 文件）",
+        "ok": false
+      }
+    },
+    {
+      "args": {
+        "action_kind": "kartoittaja_branches"
+      },
+      "call": "byok_unsupported",
+      "result": {
+        "error": "ValueError: BYOK 后端暂只支持发送回合与重抽（Swipe），不支持「kartoittaja_branches」。",
+        "ok": false
+      }
+    }
+  ],
+  "clear_suggestions": [
+    {
+      "args": {},
+      "call": "clear_suggestions",
+      "result": {
+        "data": {
+          "cleared": true
+        },
+        "ok": true
+      }
+    }
+  ],
+  "evolve_lore": [
+    {
+      "args": {
+        "entry_payload": {
+          "uid": 0
+        },
+        "lorebook_name": "Eldoria",
+        "operation": "delete"
+      },
+      "call": "evolve_lore",
+      "result": {
+        "data": {
+          "action": "deleted",
+          "constant_cache_notice": false,
+          "lorebook_path": "<TMP>/data/default-user/worlds/Eldoria.json",
+          "total_entries": 2,
+          "uid": 0
+        },
+        "ok": true
+      }
+    }
+  ],
+  "floor_op": [
+    {
+      "args": {
+        "floor_index": 0,
+        "new_text": "*改写开场*",
+        "operation": "edit_floor"
+      },
+      "call": "floor_op",
+      "result": {
+        "data": {
+          "floor_index": 0,
+          "mes": "*改写开场*",
+          "operation": "edit_floor"
+        },
+        "ok": true
+      }
+    }
+  ],
+  "import_card": [
+    {
+      "args": {
+        "base64_data": "<DATA_URI>",
+        "filename": "Imported Sage.json"
+      },
+      "call": "json",
+      "result": {
+        "data": {
+          "bytes_written": 2988,
+          "character_name": "Imported Sage",
+          "dual_chunks_written": [
+            "chara",
+            "ccv3"
+          ],
+          "minor_risk_gate": {
+            "blocked": false,
+            "explicit_adult_age": false,
+            "gate_action": "pass",
+            "reasons": [],
+            "red_screen_warn": false,
+            "signals": []
+          },
+          "output_path": "<TMP>/data/default-user/characters/Imported Sage.png",
+          "sanitized_forbidden_keys": []
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {},
+      "call": "missing_data",
+      "result": {
+        "error": "ValueError: Missing base64_data for card import.",
+        "ok": false
+      }
+    }
+  ],
+  "lint": [
+    {
+      "args": {
+        "character_name": "Seraphina"
+      },
+      "call": "lint",
+      "result": {
+        "data": {
+          "card_issues": [],
+          "healthy": true,
+          "inspected_card": "Seraphina.png",
+          "inspected_lorebook": "Eldoria.json",
+          "lorebook_issues": [],
+          "minor_risk_gate": {
+            "blocked": false,
+            "explicit_adult_age": false,
+            "gate_action": "pass",
+            "reasons": [],
+            "red_screen_warn": false,
+            "signals": []
+          },
+          "total_issues": 0
+        },
+        "ok": true
+      }
+    }
+  ],
+  "manage_variables": [
+    {
+      "args": {
+        "op": "list"
+      },
+      "call": "manage_variables",
+      "result": {
+        "data": {
+          "scope": "chat",
+          "variables": {}
+        },
+        "ok": true
+      }
+    }
+  ],
+  "no_such_op": [
+    {
+      "args": {},
+      "call": "no_such_op",
+      "result": {
+        "error": "ValueError: Unknown sidecar operation: no_such_op",
+        "ok": false
+      }
+    }
+  ],
+  "prepare_agent_turn": [
+    {
+      "args": {
+        "action_kind": "send_turn",
+        "user_text": "你好"
+      },
+      "call": "send_turn",
+      "result": {
+        "data": {
+          "action_kind": "send_turn",
+          "character_name": "Seraphina",
+          "gentle_notice": "",
+          "prompt": "你好",
+          "ready": true
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {
+        "action_kind": "suggest_replies"
+      },
+      "call": "suggest_replies",
+      "result": {
+        "data": {
+          "action_kind": "suggest_replies",
+          "character_name": "Seraphina",
+          "gentle_notice": "",
+          "prompt": "[STAGE_SUGGEST_REPLIES] Based on Seraphina's latest floor in `<STAMP>.jsonl`, propose 3 distinct in-character reply options for {{user}} (formatted with *actions* and \"dialogue\") and quietly publish them via `st_publish_stage_suggestions(kind=\"reply_suggestions\", suggestions=[...])` without engineering preamble. Do not call `st_commit_turn`.",
+          "ready": true
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {
+        "action_kind": "swipe_reroll",
+        "user_text": "更温柔"
+      },
+      "call": "swipe_reroll",
+      "result": {
+        "data": {
+          "action_kind": "swipe_reroll",
+          "character_name": "Seraphina",
+          "gentle_notice": "",
+          "prompt": "[STAGE_SWIPE_REROLL] Draft one fresh, dramatically distinct alternative reply for Seraphina responding to the latest scene in `<STAMP>.jsonl` (--play mode). Output ONLY Seraphina's in-character prose (\"...\" and *...*) without calling any tools. Direction hint: 更温柔",
+          "ready": true
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {
+        "action_kind": "kartoittaja_branches"
+      },
+      "call": "kartoittaja",
+      "result": {
+        "data": {
+          "action_kind": "kartoittaja_branches",
+          "character_name": "Seraphina",
+          "gentle_notice": "",
+          "prompt": "[STAGE_KARTOITTAJA_BRANCHES] Invoke Kartoittaja branching workflow for Seraphina: draft 3 genuinely distinct dramatic continuations (e.g. guarded, bold, intimate/reflective) for the latest floor and quietly append each using `st_commit_turn(character_name=\"Seraphina\", char_mes=..., swipe_mode=True)` without engineering preamble.",
+          "ready": true
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {
+        "action_kind": "expand_intent",
+        "user_text": "拥抱"
+      },
+      "call": "expand_intent",
+      "result": {
+        "data": {
+          "action_kind": "expand_intent",
+          "character_name": "Seraphina",
+          "gentle_notice": "",
+          "prompt": "[STAGE_EXPAND_INTENT] Expand {{user}}'s brief action/dialogue intent into 3 polished roleplay variations (preserving player intent without speaking for Seraphina): `拥抱`. Quietly publish via `st_publish_stage_suggestions(kind=\"expanded_intent\", suggestions=[...])` without engineering preamble or `st_commit_turn`.",
+          "ready": true
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {
+        "action_kind": "send_turn",
+        "user_text": "强奸"
+      },
+      "call": "policy_block",
+      "result": {
+        "error": "ValueError: Zero-Tolerance Safety Redline: Non-consensual sexual content / sexual violence is strictly prohibited.",
+        "ok": false
+      }
+    },
+    {
+      "args": {
+        "action_kind": "nope",
+        "user_text": "x"
+      },
+      "call": "unknown_kind",
+      "result": {
+        "error": "ValueError: Unknown prepare_agent_turn kind: nope",
+        "ok": false
+      }
+    },
+    {
+      "args": {
+        "action_kind": "send_turn",
+        "user_text": "导演：加快节奏"
+      },
+      "call": "director_send",
+      "result": {
+        "data": {
+          "action_kind": "send_turn",
+          "character_name": "Seraphina",
+          "gentle_notice": "",
+          "prompt": "[STAGE_DIRECTOR_INTERVENTION] 导演：加快节奏",
+          "ready": true
+        },
+        "ok": true
+      }
+    }
+  ],
+  "query_lore": [
+    {
+      "args": {
+        "query_text": "钟塔"
+      },
+      "call": "query_lore",
+      "result": {
+        "data": {
+          "active_entries": [],
+          "evicted_entries": [],
+          "queried_books": [
+            "Eldoria",
+            "Fresh Book"
+          ],
+          "total_entries_scanned": 4,
+          "used_tokens": 0
+        },
+        "ok": true
+      }
+    }
+  ],
+  "read_lorebook": [
+    {
+      "args": {},
+      "call": "read_lorebook",
+      "result": {
+        "data": {
+          "entries": [
+            {
+              "comment": "[ARCHIVED] 艾尔多利亚边境概览",
+              "constant": true,
+              "content": "艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。",
+              "cooldown": 0,
+              "depth": 4,
+              "enabled": false,
+              "keys": [
+                "艾尔多利亚",
+                "Eldoria",
+                "星陨钟塔"
+              ],
+              "keys_secondary": [],
+              "order": 90,
+              "position": "before_char",
+              "selective": false,
+              "selective_logic": "AND_ANY",
+              "sticky": 0,
+              "uid": 0,
+              "vectorized": true
+            },
+            {
+              "comment": "苍银秘仪与星界回响",
+              "constant": false,
+              "content": "当施法者过度汲取星界裂隙中的秘银辉光时，指尖会浮现细微的霜蓝色结晶，必须以温热的琥珀茶缓和。",
+              "cooldown": 1,
+              "depth": 2,
+              "enabled": false,
+              "keys": [
+                "苍银秘仪",
+                "魔力枯竭",
+                "mana",
+                "星界裂隙"
+              ],
+              "keys_secondary": [
+                "封印完好"
+              ],
+              "order": 110,
+              "position": "at_depth",
+              "selective": true,
+              "selective_logic": "NOT_ANY",
+              "sticky": 2,
+              "uid": 1,
+              "vectorized": true
+            },
+            {
+              "comment": "新条目",
+              "constant": false,
+              "content": "琥珀茶能缓和霜蓝结晶。",
+              "cooldown": 0,
+              "depth": 4,
+              "enabled": true,
+              "keys": [
+                "琥珀茶"
+              ],
+              "keys_secondary": [],
+              "order": 150,
+              "position": "at_depth",
+              "selective": false,
+              "selective_logic": "AND_ANY",
+              "sticky": 0,
+              "uid": 2,
+              "vectorized": true
+            }
+          ],
+          "issues": [],
+          "lorebook_name": "Eldoria"
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {
+        "lorebook_name": "Eldoria"
+      },
+      "call": "named",
+      "result": {
+        "data": {
+          "entries": [
+            {
+              "comment": "[ARCHIVED] 艾尔多利亚边境概览",
+              "constant": true,
+              "content": "艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。",
+              "cooldown": 0,
+              "depth": 4,
+              "enabled": false,
+              "keys": [
+                "艾尔多利亚",
+                "Eldoria",
+                "星陨钟塔"
+              ],
+              "keys_secondary": [],
+              "order": 90,
+              "position": "before_char",
+              "selective": false,
+              "selective_logic": "AND_ANY",
+              "sticky": 0,
+              "uid": 0,
+              "vectorized": true
+            },
+            {
+              "comment": "苍银秘仪与星界回响",
+              "constant": false,
+              "content": "当施法者过度汲取星界裂隙中的秘银辉光时，指尖会浮现细微的霜蓝色结晶，必须以温热的琥珀茶缓和。",
+              "cooldown": 1,
+              "depth": 2,
+              "enabled": false,
+              "keys": [
+                "苍银秘仪",
+                "魔力枯竭",
+                "mana",
+                "星界裂隙"
+              ],
+              "keys_secondary": [
+                "封印完好"
+              ],
+              "order": 110,
+              "position": "at_depth",
+              "selective": true,
+              "selective_logic": "NOT_ANY",
+              "sticky": 2,
+              "uid": 1,
+              "vectorized": true
+            },
+            {
+              "comment": "新条目",
+              "constant": false,
+              "content": "琥珀茶能缓和霜蓝结晶。",
+              "cooldown": 0,
+              "depth": 4,
+              "enabled": true,
+              "keys": [
+                "琥珀茶"
+              ],
+              "keys_secondary": [],
+              "order": 150,
+              "position": "at_depth",
+              "selective": false,
+              "selective_logic": "AND_ANY",
+              "sticky": 0,
+              "uid": 2,
+              "vectorized": true
+            }
+          ],
+          "issues": [],
+          "lorebook_name": "Eldoria"
+        },
+        "ok": true
+      }
+    }
+  ],
+  "snapshot": [
+    {
+      "args": {},
+      "call": "snapshot",
+      "result": {
+        "data": {
+          "active_card": {
+            "alternate_greetings_count": 1,
+            "description": "驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。",
+            "name": "Seraphina",
+            "personality": "温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。",
+            "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+            "system_prompt": "{{original}}\nMaintain atmospheric sensory details and subtle emotional progression.",
+            "world": "Eldoria"
+          },
+          "byok": {
+            "base_url": "https://api.example.com/v1",
+            "key_present": false,
+            "key_source": "none",
+            "model": "m1",
+            "ready": false
+          },
+          "cards": [
+            {
+              "expressions_count": 0,
+              "file": "Seraphina.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Seraphina",
+              "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+              "spec": "ccv3",
+              "tags": [
+                "fantasy",
+                "scholar",
+                "eldoria"
+              ],
+              "world": "Eldoria"
+            },
+            {
+              "expressions_count": 0,
+              "file": "Snapshot Bard.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Snapshot Bard",
+              "scenario": "A tavern.",
+              "spec": "ccv3",
+              "tags": [
+                "music"
+              ],
+              "world": ""
+            },
+            {
+              "expressions_count": 0,
+              "file": "evil.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Snapshot Bard",
+              "scenario": "A tavern.",
+              "spec": "ccv3",
+              "tags": [
+                "music"
+              ],
+              "world": ""
+            }
+          ],
+          "chats": [
+            {
+              "file": "<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            },
+            {
+              "file": "<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            },
+            {
+              "file": "<STAMP>_branch_<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            },
+            {
+              "file": "<STAMP>_fork_f2_<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            },
+            {
+              "file": "<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            }
+          ],
+          "current_expression": null,
+          "data_root_name": "default-user",
+          "doctor": {
+            "card_issues": [],
+            "healthy": true,
+            "inspected_card": "Seraphina.png",
+            "inspected_lorebook": "Eldoria.json",
+            "lorebook_issues": [],
+            "minor_risk_gate": {
+              "blocked": false,
+              "explicit_adult_age": false,
+              "gate_action": "pass",
+              "reasons": [],
+              "red_screen_warn": false,
+              "signals": []
+            },
+            "total_issues": 0
+          },
+          "dump": {
+            "active_lore": [],
+            "agentic_hands": false,
+            "character_name": "Seraphina",
+            "director_mode": false,
+            "dump_report": "=== TAVERN FUSION 3.0 --dump-prompt INSPECTOR (Seraphina | mode=--play) ===\nDimension Mixer: Epistemic=0% | AgenticHands=OFF | Director=OFF\nFour Locks Status: Lock#1(System)=0% | Lock#2(<START> Samples)=1 | Lock#3(@Depth Spliced)=0 | Lock#4(Regex Guard)=ON\nBackstage Quarantine: 0 floor(s) isolated from context\nPreset Stack: Default (10 ordered slots) | Temp=0.85\nTotal Frame Tokens: ~784 tok | Identity Weight Ratio: 81.8%\nLorebook Budget: 0 / 2048 tok\n\n[DYNAMICALLY ASSEMBLED IDENTITY & LEXICAL STACK (prompt_order aligned)]\n  Slot 0 (Top-Level System Instruction): 0% Epistemic Lock\n  Slot 1 (Preset 'Default' + Card System): 70 tok\n  Slot 2 (Before-Char Lore): 0 entries\n  Slot 3 (Character + Persona '旅行者'): 146 tok\n  Slot 4 (After-Char Lore + 1 <START> Lexical Samples): 140 tok\n  Enabled Prompt Order: main -> worldInfoBefore -> personaDescription -> charDescription -> charPersonality -> scenario -> worldInfoAfter -> dialogueExamples -> chatHistory -> jailbreak\n\n[GOLDEN @DEPTH SPLICED LORE IN CHAT HISTORY]",
+            "dynamic_tokens": 143,
+            "ephemeral_frame": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"bootstrap\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (641 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (1 items | Quarantined Backstage: 0)\nSeraphina: *雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=0]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n</ST_RUNTIME_FRAME>",
+            "epistemic_level": 0,
+            "evicted_lore": [],
+            "lexical_sample_count": 1,
+            "lore_budget": 2048,
+            "lore_used_tokens": 0,
+            "next_timed_state": {
+              "cooldown": {},
+              "sticky": {}
+            },
+            "ordered_identifiers": [
+              "main",
+              "worldInfoBefore",
+              "personaDescription",
+              "charDescription",
+              "charPersonality",
+              "scenario",
+              "worldInfoAfter",
+              "dialogueExamples",
+              "chatHistory",
+              "jailbreak"
+            ],
+            "prefix_cache_ratio_pct": 81.8,
+            "preset_name": "Default",
+            "quarantined_backstage_count": 0,
+            "static_tokens": 641
+          },
+          "expressions": [],
+          "first_run_notice": {
+            "items": [
+              "条款与风险摘要：本工具仅通过宿主官方扩展点在本地读写酒馆数据，不提取凭证、不架反代、不做多租户。模型调用受宿主平台及上游模型服务商条款约束，内容政策与账号风险由使用者自行承担。",
+              "建议使用专用账号：当前处于早期预览版（Preview），建议使用独立的专用/测试账号运行，避免在主力生产账号上加载未经审阅的外部预设或角色卡。",
+              "不支持破限 / ERP：不支持、不建议导入越狱破限（Jailbreak）或色情露骨（NSFW / ERP）预设与角色卡；云端模型侧无法绕过服务端强制安全过滤。",
+              "Antigravity 条款风险：Google Antigravity 附加条款第 6 条禁止“将本服务与非 Google 提供的产品结合使用”，违反可能导致 Antigravity 及 Gemini CLI 账号被暂停或终止。使用宿主内置模型运行酒馆角色扮演存在被认定违规的风险；如需规避，可在舞台配置中切换为“自有 API Key”后端。",
+              "对话隐私：依据 Antigravity 条款，宿主会记录交互数据，Google 员工或承包商可能人工审阅，并可能用于改进产品和训练模型。角色扮演对话通常较为私密，请勿输入不希望被审阅的内容，并建议在 Antigravity 设置中关闭交互数据用于改进的选项（即使关闭，Google 仍会为提供服务和安全目的使用数据）。"
+            ],
+            "title": "首次运行须知（Preview）",
+            "version": 2
+          },
+          "groups": [],
+          "lorebooks": [
+            "Eldoria",
+            "Fresh Book"
+          ],
+          "messages": [
+            {
+              "extra": {
+                "seeded_greeting": true
+              },
+              "is_system": false,
+              "is_user": false,
+              "mes": "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+              "name": "Seraphina",
+              "send_date": "<VOLATILE>",
+              "swipe_id": 0,
+              "swipe_info": [
+                {
+                  "extra": {},
+                  "send_date": "<VOLATILE>"
+                },
+                {
+                  "extra": {},
+                  "send_date": "<VOLATILE>"
+                }
+              ],
+              "swipes": [
+                "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+              ]
+            }
+          ],
+          "minor_risk_gate": {
+            "blocked": false,
+            "card_file": "Seraphina.png",
+            "character_name": "Seraphina",
+            "explicit_adult_age": false,
+            "gate_action": "pass",
+            "reasons": [],
+            "red_screen_warn": false,
+            "signals": [],
+            "warn_acked": false
+          },
+          "plugin_settings": {
+            "byok_base_url": "https://api.example.com/v1",
+            "byok_model": "m1",
+            "first_run_cli_shown_v1": true,
+            "first_run_cli_shown_version": 2,
+            "first_run_notice_ack_v1": false,
+            "first_run_notice_ack_version": 0,
+            "generation_backend": "host",
+            "inference_channel": "antigravity_builtin",
+            "last_st_data_root": "<TMP>/data/default-user",
+            "policy_mode": "host_gentle"
+          },
+          "presets": [
+            "Default"
+          ],
+          "session": {
+            "active": true,
+            "agentic_hands": false,
+            "an_depth": 4,
+            "authors_note": "",
+            "card_file": "Seraphina.png",
+            "character_name": "Seraphina",
+            "chat_file": "<STAMP>.jsonl",
+            "director_mode": false,
+            "epistemic_level": 0,
+            "mode": "play",
+            "pending_turn_mode": "normal",
+            "pending_uncommitted_turn": false,
+            "persona_name": "旅行者",
+            "preset_name": "Default",
+            "rp_conv_id": "",
+            "stage_busy": false
+          },
+          "suggestions": {
+            "kind": "expanded_intent",
+            "suggestions": [
+              "only one"
+            ],
+            "updated_at": "<VOLATILE>"
+          },
+          "variables": {}
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {},
+      "call": "after_ops",
+      "result": {
+        "data": {
+          "active_card": {
+            "alternate_greetings_count": 1,
+            "description": "驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。",
+            "name": "Seraphina",
+            "personality": "温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。",
+            "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+            "system_prompt": "{{original}}\nMaintain atmospheric sensory details and subtle emotional progression.",
+            "world": "Eldoria"
+          },
+          "byok": {
+            "base_url": "https://api.example.com/v1",
+            "key_present": false,
+            "key_source": "none",
+            "model": "m1",
+            "ready": false
+          },
+          "cards": [
+            {
+              "expressions_count": 0,
+              "file": "Imported Sage.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Imported Sage",
+              "scenario": "A tavern.",
+              "spec": "ccv3",
+              "tags": [
+                "music"
+              ],
+              "world": ""
+            },
+            {
+              "expressions_count": 0,
+              "file": "Seraphina.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Seraphina",
+              "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+              "spec": "ccv3",
+              "tags": [
+                "fantasy",
+                "scholar",
+                "eldoria"
+              ],
+              "world": "Eldoria"
+            },
+            {
+              "expressions_count": 0,
+              "file": "Snapshot Bard.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Snapshot Bard",
+              "scenario": "A tavern.",
+              "spec": "ccv3",
+              "tags": [
+                "music"
+              ],
+              "world": ""
+            },
+            {
+              "expressions_count": 0,
+              "file": "evil.png",
+              "has_dual_chunks": true,
+              "minor_gate_action": "pass",
+              "minor_gate_reasons": [],
+              "name": "Snapshot Bard",
+              "scenario": "A tavern.",
+              "spec": "ccv3",
+              "tags": [
+                "music"
+              ],
+              "world": ""
+            }
+          ],
+          "chats": [
+            {
+              "file": "<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            },
+            {
+              "file": "<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            },
+            {
+              "file": "<STAMP>_branch_<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            },
+            {
+              "file": "<STAMP>_fork_f2_<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            },
+            {
+              "file": "<STAMP>.jsonl",
+              "mtime": "<VOLATILE>",
+              "size": "<VOLATILE>"
+            }
+          ],
+          "current_expression": null,
+          "data_root_name": "default-user",
+          "doctor": {
+            "card_issues": [],
+            "healthy": true,
+            "inspected_card": "Seraphina.png",
+            "inspected_lorebook": "Eldoria.json",
+            "lorebook_issues": [],
+            "minor_risk_gate": {
+              "blocked": false,
+              "explicit_adult_age": false,
+              "gate_action": "pass",
+              "reasons": [],
+              "red_screen_warn": false,
+              "signals": []
+            },
+            "total_issues": 0
+          },
+          "dump": {
+            "active_lore": [],
+            "agentic_hands": false,
+            "character_name": "Seraphina",
+            "director_mode": false,
+            "dump_report": "=== TAVERN FUSION 3.0 --dump-prompt INSPECTOR (Seraphina | mode=--play) ===\nDimension Mixer: Epistemic=0% | AgenticHands=OFF | Director=OFF\nFour Locks Status: Lock#1(System)=0% | Lock#2(<START> Samples)=1 | Lock#3(@Depth Spliced)=0 | Lock#4(Regex Guard)=ON\nBackstage Quarantine: 1 floor(s) isolated from context\nPreset Stack: Default (10 ordered slots) | Temp=0.85\nTotal Frame Tokens: ~722 tok | Identity Weight Ratio: 88.8%\nLorebook Budget: 0 / 2048 tok\n\n[DYNAMICALLY ASSEMBLED IDENTITY & LEXICAL STACK (prompt_order aligned)]\n  Slot 0 (Top-Level System Instruction): 0% Epistemic Lock\n  Slot 1 (Preset 'Default' + Card System): 70 tok\n  Slot 2 (Before-Char Lore): 0 entries\n  Slot 3 (Character + Persona '旅行者'): 146 tok\n  Slot 4 (After-Char Lore + 1 <START> Lexical Samples): 140 tok\n  Enabled Prompt Order: main -> worldInfoBefore -> personaDescription -> charDescription -> charPersonality -> scenario -> worldInfoAfter -> dialogueExamples -> chatHistory -> jailbreak\n\n[GOLDEN @DEPTH SPLICED LORE IN CHAT HISTORY]",
+            "dynamic_tokens": 81,
+            "ephemeral_frame": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"bootstrap\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (641 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (2 items | Quarantined Backstage: 1)\nSeraphina: *改写开场*\n旅行者: 你好\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=1]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n</ST_RUNTIME_FRAME>",
+            "epistemic_level": 0,
+            "evicted_lore": [],
+            "lexical_sample_count": 1,
+            "lore_budget": 2048,
+            "lore_used_tokens": 0,
+            "next_timed_state": {
+              "cooldown": {},
+              "sticky": {}
+            },
+            "ordered_identifiers": [
+              "main",
+              "worldInfoBefore",
+              "personaDescription",
+              "charDescription",
+              "charPersonality",
+              "scenario",
+              "worldInfoAfter",
+              "dialogueExamples",
+              "chatHistory",
+              "jailbreak"
+            ],
+            "prefix_cache_ratio_pct": 88.8,
+            "preset_name": "Default",
+            "quarantined_backstage_count": 1,
+            "static_tokens": 641
+          },
+          "expressions": [],
+          "first_run_notice": {
+            "items": [
+              "条款与风险摘要：本工具仅通过宿主官方扩展点在本地读写酒馆数据，不提取凭证、不架反代、不做多租户。模型调用受宿主平台及上游模型服务商条款约束，内容政策与账号风险由使用者自行承担。",
+              "建议使用专用账号：当前处于早期预览版（Preview），建议使用独立的专用/测试账号运行，避免在主力生产账号上加载未经审阅的外部预设或角色卡。",
+              "不支持破限 / ERP：不支持、不建议导入越狱破限（Jailbreak）或色情露骨（NSFW / ERP）预设与角色卡；云端模型侧无法绕过服务端强制安全过滤。",
+              "Antigravity 条款风险：Google Antigravity 附加条款第 6 条禁止“将本服务与非 Google 提供的产品结合使用”，违反可能导致 Antigravity 及 Gemini CLI 账号被暂停或终止。使用宿主内置模型运行酒馆角色扮演存在被认定违规的风险；如需规避，可在舞台配置中切换为“自有 API Key”后端。",
+              "对话隐私：依据 Antigravity 条款，宿主会记录交互数据，Google 员工或承包商可能人工审阅，并可能用于改进产品和训练模型。角色扮演对话通常较为私密，请勿输入不希望被审阅的内容，并建议在 Antigravity 设置中关闭交互数据用于改进的选项（即使关闭，Google 仍会为提供服务和安全目的使用数据）。"
+            ],
+            "title": "首次运行须知（Preview）",
+            "version": 2
+          },
+          "groups": [],
+          "lorebooks": [
+            "Eldoria",
+            "Fresh Book"
+          ],
+          "messages": [
+            {
+              "extra": {
+                "edited_at": "<DATETIME>",
+                "seeded_greeting": true
+              },
+              "is_system": false,
+              "is_user": false,
+              "mes": "*改写开场*",
+              "name": "Seraphina",
+              "send_date": "<VOLATILE>",
+              "swipe_id": 0,
+              "swipe_info": [
+                {
+                  "extra": {},
+                  "send_date": "<VOLATILE>"
+                },
+                {
+                  "extra": {},
+                  "send_date": "<VOLATILE>"
+                }
+              ],
+              "swipes": [
+                "*改写开场*",
+                "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+              ]
+            },
+            {
+              "extra": {
+                "source": "tavern_stage_sidecar"
+              },
+              "is_system": false,
+              "is_user": true,
+              "mes": "你好",
+              "name": "旅行者",
+              "send_date": "<VOLATILE>"
+            },
+            {
+              "extra": {
+                "is_backstage": true,
+                "source": "tavern_stage_director"
+              },
+              "is_system": false,
+              "is_user": true,
+              "mes": "导演：加快节奏",
+              "name": "旅行者",
+              "send_date": "<VOLATILE>"
+            }
+          ],
+          "minor_risk_gate": {
+            "blocked": false,
+            "card_file": "Seraphina.png",
+            "character_name": "Seraphina",
+            "explicit_adult_age": false,
+            "gate_action": "pass",
+            "reasons": [],
+            "red_screen_warn": false,
+            "signals": [],
+            "warn_acked": false
+          },
+          "plugin_settings": {
+            "byok_base_url": "https://api.example.com/v1",
+            "byok_model": "m1",
+            "first_run_ack_at": "<VOLATILE>",
+            "first_run_cli_shown_v1": true,
+            "first_run_cli_shown_version": 2,
+            "first_run_notice_ack_v1": true,
+            "first_run_notice_ack_version": 2,
+            "generation_backend": "host",
+            "inference_channel": "antigravity_builtin",
+            "last_st_data_root": "<TMP>/data/default-user",
+            "minor_warn_acked_cards": [
+              "Seraphina.png"
+            ],
+            "policy_mode": "host_gentle"
+          },
+          "presets": [
+            "Default"
+          ],
+          "session": {
+            "active": false,
+            "agentic_hands": false,
+            "an_depth": 4,
+            "authors_note": "",
+            "card_file": "Seraphina.png",
+            "character_name": "Seraphina",
+            "chat_file": "<STAMP>.jsonl",
+            "director_mode": false,
+            "epistemic_level": 0,
+            "mode": "play",
+            "pending_turn_mode": "normal",
+            "pending_uncommitted_turn": false,
+            "persona_name": "旅行者",
+            "preset_name": "Default",
+            "rp_conv_id": "",
+            "stage_busy": false
+          },
+          "suggestions": {},
+          "variables": {}
+        },
+        "ok": true
+      }
+    }
+  ],
+  "switch_profile": [
+    {
+      "args": {
+        "director_mode": true
+      },
+      "call": "switch_profile",
+      "result": {
+        "data": {
+          "plugin_settings": {
+            "byok_base_url": "https://api.example.com/v1",
+            "byok_model": "m1",
+            "first_run_cli_shown_v1": true,
+            "first_run_cli_shown_version": 2,
+            "first_run_notice_ack_v1": false,
+            "first_run_notice_ack_version": 0,
+            "generation_backend": "host",
+            "inference_channel": "antigravity_builtin",
+            "last_st_data_root": "<TMP>/data/default-user",
+            "policy_mode": "host_gentle"
+          },
+          "updated_session": {
+            "active": true,
+            "agentic_hands": false,
+            "avatar_stem": "Seraphina",
+            "bootstrapped_char": "",
+            "bootstrapped_conv_id": "",
+            "card_file": "Seraphina.png",
+            "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
+            "character_name": "Seraphina",
+            "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+            "director_mode": true,
+            "epistemic_level": 0,
+            "extra_lorebooks": [],
+            "last_bootstrapped_at": "<VOLATILE>",
+            "last_committed_at": "<VOLATILE>",
+            "last_turn_hash": "e999050186b78042",
+            "last_user_input": "你好",
+            "mode": "play",
+            "pending_sidecar_launch": {
+              "action_kind": "expand_intent",
+              "prompt": "[STAGE_EXPAND_INTENT] Expand {{user}}'s brief action/dialogue intent into 3 polished roleplay variations (preserving player intent without speaking for Seraphina): `拥抱`. Quietly publish via `st_publish_stage_suggestions(kind=\"expanded_intent\", suggestions=[...])` without engineering preamble or `st_commit_turn`.",
+              "ts": "<VOLATILE>",
+              "user_floor_already_appended": false,
+              "user_text": "拥抱"
+            },
+            "pending_turn_mode": "suggestions",
+            "pending_uncommitted_turn": false,
+            "persona_name": "旅行者",
+            "preset_name": "Default",
+            "rp_conv_id": "conv-snap",
+            "stage_busy": true,
+            "stop_retry_count": 0,
+            "user_floor_already_appended": false
+          }
+        },
+        "ok": true
+      }
+    },
+    {
+      "args": {
+        "director_mode": false
+      },
+      "call": "director_off",
+      "result": {
+        "data": {
+          "plugin_settings": {
+            "byok_base_url": "https://api.example.com/v1",
+            "byok_model": "m1",
+            "first_run_cli_shown_v1": true,
+            "first_run_cli_shown_version": 2,
+            "first_run_notice_ack_v1": false,
+            "first_run_notice_ack_version": 0,
+            "generation_backend": "host",
+            "inference_channel": "antigravity_builtin",
+            "last_st_data_root": "<TMP>/data/default-user",
+            "policy_mode": "host_gentle"
+          },
+          "updated_session": {
+            "active": true,
+            "agentic_hands": false,
+            "avatar_stem": "Seraphina",
+            "bootstrapped_char": "",
+            "bootstrapped_conv_id": "",
+            "card_file": "Seraphina.png",
+            "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
+            "character_name": "Seraphina",
+            "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+            "director_mode": false,
+            "epistemic_level": 0,
+            "extra_lorebooks": [],
+            "last_bootstrapped_at": "<VOLATILE>",
+            "last_committed_at": "<VOLATILE>",
+            "last_turn_hash": "e999050186b78042",
+            "last_user_input": "导演：加快节奏",
+            "mode": "play",
+            "pending_sidecar_launch": {
+              "action_kind": "director_intervention",
+              "prompt": "[STAGE_DIRECTOR_INTERVENTION] 导演：加快节奏",
+              "ts": "<VOLATILE>",
+              "user_floor_already_appended": true,
+              "user_text": "导演：加快节奏"
+            },
+            "pending_turn_mode": "director",
+            "pending_uncommitted_turn": true,
+            "persona_name": "旅行者",
+            "preset_name": "Default",
+            "rp_conv_id": "conv-snap",
+            "stage_busy": true,
+            "stop_retry_count": 0,
+            "user_floor_already_appended": true
+          }
+        },
+        "ok": true
+      }
+    }
+  ]
+}

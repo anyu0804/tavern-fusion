@@ -1,0 +1,187 @@
+[
+  {
+    "args": {
+      "card_filename": "Seraphina"
+    },
+    "call": "st_read_card",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "avatar_data_uri": null,
+                "card": {
+                  "data": {
+                    "alternate_greetings": [
+                      "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的{{user}}。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+                    ],
+                    "assets": [
+                      {
+                        "ext": "png",
+                        "name": "main",
+                        "type": "icon",
+                        "uri": "ccdefault:"
+                      }
+                    ],
+                    "character_version": "3.0.0",
+                    "creation_date": "<VOLATILE>",
+                    "creator": "安钰 (AnYu)",
+                    "creator_notes": "",
+                    "description": "驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。",
+                    "extensions": {
+                      "world": "Eldoria"
+                    },
+                    "first_mes": "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的{{user}}。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                    "group_only_greetings": [],
+                    "mes_example": "<START>\n{{user}}: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\n{{char}}: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"",
+                    "modification_date": "<VOLATILE>",
+                    "name": "Seraphina",
+                    "nickname": "",
+                    "personality": "温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。",
+                    "post_history_instructions": "",
+                    "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+                    "source": [],
+                    "system_prompt": "{{original}}\nMaintain atmospheric sensory details and subtle emotional progression.",
+                    "tags": [
+                      "fantasy",
+                      "scholar",
+                      "eldoria"
+                    ]
+                  },
+                  "description": "驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。",
+                  "first_mes": "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的{{user}}。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                  "mes_example": "<START>\n{{user}}: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\n{{char}}: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"",
+                  "name": "Seraphina",
+                  "personality": "温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。",
+                  "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+                  "spec": "chara_card_v3",
+                  "spec_version": "3.0"
+                },
+                "detected_chunk": "ccv3",
+                "has_dual_chunks": true,
+                "source_path": "<TMP>/data/default-user/characters/Seraphina.png"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "card_filename": "Seraphina.png",
+      "include_avatar_base64": true
+    },
+    "call": "with_avatar",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "avatar_data_uri": "<DATA_URI>",
+                "card": {
+                  "data": {
+                    "alternate_greetings": [
+                      "*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的{{user}}。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\""
+                    ],
+                    "assets": [
+                      {
+                        "ext": "png",
+                        "name": "main",
+                        "type": "icon",
+                        "uri": "ccdefault:"
+                      }
+                    ],
+                    "character_version": "3.0.0",
+                    "creation_date": "<VOLATILE>",
+                    "creator": "安钰 (AnYu)",
+                    "creator_notes": "",
+                    "description": "驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。",
+                    "extensions": {
+                      "world": "Eldoria"
+                    },
+                    "first_mes": "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的{{user}}。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                    "group_only_greetings": [],
+                    "mes_example": "<START>\n{{user}}: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\n{{char}}: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"",
+                    "modification_date": "<VOLATILE>",
+                    "name": "Seraphina",
+                    "nickname": "",
+                    "personality": "温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。",
+                    "post_history_instructions": "",
+                    "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+                    "source": [],
+                    "system_prompt": "{{original}}\nMaintain atmospheric sensory details and subtle emotional progression.",
+                    "tags": [
+                      "fantasy",
+                      "scholar",
+                      "eldoria"
+                    ]
+                  },
+                  "description": "驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。",
+                  "first_mes": "*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的{{user}}。*\n\n\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\"",
+                  "mes_example": "<START>\n{{user}}: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\n{{char}}: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"",
+                  "name": "Seraphina",
+                  "personality": "温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。",
+                  "scenario": "{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。",
+                  "spec": "chara_card_v3",
+                  "spec_version": "3.0"
+                },
+                "detected_chunk": "ccv3",
+                "has_dual_chunks": true,
+                "source_path": "<TMP>/data/default-user/characters/Seraphina.png"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "card_filename": "Nobody"
+    },
+    "call": "missing",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_read_card: Character card matching 'Nobody' not found in <TMP>/data/default-user/characters.",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  },
+  {
+    "args": {
+      "card_filename": "../etc/passwd"
+    },
+    "call": "traversal",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_read_card: Invalid character query containing path separators.",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  }
+]

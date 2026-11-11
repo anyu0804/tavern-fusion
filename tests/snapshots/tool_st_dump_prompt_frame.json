@@ -1,0 +1,173 @@
+[
+  {
+    "args": {
+      "user_input": "星界裂隙还好吗？mana 是否稳定"
+    },
+    "call": "keyword_hit",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "active_lore": [
+                  {
+                    "book": "Eldoria",
+                    "comment": "艾尔多利亚边境概览",
+                    "constant": true,
+                    "content": "艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。",
+                    "keys": [
+                      "艾尔多利亚",
+                      "Eldoria",
+                      "星陨钟塔"
+                    ],
+                    "keys_secondary": [],
+                    "order": 90,
+                    "position": "before_char",
+                    "selective": false,
+                    "tokens": 45,
+                    "trigger": "constant",
+                    "uid": 0
+                  },
+                  {
+                    "book": "Eldoria",
+                    "comment": "苍银秘仪与星界回响",
+                    "constant": false,
+                    "content": "当施法者过度汲取星界裂隙中的秘银辉光时，指尖会浮现细微的霜蓝色结晶，必须以温热的琥珀茶缓和。",
+                    "keys": [
+                      "苍银秘仪",
+                      "魔力枯竭",
+                      "mana",
+                      "星界裂隙"
+                    ],
+                    "keys_secondary": [
+                      "封印完好"
+                    ],
+                    "order": 110,
+                    "position": "@D2(system)",
+                    "selective": true,
+                    "tokens": 50,
+                    "trigger": "keyword",
+                    "uid": 1
+                  }
+                ],
+                "agentic_hands": false,
+                "character_name": "Seraphina",
+                "director_mode": false,
+                "dump_report": "=== TAVERN FUSION 3.0 --dump-prompt INSPECTOR (Seraphina | mode=--play) ===\nDimension Mixer: Epistemic=0% | AgenticHands=OFF | Director=OFF\nFour Locks Status: Lock#1(System)=0% | Lock#2(<START> Samples)=1 | Lock#3(@Depth Spliced)=1 | Lock#4(Regex Guard)=ON\nBackstage Quarantine: 0 floor(s) isolated from context\nPreset Stack: Default (10 ordered slots) | Temp=0.85\nTotal Frame Tokens: ~893 tok | Identity Weight Ratio: 77.6%\nLorebook Budget: 95 / 2048 tok\n\n[DYNAMICALLY ASSEMBLED IDENTITY & LEXICAL STACK (prompt_order aligned)]\n  Slot 0 (Top-Level System Instruction): 0% Epistemic Lock\n  Slot 1 (Preset 'Default' + Card System): 70 tok\n  Slot 2 (Before-Char Lore): 1 entries\n  Slot 3 (Character + Persona '旅行者'): 146 tok\n  Slot 4 (After-Char Lore + 1 <START> Lexical Samples): 140 tok\n  Enabled Prompt Order: main -> worldInfoBefore -> personaDescription -> charDescription -> charPersonality -> scenario -> worldInfoAfter -> dialogueExamples -> chatHistory -> jailbreak\n\n[GOLDEN @DEPTH SPLICED LORE IN CHAT HISTORY]\n  + [#0 艾尔多利亚边境概览] via=constant | pos=before_char | order=90 | 45 tok\n  + [#1 苍银秘仪与星界回响] via=keyword | pos=@D2(system) | order=110 | 50 tok",
+                "dynamic_tokens": 200,
+                "ephemeral_frame": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"bootstrap\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (693 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[World Info (Before)]\n艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (3 items | Quarantined Backstage: 0)\n[World Info @Depth Injection #1]: 当施法者过度汲取星界裂隙中的秘银辉光时，指尖会浮现细微的霜蓝色结晶，必须以温热的琥珀茶缓和。\nSeraphina: *炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\"\nUser: 星界裂隙还好吗？mana 是否稳定\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=0]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n</ST_RUNTIME_FRAME>",
+                "epistemic_level": 0,
+                "evicted_lore": [],
+                "lexical_sample_count": 1,
+                "lore_budget": 2048,
+                "lore_used_tokens": 95,
+                "next_timed_state": {
+                  "cooldown": {},
+                  "sticky": {
+                    "Eldoria:1": 2
+                  }
+                },
+                "ordered_identifiers": [
+                  "main",
+                  "worldInfoBefore",
+                  "personaDescription",
+                  "charDescription",
+                  "charPersonality",
+                  "scenario",
+                  "worldInfoAfter",
+                  "dialogueExamples",
+                  "chatHistory",
+                  "jailbreak"
+                ],
+                "prefix_cache_ratio_pct": 77.6,
+                "preset_name": "Default",
+                "quarantined_backstage_count": 0,
+                "static_tokens": 693
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "compact_agent_delta": true,
+      "token_budget": 64,
+      "user_input": "hello"
+    },
+    "call": "compact_small_budget",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "active_lore": [
+                  {
+                    "book": "Eldoria",
+                    "comment": "艾尔多利亚边境概览",
+                    "constant": true,
+                    "content": "艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。",
+                    "keys": [
+                      "艾尔多利亚",
+                      "Eldoria",
+                      "星陨钟塔"
+                    ],
+                    "keys_secondary": [],
+                    "order": 90,
+                    "position": "before_char",
+                    "selective": false,
+                    "tokens": 45,
+                    "trigger": "constant",
+                    "uid": 0
+                  }
+                ],
+                "agentic_hands": false,
+                "character_name": "Seraphina",
+                "director_mode": false,
+                "dump_report": "=== TAVERN FUSION 3.0 --dump-prompt INSPECTOR (Seraphina | mode=--play) ===\nDimension Mixer: Epistemic=0% | AgenticHands=OFF | Director=OFF\nFour Locks Status: Lock#1(System)=0% | Lock#2(<START> Samples)=1 | Lock#3(@Depth Spliced)=0 | Lock#4(Regex Guard)=ON\nBackstage Quarantine: 0 floor(s) isolated from context\nPreset Stack: Default (10 ordered slots) | Temp=0.85\nTotal Frame Tokens: ~820 tok | Identity Weight Ratio: 84.5%\nLorebook Budget: 45 / 64 tok\n\n[DYNAMICALLY ASSEMBLED IDENTITY & LEXICAL STACK (prompt_order aligned)]\n  Slot 0 (Top-Level System Instruction): 0% Epistemic Lock\n  Slot 1 (Preset 'Default' + Card System): 70 tok\n  Slot 2 (Before-Char Lore): 1 entries\n  Slot 3 (Character + Persona '旅行者'): 146 tok\n  Slot 4 (After-Char Lore + 1 <START> Lexical Samples): 140 tok\n  Enabled Prompt Order: main -> worldInfoBefore -> personaDescription -> charDescription -> charPersonality -> scenario -> worldInfoAfter -> dialogueExamples -> chatHistory -> jailbreak\n\n[GOLDEN @DEPTH SPLICED LORE IN CHAT HISTORY]\n  + [#0 艾尔多利亚边境概览] via=constant | pos=before_char | order=90 | 45 tok",
+                "dynamic_tokens": 127,
+                "ephemeral_frame": "<ST_RUNTIME_FRAME character=\"Seraphina\" user=\"旅行者\" mode=\"--play\" epistemic=\"0%\" agentic=\"off\" director=\"off\" frame=\"incremental\">\n## 1. TOP-LEVEL SYSTEM INSTRUCTION & CHARACTER IDENTITY (693 tok | Preset: Default)\n<SYSTEM_INSTRUCTION dimension_lock=\"0%_DEEP_IMMERSION\">\n【底层认知切断铁律 · 0% 深潜封闭】\n1. 位面认知防火墙：你的意识世界、记忆、常识与词汇体系仅限于角色卡设定的位面与时代。你对现实世界的现代科技、互联网、现代人类文明、计算机代码以及“你是一个大语言模型/AI助手”的事实彻底不知情。\n2. 禁止全知上帝视角：严禁以全知全能的旁白视角解释世界观或读取 旅行者 未说出口的内心独白；你只能感知 Seraphina 当前五官可及的局部场景与自身既有认知。\n3. 宿主身份物理挂起：彻底剥离编程助手习惯、列表总结、场外寒暄与免责套话；只以 Seraphina 的血肉感官与声线回应（动作/神态/心理用 *...* 包裹，有声台词用 \"...\" 包裹）。\n</SYSTEM_INSTRUCTION>\n\nWrite Seraphina's next reply in a fictional roleplay between Seraphina and 旅行者. Stay strictly in character, wrap spoken dialogue in \"...\" and physical actions/inner thoughts in *...*, and never speak for 旅行者.\nMaintain atmospheric sensory details and subtle emotional progression.\n\n[World Info (Before)]\n艾尔多利亚位于银雾山脉北麓，核心地标「星陨钟塔」会在魔力潮汐上涨时鸣响低沉的青铜泛音。\n\n[User Persona (旅行者)]\n一位游历艾尔多利亚边境遗迹的漫游学者，沉稳敏锐，善于观察星象与古代铭文。\n\n[Character Description]\n驻守艾尔多利亚星陨钟塔的苍银守望者，擅长观测魔力潮汐与修复古星象仪。\n\n[Personality]\n温雅克制、观察入微，谈及古代铭文时流露罕见的热忱。\n\n[Scenario]\n旅行者在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\n\n[Dialogue Examples — Lock #2 Lexical Convergence (1 <START> blocks: Lock token probability distribution to Seraphina's diction, punctuation, and sensory style; do NOT treat these samples as events that already happened in the current chat)]\n<START_LEXICAL_SAMPLE index=\"1\" purpose=\"vocabulary_and_cadence_dye_only\">\n旅行者: *走近星盘观察刻度* \"裂隙还在扩大吗？\"\nSeraphina: *指尖掠过微凉的银环，语气平静却认真* \"仍在可控范围内，但我们需要在黎明前校准第三道铭文。\"\n</START_LEXICAL_SAMPLE>\n\n## 2. GOLDEN @DEPTH SPLICED SCENE HISTORY (2 items | Quarantined Backstage: 0)\nSeraphina: *炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\n\n\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\"\nUser: hello\n\n## 3. IMMEDIATE @D0 POST-HISTORY DIRECTIVES\n[Dimension Mixer State | Epistemic=0% | AgenticHands=OFF (Tools Unplugged) | DirectorMode=OFF | QuarantinedBackstageFloors=0]\n\n[Live Context Card | mode=--play] Active Variables: affection=initial\n\nStay grounded in sensory details and Seraphina's authentic perspective without writing actions or dialogue for 旅行者.\n</ST_RUNTIME_FRAME>",
+                "epistemic_level": 0,
+                "evicted_lore": [],
+                "lexical_sample_count": 1,
+                "lore_budget": 64,
+                "lore_used_tokens": 45,
+                "next_timed_state": {
+                  "cooldown": {},
+                  "sticky": {}
+                },
+                "ordered_identifiers": [
+                  "main",
+                  "worldInfoBefore",
+                  "personaDescription",
+                  "charDescription",
+                  "charPersonality",
+                  "scenario",
+                  "worldInfoAfter",
+                  "dialogueExamples",
+                  "chatHistory",
+                  "jailbreak"
+                ],
+                "prefix_cache_ratio_pct": 84.5,
+                "preset_name": "Default",
+                "quarantined_backstage_count": 0,
+                "static_tokens": 693
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  }
+]

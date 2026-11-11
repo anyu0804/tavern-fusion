@@ -29,3 +29,6 @@ jobs:
 
       - name: Run full verification suite
         run: node scripts/run_py.mjs tests/test_full_suite.py
+
+      - name: Run golden snapshot characterization suite
+        run: node scripts/run_py.mjs tests/test_tool_snapshots.py

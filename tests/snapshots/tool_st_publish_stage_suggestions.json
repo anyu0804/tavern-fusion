@@ -1,0 +1,69 @@
+[
+  {
+    "args": {
+      "suggestions": [
+        " a ",
+        "",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f"
+      ]
+    },
+    "call": "list_trim",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "kind": "reply_suggestions",
+                "published": 5,
+                "suggestions": [
+                  "a",
+                  "b",
+                  "c",
+                  "d",
+                  "e"
+                ]
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "kind": "expanded_intent",
+      "suggestions": "only one"
+    },
+    "call": "string",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "kind": "expanded_intent",
+                "published": 1,
+                "suggestions": [
+                  "only one"
+                ]
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  }
+]

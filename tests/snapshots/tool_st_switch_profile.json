@@ -1,0 +1,298 @@
+[
+  {
+    "args": {
+      "an_depth": 2,
+      "authors_note": "Keep it rainy.",
+      "epistemic_level": 55,
+      "mode": "chat"
+    },
+    "call": "mode_epistemic_note",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "plugin_settings": {
+                  "first_run_cli_shown_v1": true,
+                  "first_run_cli_shown_version": 2,
+                  "first_run_notice_ack_v1": false,
+                  "first_run_notice_ack_version": 0,
+                  "inference_channel": "antigravity_builtin",
+                  "last_st_data_root": "<TMP>/data/default-user",
+                  "policy_mode": "host_gentle"
+                },
+                "updated_session": {
+                  "active": true,
+                  "avatar_stem": "Seraphina",
+                  "bootstrapped_char": "",
+                  "bootstrapped_conv_id": "",
+                  "card_file": "Seraphina.png",
+                  "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
+                  "character_name": "Seraphina",
+                  "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                  "epistemic_level": 50,
+                  "extra_lorebooks": [],
+                  "last_bootstrapped_at": "<VOLATILE>",
+                  "last_committed_at": "<VOLATILE>",
+                  "last_turn_hash": "cb983a18d79c1add",
+                  "mode": "chat",
+                  "pending_turn_mode": "normal",
+                  "pending_uncommitted_turn": false,
+                  "persona_name": "旅行者",
+                  "preset_name": "Default",
+                  "rp_conv_id": "",
+                  "stage_busy": false,
+                  "stop_retry_count": 0,
+                  "user_floor_already_appended": false
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "agentic_hands": true,
+      "policy_mode": "strict_block"
+    },
+    "call": "strict",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "plugin_settings": {
+                  "first_run_cli_shown_v1": true,
+                  "first_run_cli_shown_version": 2,
+                  "first_run_notice_ack_v1": false,
+                  "first_run_notice_ack_version": 0,
+                  "inference_channel": "antigravity_builtin",
+                  "last_st_data_root": "<TMP>/data/default-user",
+                  "policy_mode": "strict_block"
+                },
+                "updated_session": {
+                  "active": true,
+                  "agentic_hands": true,
+                  "avatar_stem": "Seraphina",
+                  "bootstrapped_char": "",
+                  "bootstrapped_conv_id": "",
+                  "card_file": "Seraphina.png",
+                  "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
+                  "character_name": "Seraphina",
+                  "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                  "epistemic_level": 50,
+                  "extra_lorebooks": [],
+                  "last_bootstrapped_at": "<VOLATILE>",
+                  "last_committed_at": "<VOLATILE>",
+                  "last_turn_hash": "cb983a18d79c1add",
+                  "mode": "chat",
+                  "pending_turn_mode": "normal",
+                  "pending_uncommitted_turn": false,
+                  "persona_name": "旅行者",
+                  "preset_name": "Default",
+                  "rp_conv_id": "",
+                  "stage_busy": false,
+                  "stop_retry_count": 0,
+                  "user_floor_already_appended": false
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "agentic_hands": false,
+      "epistemic_level": 0,
+      "mode": "play",
+      "policy_mode": "host_gentle"
+    },
+    "call": "back_to_gentle",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "plugin_settings": {
+                  "first_run_cli_shown_v1": true,
+                  "first_run_cli_shown_version": 2,
+                  "first_run_notice_ack_v1": false,
+                  "first_run_notice_ack_version": 0,
+                  "inference_channel": "antigravity_builtin",
+                  "last_st_data_root": "<TMP>/data/default-user",
+                  "policy_mode": "host_gentle"
+                },
+                "updated_session": {
+                  "active": true,
+                  "agentic_hands": false,
+                  "avatar_stem": "Seraphina",
+                  "bootstrapped_char": "",
+                  "bootstrapped_conv_id": "",
+                  "card_file": "Seraphina.png",
+                  "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
+                  "character_name": "Seraphina",
+                  "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                  "epistemic_level": 0,
+                  "extra_lorebooks": [],
+                  "last_bootstrapped_at": "<VOLATILE>",
+                  "last_committed_at": "<VOLATILE>",
+                  "last_turn_hash": "cb983a18d79c1add",
+                  "mode": "play",
+                  "pending_turn_mode": "normal",
+                  "pending_uncommitted_turn": false,
+                  "persona_name": "旅行者",
+                  "preset_name": "Default",
+                  "rp_conv_id": "",
+                  "stage_busy": false,
+                  "stop_retry_count": 0,
+                  "user_floor_already_appended": false
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "byok_base_url": " https://api.example.com/v1 ",
+      "byok_model": "m1",
+      "generation_backend": "byok"
+    },
+    "call": "byok_cfg",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "plugin_settings": {
+                  "byok_base_url": "https://api.example.com/v1",
+                  "byok_model": "m1",
+                  "first_run_cli_shown_v1": true,
+                  "first_run_cli_shown_version": 2,
+                  "first_run_notice_ack_v1": false,
+                  "first_run_notice_ack_version": 0,
+                  "generation_backend": "byok",
+                  "inference_channel": "antigravity_builtin",
+                  "last_st_data_root": "<TMP>/data/default-user",
+                  "policy_mode": "host_gentle"
+                },
+                "updated_session": {
+                  "active": true,
+                  "agentic_hands": false,
+                  "avatar_stem": "Seraphina",
+                  "bootstrapped_char": "",
+                  "bootstrapped_conv_id": "",
+                  "card_file": "Seraphina.png",
+                  "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
+                  "character_name": "Seraphina",
+                  "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                  "epistemic_level": 0,
+                  "extra_lorebooks": [],
+                  "last_bootstrapped_at": "<VOLATILE>",
+                  "last_committed_at": "<VOLATILE>",
+                  "last_turn_hash": "e999050186b78042",
+                  "mode": "play",
+                  "pending_turn_mode": "normal",
+                  "pending_uncommitted_turn": false,
+                  "persona_name": "旅行者",
+                  "preset_name": "Default",
+                  "rp_conv_id": "",
+                  "stage_busy": false,
+                  "stop_retry_count": 0,
+                  "user_floor_already_appended": false
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "generation_backend": "host",
+      "persona_name": "旅行者",
+      "preset_name": "Default"
+    },
+    "call": "host_persona_preset",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "plugin_settings": {
+                  "byok_base_url": "https://api.example.com/v1",
+                  "byok_model": "m1",
+                  "first_run_cli_shown_v1": true,
+                  "first_run_cli_shown_version": 2,
+                  "first_run_notice_ack_v1": false,
+                  "first_run_notice_ack_version": 0,
+                  "generation_backend": "host",
+                  "inference_channel": "antigravity_builtin",
+                  "last_st_data_root": "<TMP>/data/default-user",
+                  "policy_mode": "host_gentle"
+                },
+                "updated_session": {
+                  "active": true,
+                  "agentic_hands": false,
+                  "avatar_stem": "Seraphina",
+                  "bootstrapped_char": "",
+                  "bootstrapped_conv_id": "",
+                  "card_file": "Seraphina.png",
+                  "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
+                  "character_name": "Seraphina",
+                  "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+                  "epistemic_level": 0,
+                  "extra_lorebooks": [],
+                  "last_bootstrapped_at": "<VOLATILE>",
+                  "last_committed_at": "<VOLATILE>",
+                  "last_turn_hash": "e999050186b78042",
+                  "mode": "play",
+                  "pending_turn_mode": "normal",
+                  "pending_uncommitted_turn": false,
+                  "persona_name": "旅行者",
+                  "preset_name": "Default",
+                  "rp_conv_id": "",
+                  "stage_busy": false,
+                  "stop_retry_count": 0,
+                  "user_floor_already_appended": false
+                }
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  }
+]

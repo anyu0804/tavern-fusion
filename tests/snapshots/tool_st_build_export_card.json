@@ -1,0 +1,180 @@
+[
+  {
+    "args": {
+      "card_v3_json": {
+        "data": {
+          "description": "A wandering adult bard, 29 years old.",
+          "extensions": {
+            "regex_scripts": [],
+            "world": ""
+          },
+          "first_mes": "\"Hello, {{user}}!\"",
+          "mes_example": "",
+          "name": "Snapshot Bard",
+          "personality": "cheerful",
+          "scenario": "A tavern.",
+          "tags": [
+            "music"
+          ]
+        },
+        "spec": "chara_card_v3",
+        "spec_version": "3.0"
+      },
+      "output_filename": "Snapshot Bard.png"
+    },
+    "call": "export",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "bytes_written": 2988,
+                "character_name": "Snapshot Bard",
+                "dual_chunks_written": [
+                  "chara",
+                  "ccv3"
+                ],
+                "output_path": "<TMP>/data/default-user/characters/Snapshot Bard.png",
+                "sanitized_forbidden_keys": []
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "card_v3_json": {
+        "<json>": {
+          "data": {
+            "description": "A wandering adult bard, 29 years old.",
+            "extensions": {
+              "regex_scripts": [],
+              "world": ""
+            },
+            "first_mes": "\"Hello, {{user}}!\"",
+            "mes_example": "",
+            "name": "Snapshot Bard",
+            "personality": "cheerful",
+            "scenario": "A tavern.",
+            "tags": [
+              "music"
+            ]
+          },
+          "spec": "chara_card_v3",
+          "spec_version": "3.0"
+        }
+      },
+      "output_filename": "../../evil"
+    },
+    "call": "export_str_sanitized",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "bytes_written": 2988,
+                "character_name": "Snapshot Bard",
+                "dual_chunks_written": [
+                  "chara",
+                  "ccv3"
+                ],
+                "output_path": "<TMP>/data/default-user/characters/evil.png",
+                "sanitized_forbidden_keys": []
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "card_v3_json": {
+        "data": {
+          "description": "A 12-year-old child, explicit sexual content.",
+          "extensions": {
+            "regex_scripts": [],
+            "world": ""
+          },
+          "first_mes": "\"Hello, {{user}}!\"",
+          "mes_example": "",
+          "name": "Kid",
+          "personality": "cheerful",
+          "scenario": "A tavern.",
+          "tags": [
+            "loli",
+            "nsfw"
+          ]
+        },
+        "spec": "chara_card_v3",
+        "spec_version": "3.0"
+      },
+      "output_filename": "kid"
+    },
+    "call": "minor_blocked",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_build_export_card: [Card Doctor 未成年风险闸] 默认拒绝铸造/导出未成年风险角色卡：命中低幼性化标签「loli」",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  },
+  {
+    "args": {
+      "card_v3_json": {
+        "data": {
+          "description": "A wandering adult bard, 29 years old.",
+          "extensions": {
+            "regex_scripts": [],
+            "world": ""
+          },
+          "first_mes": "\"Hello, {{user}}!\"",
+          "mes_example": "",
+          "name": "Snapshot Bard",
+          "personality": "cheerful",
+          "scenario": "A tavern.",
+          "tags": [
+            "music"
+          ]
+        },
+        "spec": "chara_card_v3",
+        "spec_version": "3.0"
+      },
+      "output_filename": "p",
+      "portrait_image_path": "/etc/hosts.png"
+    },
+    "call": "portrait_outside",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_build_export_card: Path containment violation: portrait_image_path 'hosts.png' must reside inside plugin state_dir, SillyTavern data root, or the current workspace.",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  }
+]

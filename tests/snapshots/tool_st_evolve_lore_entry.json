@@ -1,0 +1,134 @@
+[
+  {
+    "args": {
+      "entry_payload": {
+        "comment": "新条目",
+        "content": "琥珀茶能缓和霜蓝结晶。",
+        "key": [
+          "琥珀茶"
+        ]
+      },
+      "lorebook_name": "Eldoria"
+    },
+    "call": "upsert_new",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "action": "inserted",
+                "constant_cache_notice": false,
+                "lorebook_path": "<TMP>/data/default-user/worlds/Eldoria.json",
+                "total_entries": 3,
+                "uid": 2
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "entry_payload": {
+        "<json>": {
+          "uid": 1
+        }
+      },
+      "lorebook_name": "Eldoria",
+      "operation": "toggle"
+    },
+    "call": "toggle_str_payload",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "action": "toggled",
+                "constant_cache_notice": false,
+                "lorebook_path": "<TMP>/data/default-user/worlds/Eldoria.json",
+                "total_entries": 3,
+                "uid": 1
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "entry_payload": {
+        "uid": 0
+      },
+      "lorebook_name": "Eldoria",
+      "operation": "archive"
+    },
+    "call": "archive",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "action": "archived",
+                "constant_cache_notice": false,
+                "lorebook_path": "<TMP>/data/default-user/worlds/Eldoria.json",
+                "total_entries": 3,
+                "uid": 0
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "entry_payload": {
+        "comment": "c",
+        "content": "v",
+        "key": [
+          "k"
+        ]
+      },
+      "lorebook_name": "Fresh Book"
+    },
+    "call": "new_book",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "action": "inserted",
+                "constant_cache_notice": false,
+                "lorebook_path": "<TMP>/data/default-user/worlds/Fresh Book.json",
+                "total_entries": 1,
+                "uid": 100
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  }
+]

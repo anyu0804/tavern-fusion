@@ -1,0 +1,76 @@
+[
+  {
+    "args": {
+      "placement": "inline"
+    },
+    "call": "inline",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "character_name": "Seraphina",
+                "html": "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>Tavern Fusion Stage — Seraphina</title>\n  <script src=\"https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js\"></script>\n  <style>\n    .inline-cap { max-height: 484px; overflow: hidden; }\n    .thin-scroll::-webkit-scrollbar { width: 5px; height: 5px; }\n    .thin-scroll::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.35); border-radius: 9999px; }\n  </style>\n</head>\n<body class=\"bg-transparent p-2 text-[var(--foreground)] antialiased\">\n  <div id=\"stageRoot\" class=\"mx-auto w-full rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden flex flex-col\">\n    <header class=\"px-4 py-3 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2\">\n      <div class=\"flex items-center gap-3 min-w-0\">\n        <img id=\"avatarImg\" src=\"<DATA_URI>\" alt=\"Seraphina\" class=\"w-11 h-11 rounded-full object-cover border-2 border-emerald-500/60 shrink-0\" />\n        <div class=\"min-w-0\">\n          <div class=\"flex items-center gap-2 flex-wrap\">\n            <h1 id=\"charTitle\" class=\"text-sm font-semibold text-[var(--foreground)] truncate\"></h1>\n            <span class=\"text-xs px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30\">CCv3</span>\n            <span id=\"syncPill\" class=\"text-xs px-2 py-0.5 rounded-full bg-[var(--secondary)] text-[var(--muted-foreground)]\"></span>\n          </div>\n          <p id=\"scenarioLine\" class=\"text-xs text-[var(--muted-foreground)] truncate\"></p>\n        </div>\n      </div>\n      <div class=\"flex items-center gap-1.5 text-xs\">\n        <button type=\"button\" data-view=\"chat\" class=\"tab-btn px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-medium text-xs\">对话流</button>\n        <button type=\"button\" data-view=\"lore\" class=\"tab-btn px-2.5 py-1 rounded-lg bg-[var(--secondary)] text-[var(--foreground)] font-medium text-xs\">世界书</button>\n        <button type=\"button\" data-view=\"dump\" class=\"tab-btn px-2.5 py-1 rounded-lg bg-[var(--secondary)] text-[var(--foreground)] font-medium text-xs\">Dump</button>\n      </div>\n    </header>\n\n    <div id=\"varsRibbon\" class=\"px-4 py-2 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2 text-xs\">\n      <div id=\"varsItems\" class=\"flex flex-wrap items-center gap-3\"></div>\n      <div id=\"lorePills\" class=\"flex flex-wrap items-center gap-1.5\"></div>\n    </div>\n\n    <section id=\"viewChat\" class=\"p-4 space-y-3 overflow-y-auto thin-scroll max-h-[340px]\"></section>\n    <section id=\"viewLore\" class=\"hidden p-4 space-y-2.5 overflow-y-auto thin-scroll max-h-[340px]\"></section>\n    <section id=\"viewDump\" class=\"hidden p-4 overflow-y-auto thin-scroll max-h-[340px]\">\n      <pre id=\"dumpPre\" class=\"text-xs font-mono text-[var(--foreground)] bg-[var(--background)] p-3 rounded-lg border border-[var(--border)] whitespace-pre-wrap\"></pre>\n    </section>\n  </div>\n\n  <script>\n    const S = {\"placement\": \"inline\", \"mode\": \"play\", \"charName\": \"Seraphina\", \"scenario\": \"{{user}}在星界裂隙微光浮现的雨夜登上了星陨钟塔顶层。\", \"chatFile\": \"<STAMP>.jsonl\", \"variables\": {\"affection\": 60}, \"loreTrace\": [], \"messages\": [{\"name\": \"Seraphina\", \"is_user\": false, \"is_system\": false, \"send_date\": \"<DATETIME>\", \"mes\": \"*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\\n\\n\\\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\\\"\", \"swipes\": [\"*雨丝敲打着星陨钟塔的高窗，Seraphina 轻轻合上铜制星盘，回眸望向推门而入的旅行者。*\\n\\n\\\"今夜的星界潮汐比往常提前了半个时辰，你也是循着钟声而来的吗？\\\"\", \"*炉火映亮琥珀茶盏，Seraphina 将一方干爽披风递给刚踏入塔楼的旅行者。*\\n\\n\\\"银雾山脉的夜风很凉，先喝口热茶暖一暖吧。\\\"\"], \"swipe_id\": 0, \"swipe_info\": [{\"send_date\": \"<DATETIME>\", \"extra\": {}}, {\"send_date\": \"<DATETIME>\", \"extra\": {}}], \"extra\": {\"seeded_greeting\": true}}], \"dumpReport\": \"=== TAVERN FUSION 3.0 --dump-prompt INSPECTOR (Seraphina | mode=--play) ===\\nDimension Mixer: Epistemic=0% | AgenticHands=OFF | Director=OFF\\nFour Locks Status: Lock#1(System)=0% | Lock#2(<START> Samples)=1 | Lock#3(@Depth Spliced)=0 | Lock#4(Regex Guard)=ON\\nBackstage Quarantine: 0 floor(s) isolated from context\\nPreset Stack: Default (10 ordered slots) | Temp=0.85\\nTotal Frame Tokens: ~784 tok | Identity Weight Ratio: 81.8%\\nLorebook Budget: 0 / 2048 tok\\n\\n[DYNAMICALLY ASSEMBLED IDENTITY & LEXICAL STACK (prompt_order aligned)]\\n  Slot 0 (Top-Level System Instruction): 0% Epistemic Lock\\n  Slot 1 (Preset 'Default' + Card System): 70 tok\\n  Slot 2 (Before-Char Lore): 0 entries\\n  Slot 3 (Character + Persona '旅行者'): 146 tok\\n  Slot 4 (After-Char Lore + 1 <START> Lexical Samples): 140 tok\\n  Enabled Prompt Order: main -> worldInfoBefore -> personaDescription -> charDescription -> charPersonality -> scenario -> worldInfoAfter -> dialogueExamples -> chatHistory -> jailbreak\\n\\n[GOLDEN @DEPTH SPLICED LORE IN CHAT HISTORY]\"};\n\n    function esc(t) {\n      return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n    }\n\n    function fmtRP(raw) {\n      const s = esc(raw);\n      const act = s.replace(/\\*([^*]+)\\*/g, '<span class=\"italic text-emerald-600 dark:text-emerald-300 font-serif\">$1</span>');\n      return act.replace(/\"([^\"]+)\"|“([^”]+)”/g, function (_, a, b) {\n        return '<span class=\"font-medium underline decoration-amber-500/40 underline-offset-2\">“' + (a || b) + '”</span>';\n      });\n    }\n\n    function render() {\n      const root = document.getElementById('stageRoot');\n      if (S.placement === 'inline') {\n        root.classList.add('inline-cap');\n      } else {\n        root.classList.remove('inline-cap');\n      }\n\n      document.getElementById('charTitle').textContent = S.charName;\n      document.getElementById('syncPill').textContent = S.chatFile + ' · #' + S.messages.length + '楼';\n      document.getElementById('scenarioLine').textContent = S.scenario;\n      document.getElementById('dumpPre').textContent = S.dumpReport;\n\n      const vEntries = Object.entries(S.variables || {});\n      document.getElementById('varsItems').innerHTML = vEntries.map(function (kv) {\n        return '<span class=\"text-[var(--muted-foreground)]\">' + esc(kv[0]) + ': <strong class=\"text-[var(--foreground)] font-mono\">' + esc(kv[1]) + '</strong></span>';\n      }).join('');\n\n      document.getElementById('lorePills').innerHTML = (S.loreTrace || []).map(function (lt) {\n        return '<button type=\"button\" class=\"lore-jump text-xs px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300\">'\n          + esc(lt.comment) + ' · ' + esc(lt.position) + '</button>';\n      }).join('');\n\n      document.querySelectorAll('.lore-jump').forEach(function (b) {\n        b.addEventListener('click', function () { setView('lore'); });\n      });\n\n      const msgs = S.placement === 'inline' ? S.messages.slice(-2) : S.messages;\n      document.getElementById('viewChat').innerHTML = msgs.map(function (m, idx) {\n        const swipes = Array.isArray(m.swipes) && m.swipes.length > 0 ? m.swipes : [m.mes];\n        const sId = Math.min(swipes.length - 1, Math.max(0, Number(m.swipe_id || 0)));\n        const txt = swipes[sId] || m.mes;\n        if (m.is_user) {\n          return '<div class=\"flex justify-end\"><div class=\"max-w-[85%] rounded-2xl rounded-tr-sm bg-[var(--secondary)] border border-[var(--border)] px-3.5 py-2.5 text-xs\">'\n            + '<div class=\"text-xs font-semibold text-[var(--muted-foreground)] mb-1\">' + esc(m.name) + '</div>' + fmtRP(txt) + '</div></div>';\n        }\n        let swipeCtl = '';\n        if (swipes.length > 1) {\n          swipeCtl = '<div class=\"mt-2 pt-1.5 border-t border-[var(--border)] flex justify-end gap-2 text-xs font-mono\">'\n            + '<button type=\"button\" data-idx=\"' + idx + '\" data-d=\"-1\" class=\"sw-btn px-2 py-0.5 bg-[var(--secondary)] rounded\">&lsaquo;</button>'\n            + '<span>Swipe ' + (sId + 1) + '/' + swipes.length + '</span>'\n            + '<button type=\"button\" data-idx=\"' + idx + '\" data-d=\"1\" class=\"sw-btn px-2 py-0.5 bg-[var(--secondary)] rounded\">&rsaquo;</button></div>';\n        }\n        return '<div class=\"flex items-start gap-2.5\"><img src=\"' + document.getElementById('avatarImg').src + '\" class=\"w-8 h-8 rounded-full object-cover mt-0.5 shrink-0\" />'\n          + '<div class=\"flex-1 rounded-2xl rounded-tl-sm bg-[var(--background)] border border-[var(--border)] px-3.5 py-2.5 text-xs leading-relaxed\">'\n          + '<div class=\"text-xs font-semibold text-emerald-600 dark:text-emerald-300 mb-1\">' + esc(m.name) + '</div>' + fmtRP(txt) + swipeCtl + '</div></div>';\n      }).join('');\n\n      document.querySelectorAll('.sw-btn').forEach(function (btn) {\n        btn.addEventListener('click', function () {\n          const visibleOffset = S.placement === 'inline' ? Math.max(0, S.messages.length - 2) : 0;\n          const mObj = S.messages[visibleOffset + Number(btn.getAttribute('data-idx'))];\n          if (!mObj || !mObj.swipes) return;\n          const d = Number(btn.getAttribute('data-d'));\n          mObj.swipe_id = (Number(mObj.swipe_id || 0) + d + mObj.swipes.length) % mObj.swipes.length;\n          render();\n        });\n      });\n\n      document.getElementById('viewLore').innerHTML = (S.loreTrace || []).map(function (lt) {\n        return '<div class=\"p-3 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs space-y-1\">'\n          + '<div class=\"flex justify-between font-semibold\"><span>#' + lt.uid + ' · ' + esc(lt.comment) + '</span>'\n          + '<span class=\"font-mono text-xs text-[var(--muted-foreground)]\">' + esc(lt.trigger) + ' | ' + esc(lt.position) + '</span></div>'\n          + '<p class=\"text-[var(--muted-foreground)] text-xs leading-relaxed\">' + esc(lt.content) + '</p></div>';\n      }).join('') || '<p class=\"text-xs text-[var(--muted-foreground)]\">当前回合暂无激活的世界书词条。</p>';\n    }\n\n    function setView(v) {\n      document.getElementById('viewChat').classList.toggle('hidden', v !== 'chat');\n      document.getElementById('viewLore').classList.toggle('hidden', v !== 'lore');\n      document.getElementById('viewDump').classList.toggle('hidden', v !== 'dump');\n      document.querySelectorAll('.tab-btn').forEach(function (b) {\n        const active = b.getAttribute('data-view') === v;\n        b.className = active\n          ? 'tab-btn px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-medium text-xs'\n          : 'tab-btn px-2.5 py-1 rounded-lg bg-[var(--secondary)] text-[var(--foreground)] font-medium text-xs';\n      });\n    }\n\n    document.querySelectorAll('.tab-btn').forEach(function (b) {\n      b.addEventListener('click', function () { setView(b.getAttribute('data-view')); });\n    });\n\n    render();\n  </script>\n</body>\n</html>\n",
+                "html_length": "<VOLATILE>",
+                "output_html_path": null,
+                "placement": "inline"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "output_html_path": "snap.html",
+      "placement": "standalone"
+    },
+    "call": "to_file",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": {
+              "<json>": {
+                "character_name": "Seraphina",
+                "html": "Saved to <TMP>/state/widgets/snap.html",
+                "html_length": "<VOLATILE>",
+                "output_html_path": "<TMP>/state/widgets/snap.html",
+                "placement": "standalone"
+              }
+            },
+            "type": "text"
+          }
+        ],
+        "isError": false
+      }
+    }
+  },
+  {
+    "args": {
+      "output_html_path": "bad.txt"
+    },
+    "call": "bad_suffix",
+    "result": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "result": {
+        "content": [
+          {
+            "text": "Error executing st_compile_stage_widget: output_html_path must have one of suffixes ('.html', '.htm'), got '.txt'.",
+            "type": "text"
+          }
+        ],
+        "isError": true
+      }
+    }
+  }
+]
