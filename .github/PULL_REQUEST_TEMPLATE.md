@@ -5,6 +5,7 @@
 ## 验证方式 (Verification)
 
 - [ ] 已在本地运行并通过全量测试套件：`node scripts/run_py.mjs tests/test_full_suite.py`
+- [ ] 已在本地运行并通过特征快照测试：`node scripts/run_py.mjs tests/test_tool_snapshots.py`
 
 ## 技术中立与边界红线核对 (Mandatory Policy Checklist)
 

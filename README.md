@@ -31,9 +31,10 @@
    - **楼层修订与分支管理**：支持楼层原地编辑、删楼（自动留存 `.bak` 备份）、一键切换「🎬 场外隔离」标记、Swipe 切换与裁剪、以及从任意历史楼层分叉（Fork）新 `.jsonl` 存档。
    - **玩家导演杆（Player Director Lever）**：提供「✨ 回复灵感 x3」与「🪄 意图扩写」，生成主角视角的候选台词并经 `st_publish_stage_suggestions` 回填至输入框。
 
-3. **零第三方依赖 Python 控制面与并发写盘保护**
+3. **零第三方依赖 Python 控制面、模块化运行时与并发写盘保护**
    - 通过 `scripts/run_py.mjs` 自动跳过 Windows `WindowsApps\python3.exe` 商店占位程序，基于 Python 3.10–3.13 标准库即可运行。
-   - SQLite 稀疏/稠密语义向量缓存采用短连接模式避免句柄泄漏；`.jsonl` 读写采用覆盖完整「读-改-写（RMW）」周期的跨平台文件锁与 `os.replace` 原子替换，并对损坏 JSON 行报错阻断以防静默丢楼。
+   - 控制面按职责拆分为 `server/protocol/`（JSON-RPC stdio）、`server/runtime/`（`RuntimeContext` 与 `SessionStore` 单一会话状态入口）、`server/tools/`（14 个 MCP 工具注册表 + `inputSchema.required` 参数校验 + Sidecar 操作）、`server/policy/`（合规护栏与未成年风险闸入口）与 `server/prompt/`（宏、预设、正则管线与提示词帧编译器）；生命周期钩子在常规工程会话路径下零导入重型编解码与向量模块。
+   - SQLite 稀疏/稠密语义向量缓存采用懒加载与短连接模式避免句柄泄漏；`.jsonl` 聊天记录、世界书、`active_session.json` 与 `settings.json` 全局变量均采用覆盖完整「读-改-写（RMW）」周期的跨平台文件锁与 `os.replace` 原子替换，并对损坏 JSON 行报错阻断以防静默丢楼或并发丢更新。
 
 4. **兼容酒馆常用数据格式与 Card Doctor 静态体检**
    - 解析并同步双写 PNG `chara`（CCv2）+ `ccv3`（CCv3）数据块，落实 **Card-is-Data** 字段清洗。
@@ -77,13 +78,15 @@
 
 ```bash
 # 1. 安装至全局 ~/.gemini/config/plugins/tavern-fusion 并绑定本地 SillyTavern 数据目录
+#    （全局安装会自动清理同级工作区重复的 .agents/plugins.json 挂载项，避免双重触发 Hook）
 node scripts/run_py.mjs scripts/install_local.py --global-plugin --st-root /path/to/SillyTavern
 
-# 2. (可选) 仅注册到当前工作区 (.agents/plugins.json) 并生成示例双区块角色卡 Seraphina.png
-node scripts/run_py.mjs scripts/install_local.py --workspace .
+# 2. (二选一，勿与全局安装混用) 仅注册到指定工作区 (.agents/plugins.json) 并生成示例角色卡 Seraphina.png
+node scripts/run_py.mjs scripts/install_local.py --workspace /path/to/workspace
 
-# 3. 运行全量自动化验收套件 (含四重维度锁、维度调音台、场外隔离与沙箱安全测试)
+# 3. 运行全量自动化验收套件与 14 工具黄金特征快照测试
 node scripts/run_py.mjs tests/test_full_suite.py
+node scripts/run_py.mjs tests/test_tool_snapshots.py
 ```
 
 ---
@@ -112,7 +115,7 @@ node scripts/run_py.mjs tests/test_full_suite.py
 ### 1. 接入边界、预设限制与风险承担 (Integration Scope & Risk Allocation)
 
 * **技术接入边界**：我们**不提取/不中转凭证、不架反代、不做多租户；使用官方插件扩展点**（插件清单、本地 `stdio` MCP 服务、生命周期钩子与 `sidecar_sdk` 面板接口）在本地运行；**内容政策与账号风险由使用者承担**（建议使用独立的专用/测试账号体验预览版本；首次运行将弹出一次性风险与边界告知）。
-* **预设与内容限制**：**不支持、不建议导入破限/NSFW 预设，云端模型侧无法绕过服务端强制过滤**。导入越狱破限（Jailbreak / DAN）或色情露骨（NSFW / ERP）等违规预设与角色卡，不仅无法突破云端模型的服务端安全拦截，还可能直接触发上游平台风控。[server/st_runtime_compat.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/st_runtime_compat.py) 默认启用 `host_gentle` 本地前置护栏（宿主 MCP 模式仅保留 `host_gentle` 与 `strict_block` 两档，不提供关闭护栏的 `passthrough` 开关），该机制仅用于本地输入侧自检，**不构成对任何上游平台合规性或账号安全的保证**。
+* **预设与内容限制**：**不支持、不建议导入破限/NSFW 预设，云端模型侧无法绕过服务端强制过滤**。导入越狱破限（Jailbreak / DAN）或色情露骨（NSFW / ERP）等违规预设与角色卡，不仅无法突破云端模型的服务端安全拦截，还可能直接触发上游平台风控。[server/policy/compliance.py](https://github.com/anyu0804/tavern-fusion/blob/main/server/policy/compliance.py) 默认启用 `host_gentle` 本地前置护栏（宿主 MCP 模式仅保留 `host_gentle` 与 `strict_block` 两档，不提供关闭护栏的 `passthrough` 开关），该机制仅用于本地输入侧自检，**不构成对任何上游平台合规性或账号安全的保证**。
 * **永不实现清单与 PR 红线**：本项目永久拒绝实现凭证读取、反向代理、多账号轮询、`passthrough` 透传与内容过滤关闭开关，相关 PR 一律不予合并；详见 **[POLICY.md](./POLICY.md)** 与 [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md)。
 
 ### 2. Antigravity 条款与对话隐私 (Antigravity Terms & Conversation Privacy)

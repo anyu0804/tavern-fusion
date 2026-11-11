@@ -33,4 +33,4 @@ Tavern Fusion 的工程定位严格限定为：**基于宿主官方插件扩展�
 所有向本仓库提交的 Pull Request 必须完成 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 中的边界核对清单：
 
 - 触及上述「永不实现清单」任一条目的 PR，维护者将不做代码细节评审，直接标记拒绝并关闭。
-- 修改 `server/st_runtime_compat.py`、`hooks/`、`mcp_config.json` 或 `sidecars/` 交互入口的 PR，必须保持全量自动化测试（`node scripts/run_py.mjs tests/test_full_suite.py`）通过，且不得削弱现有路径沙箱（`ensure_under_dir`）与策略回落逻辑。
+- 修改 `server/policy/`、`server/runtime/`、`server/tools/`、`server/st_runtime_compat.py`、`hooks/`、`mcp_config.json` 或 `sidecars/` 交互入口的 PR，必须保持全量自动化测试（`node scripts/run_py.mjs tests/test_full_suite.py` 与 `node scripts/run_py.mjs tests/test_tool_snapshots.py`）通过，且不得削弱现有路径沙箱（`ensure_under_dir`）与策略回落逻辑。
