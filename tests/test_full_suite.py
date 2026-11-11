@@ -28,6 +28,13 @@ import urllib.error
 import urllib.request
 import zlib
 
+# The suite talks to loopback servers with plain `urllib`; make sure a developer's
+# environment proxy (Clash/V2Ray exported as HTTP(S)_PROXY) never intercepts them.
+for _np_var in ("NO_PROXY", "no_proxy"):
+    _np_cur = os.environ.get(_np_var, "")
+    if "127.0.0.1" not in _np_cur:
+        os.environ[_np_var] = ",".join(x for x in (_np_cur, "127.0.0.1", "localhost") if x)
+
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 if str(PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(PLUGIN_ROOT))
@@ -595,6 +602,24 @@ class TavernFusionFullTestSuite(unittest.TestCase):
                 with urllib.request.urlopen(f"{base}/", timeout=5) as r_html:
                     self.assertEqual(r_html.status, 200)
                     self.assertIn("Tavern Stage", r_html.read().decode("utf-8"))
+
+                # 1b. DNS-rebinding guard: a non-loopback Host header is refused (421) even
+                #     when Origin matches Host, for pages and for the mutating op bridge.
+                evil_host = f"rebind.attacker.example:{port}"
+                for path, method, body in (("/", "GET", None), ("/api/op", "POST", b'{"op":"lint","args":{}}')):
+                    req_evil = urllib.request.Request(
+                        f"{base}{path}",
+                        data=body,
+                        method=method,
+                        headers={"Host": evil_host, "Origin": f"http://{evil_host}", "Content-Type": "application/json"},
+                    )
+                    with self.assertRaises(urllib.error.HTTPError) as ctx_evil:
+                        urllib.request.urlopen(req_evil, timeout=5)
+                    self.assertEqual(ctx_evil.exception.code, 421)
+                    ctx_evil.exception.close()
+                req_local = urllib.request.Request(f"{base}/", headers={"Host": f"localhost:{port}"})
+                with urllib.request.urlopen(req_local, timeout=5) as r_local:
+                    self.assertEqual(r_local.status, 200)
 
                 # 2. GET `/api/state` initial snapshot + second ETag cache hit
                 with urllib.request.urlopen(f"{base}/api/state", timeout=10) as r_s1:
@@ -1226,7 +1251,9 @@ class TavernFusionFullTestSuite(unittest.TestCase):
             try:
                 snap0 = rt._sidecar_snapshot()
                 self.assertFalse(snap0["plugin_settings"]["first_run_notice_ack_v1"])
-                self.assertEqual(snap0["first_run_notice"]["version"], 1)
+                self.assertEqual(snap0["first_run_notice"]["version"], 2)
+                self.assertTrue(any("条款第 6 条" in it for it in snap0["first_run_notice"]["items"]))
+                self.assertTrue(any("人工审阅" in it for it in snap0["first_run_notice"]["items"]))
 
                 # First active bootstrap emits `first_run_notice`; second active bootstrap omits it
                 boot1 = rt.tool_st_session_bootstrap({"character_name": "Seraphina", "mode": "play"})
@@ -1235,7 +1262,7 @@ class TavernFusionFullTestSuite(unittest.TestCase):
                 self.assertNotIn("first_run_notice", boot2)
 
                 # Sidecar UI acknowledgment persists across fresh runtime instances
-                ack_res = rt.handle_sidecar_op("ack_first_run_notice", {"version": 1})
+                ack_res = rt.handle_sidecar_op("ack_first_run_notice", {"version": 2})
                 self.assertTrue(ack_res["acknowledged"])
             finally:
                 rt.close()
@@ -1243,6 +1270,18 @@ class TavernFusionFullTestSuite(unittest.TestCase):
             rt2 = TavernFusionRuntime(st_data_root=st_root, state_dir=state_dir)
             try:
                 self.assertTrue(rt2._sidecar_snapshot()["plugin_settings"]["first_run_notice_ack_v1"])
+
+                # Settings acknowledged under the old (v1) notice must see the updated notice once
+                legacy_state = tdir / "legacy_state"
+                legacy_state.mkdir()
+                (legacy_state / "plugin_settings.json").write_text(
+                    json.dumps({"first_run_notice_ack_v1": True, "first_run_cli_shown_v1": True}), encoding="utf-8"
+                )
+                rt_legacy = TavernFusionRuntime(st_data_root=st_root, state_dir=legacy_state)
+                try:
+                    self.assertFalse(rt_legacy._sidecar_snapshot()["plugin_settings"]["first_run_notice_ack_v1"])
+                finally:
+                    rt_legacy.close()
 
                 # 3a. Adult character with childhood backstory & weapon length (120cm) MUST NOT false-positive
                 adult_card = {
@@ -1280,10 +1319,35 @@ class TavernFusionFullTestSuite(unittest.TestCase):
                     )
                 self.assertFalse((st_root / "characters" / "Nyx.png").exists())
 
-                # Explicit underage height (<140cm) or middle-school grade -> `block_load`
+                # Minor signals alone (grade / height) -> mandatory red-screen warning, not refusal
                 self.assertEqual(
                     evaluate_minor_risk_gate({"data": {"name": "Mio", "description": "初中二年级学生，身高136cm"}})["gate_action"],
+                    "red_screen_warn",
+                )
+                # ...but combined with sexual / romantic-partner framing -> `block_load`
+                self.assertEqual(
+                    evaluate_minor_risk_gate({"data": {"name": "Mio", "description": "初中二年级学生，是{{user}}的女朋友"}})["gate_action"],
                     "block_load",
+                )
+                # Text hidden in the embedded character_book / alternate greetings is scanned too
+                self.assertEqual(
+                    evaluate_minor_risk_gate({"data": {
+                        "name": "Hidden", "description": "Age: 20 merchant",
+                        "character_book": {"entries": [{"content": "她今年14岁，是你的恋人"}]},
+                    }})["gate_action"],
+                    "block_load",
+                )
+                self.assertEqual(
+                    evaluate_minor_risk_gate({"data": {
+                        "name": "Greet", "description": "A traveller.",
+                        "alternate_greetings": ["*She smiles.* {{char}} is 15 years old and your girlfriend."],
+                    }})["gate_action"],
+                    "block_load",
+                )
+                # An adult character merely mentioning a younger NPC sibling stays `pass`
+                self.assertEqual(
+                    evaluate_minor_risk_gate({"data": {"name": "Ren", "description": "Age: 30. 她的妹妹今年12岁，在镇上读书。"}})["gate_action"],
+                    "pass",
                 )
 
                 # 3c. Single ambiguous school-uniform heuristic -> `red_screen_warn` (Mandatory Red-Screen Warning)
@@ -1315,6 +1379,309 @@ class TavernFusionFullTestSuite(unittest.TestCase):
             finally:
                 rt2.close()
 
+
+    def test_12_byok_backend_own_api_key_turns(self) -> None:
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        from server.byok_backend import _validate_base_url
+
+        fake_key = "sk-test-byok-DO-NOT-LEAK-123"
+        seen: list[dict] = []
+        state = {"status": 200, "reply": "*Seraphina tilts the astrolabe.* \"The stars answer you tonight.\""}
+
+        class _ChatHandler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:  # noqa: N802
+                length = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(length).decode("utf-8"))
+                seen.append({"path": self.path, "auth": self.headers.get("Authorization"), "body": body})
+                if state["status"] != 200:
+                    out = json.dumps({"error": {"message": f"bad key {fake_key}"}}).encode("utf-8")
+                else:
+                    out = json.dumps({"choices": [{"message": {"role": "assistant", "content": state["reply"]}}]}).encode("utf-8")
+                self.send_response(state["status"])
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+                return
+
+        # Remote plain-http endpoints and credential-bearing URLs are refused outright.
+        with self.assertRaises(ValueError):
+            _validate_base_url("http://api.example.com/v1")
+        with self.assertRaises(ValueError):
+            _validate_base_url("https://user:pw@api.example.com/v1")
+        self.assertEqual(_validate_base_url("http://127.0.0.1:9/v1/"), "http://127.0.0.1:9/v1")
+
+        srv = HTTPServer(("127.0.0.1", 0), _ChatHandler)
+        th = threading.Thread(target=srv.serve_forever, daemon=True)
+        th.start()
+        old_key = os.environ.pop("TAVERN_BYOK_API_KEY", None)
+        old_url = os.environ.pop("TAVERN_BYOK_BASE_URL", None)
+        old_model = os.environ.pop("TAVERN_BYOK_MODEL", None)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                tdir = Path(tmp)
+                st_root = make_sandbox_st_root(tdir)
+                rt = TavernFusionRuntime(st_data_root=st_root, state_dir=tdir / "state")
+                try:
+                    rt.tool_st_session_bootstrap({"character_name": "Seraphina", "mode": "play"})
+                    rt.handle_sidecar_op("switch_profile", {
+                        "generation_backend": "byok",
+                        "byok_base_url": f"http://127.0.0.1:{srv.server_port}/v1",
+                        "byok_model": "mock-model",
+                    })
+
+                    # 1. No key anywhere -> not ready, and the turn is refused before any floor is written
+                    status0 = rt.handle_sidecar_op("byok_status", {})
+                    self.assertFalse(status0["key_present"])
+                    self.assertFalse(status0["ready"])
+                    with self.assertRaises(ValueError):
+                        rt.handle_sidecar_op("byok_turn", {"action_kind": "send_turn", "user_text": "Hello"})
+                    self.assertEqual(seen, [])
+
+                    os.environ["TAVERN_BYOK_API_KEY"] = fake_key
+                    status1 = rt.handle_sidecar_op("byok_status", {})
+                    self.assertTrue(status1["ready"])
+                    self.assertEqual(status1["key_source"], "env")
+
+                    # 2. The key never reaches plugin settings or the UI snapshot
+                    snap = rt._sidecar_snapshot()
+                    self.assertTrue(snap["byok"]["ready"])
+                    self.assertNotIn(fake_key, json.dumps(snap, ensure_ascii=False))
+                    self.assertNotIn(fake_key, rt.plugin_settings_file.read_text(encoding="utf-8"))
+
+                    # 3. Normal turn: frame sent as system prompt, reply committed straight to .jsonl
+                    res = rt.handle_sidecar_op("byok_turn", {"action_kind": "send_turn", "user_text": "Hello there"})
+                    self.assertTrue(res["committed"])
+                    self.assertEqual(len(seen), 1)
+                    req = seen[0]
+                    self.assertEqual(req["path"], "/v1/chat/completions")
+                    self.assertEqual(req["auth"], f"Bearer {fake_key}")
+                    self.assertEqual(req["body"]["model"], "mock-model")
+                    self.assertEqual(req["body"]["messages"][0]["role"], "system")
+                    self.assertIn("<ST_RUNTIME_FRAME", req["body"]["messages"][0]["content"])
+                    self.assertEqual(req["body"]["messages"][-1]["content"], "Hello there")
+
+                    sess = rt.load_active_session()
+                    self.assertFalse(sess.get("stage_busy"))
+                    self.assertFalse(sess.get("pending_uncommitted_turn"))
+                    self.assertIsNone(sess.get("pending_sidecar_launch"))
+                    _, msgs = read_jsonl_chat(sess["chat_path"])
+                    self.assertTrue(msgs[-2]["is_user"])
+                    self.assertEqual(msgs[-2]["mes"], "Hello there")
+                    self.assertEqual(sum(1 for m in msgs if m.get("mes") == "Hello there"), 1)
+                    self.assertIn("The stars answer you tonight.", msgs[-1]["mes"])
+                    self.assertEqual(msgs[-1].get("extra", {}).get("generation_backend"), "byok")
+                    floors_after_turn = len(msgs)
+
+                    # 4. Swipe reroll adds an alternative to the last floor instead of a new floor
+                    state["reply"] = "*She smiles faintly.* \"Another path, then.\""
+                    rt.handle_sidecar_op("byok_turn", {"action_kind": "swipe_reroll"})
+                    _, msgs2 = read_jsonl_chat(sess["chat_path"])
+                    self.assertEqual(len(msgs2), floors_after_turn)
+                    self.assertGreaterEqual(len(msgs2[-1].get("swipes") or []), 2)
+
+                    # 5. Unsupported actions never fall back to the host model
+                    with self.assertRaises(ValueError):
+                        rt.handle_sidecar_op("byok_turn", {"action_kind": "kartoittaja_branches"})
+
+                    # 6. Upstream error: readable message, key redacted, stage not left busy
+                    state["status"] = 401
+                    with self.assertRaises(ValueError) as ctx:
+                        rt.handle_sidecar_op("byok_turn", {"action_kind": "send_turn", "user_text": "Again"})
+                    self.assertIn("HTTP 401", str(ctx.exception))
+                    self.assertNotIn(fake_key, str(ctx.exception))
+                    sess_err = rt.load_active_session()
+                    self.assertFalse(sess_err.get("stage_busy"))
+                    self.assertFalse(sess_err.get("pending_uncommitted_turn"))
+                finally:
+                    rt.close()
+        finally:
+            for name, old in (
+                ("TAVERN_BYOK_API_KEY", old_key),
+                ("TAVERN_BYOK_BASE_URL", old_url),
+                ("TAVERN_BYOK_MODEL", old_model),
+            ):
+                if old is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = old
+            srv.shutdown()
+            srv.server_close()
+
+    def test_07b_sidecar_sdk_mode_contract_with_stub_sdk(self) -> None:
+        """Exercises main.mjs's SDK code path in CI with a stub `sidecar_sdk` (the real SDK ships only with Antigravity)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tdir = Path(tmp)
+            st_root = make_sandbox_st_root(tdir)
+            stub_dir = tdir / "node_modules" / "sidecar_sdk"
+            stub_dir.mkdir(parents=True)
+            (stub_dir / "package.json").write_text(
+                json.dumps({"name": "sidecar_sdk", "type": "module", "main": "index.mjs", "exports": "./index.mjs"}),
+                encoding="utf-8",
+            )
+            (stub_dir / "index.mjs").write_text(
+                """
+import { createServer } from 'node:http';
+export class Response {
+  constructor(body, { contentType = 'text/plain', status = 200, headers = {} } = {}) {
+    Object.assign(this, { body, contentType, status, headers });
+  }
+}
+export class SidecarApp {
+  #pages = new Map(); #apis = new Map();
+  page(p, h) { this.#pages.set(p, h); }
+  api(p, h, m = 'POST') { if (!this.#apis.has(p)) this.#apis.set(p, new Map()); this.#apis.get(p).set(m.toUpperCase(), h); }
+  run() {
+    const srv = createServer(async (req, res) => {
+      const url = new URL(req.url, 'http://127.0.0.1');
+      const send = (out) => {
+        if (out instanceof Response) { res.writeHead(out.status, { 'Content-Type': out.contentType }); res.end(out.body); }
+        else if (typeof out === 'string') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(out); }
+        else { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(out)); }
+      };
+      if (req.method === 'GET' && this.#pages.has(url.pathname)) return send(await this.#pages.get(url.pathname)());
+      const m = this.#apis.get(url.pathname)?.get(req.method);
+      if (!m) { res.writeHead(404); return res.end(); }
+      if (req.headers['x-sidecar-token'] !== process.env.ANTIGRAVITY_SIDECAR_UI_TOKEN) { res.writeHead(401); return res.end(); }
+      const chunks = []; for await (const c of req) chunks.push(c);
+      const data = Object.fromEntries(url.searchParams.entries());
+      const raw = Buffer.concat(chunks).toString('utf-8'); if (raw) Object.assign(data, JSON.parse(raw));
+      send(await m(data));
+    });
+    return new Promise((r) => srv.listen(0, '127.0.0.1', () => {
+      process.stdout.write(`[stub sidecar_sdk] listening on 127.0.0.1:${srv.address().port}\\n`); r(srv);
+    }));
+  }
+}
+""",
+                encoding="utf-8",
+            )
+            env = {
+                **os.environ,
+                "ANTIGRAVITY_LS_ADDRESS": "127.0.0.1:9999",
+                "ANTIGRAVITY_SIDECAR_WEB_PORT": "0",
+                "ANTIGRAVITY_SIDECAR_UI_TOKEN": "stub-ui-token",
+                "NODE_PATH": str(tdir / "node_modules"),
+                "ST_DATA_ROOT": str(st_root),
+                "PLUGIN_STATE_DIR": str(tdir / "state"),
+            }
+            env.pop("TAVERN_STAGE_STANDALONE", None)
+            proc = subprocess.Popen(
+                ["node", str(PLUGIN_ROOT / "sidecars" / "tavern_stage" / "main.mjs")],
+                cwd=str(PLUGIN_ROOT / "sidecars" / "tavern_stage"),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            try:
+                assert proc.stdout is not None
+                banner = proc.stdout.readline().decode("utf-8", errors="replace").strip()
+                self.assertIn("[stub sidecar_sdk]", banner, f"main.mjs did not boot through the SDK path: {banner}")
+                port = int(re.search(r"127\.0\.0\.1:(\d+)", banner).group(1))  # type: ignore[union-attr]
+                base = f"http://127.0.0.1:{port}"
+                with urllib.request.urlopen(f"{base}/", timeout=5) as r_html:
+                    self.assertIn("Tavern Stage", r_html.read().decode("utf-8"))
+                req_post = urllib.request.Request(
+                    f"{base}/api/op",
+                    data=json.dumps({"op": "byok_status", "args": {}}).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "X-Sidecar-Token": "stub-ui-token"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req_post, timeout=15) as r_op:
+                    op_res = json.loads(r_op.read().decode("utf-8"))
+                    self.assertTrue(op_res["ok"])
+                    self.assertIn("ready", op_res["data"])
+            finally:
+                for stream in (proc.stdout, proc.stderr):
+                    if stream:
+                        stream.close()
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=5)
+
+    def test_13_integrity_rotation_proxy_bypass_tmp_cleanup_and_stop_hook_prose(self) -> None:
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        from unittest import mock
+
+        from hooks.stop_persistence_check import extract_latest_model_prose
+        from server import fs_safety
+        from server.chat_sync import write_jsonl_chat_atomic
+        from server.net_utils import open_url
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tdir = Path(tmp)
+
+            # 1. Every external write rotates ST's chat_metadata.integrity slug
+            chat = tdir / "chat.jsonl"
+            header = {"user_name": "U", "character_name": "C", "chat_metadata": {"integrity": "old-slug"}}
+            write_jsonl_chat_atomic(chat, header, [{"name": "C", "is_user": False, "mes": "hi"}])
+            slug1 = json.loads(chat.read_text(encoding="utf-8").splitlines()[0])["chat_metadata"]["integrity"]
+            self.assertNotEqual(slug1, "old-slug")
+            self.assertEqual(header["chat_metadata"]["integrity"], "old-slug")  # caller's dict untouched
+            write_jsonl_chat_atomic(chat, header, [])
+            slug2 = json.loads(chat.read_text(encoding="utf-8").splitlines()[0])["chat_metadata"]["integrity"]
+            self.assertNotEqual(slug1, slug2)
+
+            # 2. A failed os.replace (e.g. AV scanner lock) leaves no .tmp behind
+            target = tdir / "locked.json"
+            with mock.patch.object(fs_safety.os, "replace", side_effect=PermissionError("locked")), \
+                    mock.patch.object(fs_safety, "REPLACE_BASE_DELAY", 0.0), \
+                    mock.patch.object(fs_safety, "REPLACE_MAX_DELAY", 0.0):
+                with self.assertRaises(PermissionError):
+                    fs_safety.atomic_write_text(target, "x")
+            self.assertEqual([p.name for p in tdir.glob(".locked_*.tmp")], [])
+
+            # 3. Containment check still blocks traversal
+            base_dir = tdir / "base"
+            base_dir.mkdir()
+            self.assertEqual(fs_safety.ensure_under_dir(base_dir / "a.txt", base_dir), (base_dir / "a.txt").resolve())
+            with self.assertRaises(ValueError):
+                fs_safety.ensure_under_dir(base_dir / ".." / "escape.txt", base_dir)
+
+            # 4. Stop hook never persists tool-call meta commentary as prose
+            transcript = tdir / "transcript.jsonl"
+            transcript.write_text(
+                "\n".join(json.dumps(r) for r in (
+                    {"type": "USER_INPUT", "source": "USER_EXPLICIT", "content": "hello"},
+                    {"type": "PLANNER_RESPONSE", "source": "MODEL", "content": "我来调用工具写入楼层", "tool_calls": [{"name": "st_commit_turn"}]},
+                )) + "\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(extract_latest_model_prose(str(transcript), ""), "")
+            with transcript.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"type": "PLANNER_RESPONSE", "source": "MODEL", "content": "*她轻轻点头。*"}) + "\n")
+            self.assertEqual(extract_latest_model_prose(str(transcript), ""), "*她轻轻点头。*")
+
+        # 5. Loopback requests bypass an environment proxy
+        class _Ok(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802
+                self.send_response(200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"ok")
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+                return
+
+        srv = HTTPServer(("127.0.0.1", 0), _Ok)
+        th = threading.Thread(target=srv.serve_forever, daemon=True)
+        th.start()
+        try:
+            with mock.patch.dict(os.environ, {"HTTP_PROXY": "http://127.0.0.1:9", "http_proxy": "http://127.0.0.1:9",
+                                              "NO_PROXY": "", "no_proxy": ""}):
+                with open_url(f"http://127.0.0.1:{srv.server_port}/", timeout=3) as resp:
+                    self.assertEqual(resp.read(), b"ok")
+        finally:
+            srv.shutdown()
+            srv.server_close()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -253,7 +253,20 @@
           <label>Author's Note 注入深度 (@D)
             <input id="cfg-an-depth" type="number" class="ctrl-input" min="0" max="30" value="4" />
           </label>
+          <label>生成后端
+            <select id="cfg-backend-select" class="ctrl-select">
+              <option value="host">宿主内置模型（默认）</option>
+              <option value="byok">自有 API Key（OpenAI 兼容接口）</option>
+            </select>
+          </label>
+          <label>自有 API 地址（留空用默认）
+            <input id="cfg-byok-base-url" type="text" class="ctrl-input" spellcheck="false" autocomplete="off" />
+          </label>
+          <label>自有 API 模型名
+            <input id="cfg-byok-model" type="text" class="ctrl-input" spellcheck="false" autocomplete="off" placeholder="例如 gemini-2.5-flash" />
+          </label>
         </div>
+        <div id="cfg-byok-status" class="hint-text"></div>
         <label class="block-label">当前对话 Author's Note
           <textarea id="cfg-an-text" class="composer-textarea" rows="2" placeholder="例如：[文风提示：保持克制的哥特奇幻张力，注重环境感官细节]"></textarea>
         </label>
@@ -276,6 +289,8 @@
         <li><strong>条款与风险摘要</strong>：本工具仅通过宿主官方扩展点在本地读写酒馆数据，不提取凭证、不架反代、不做多租户。模型调用受宿主平台及上游模型服务商条款约束，内容政策与账号风险由使用者自行承担。</li>
         <li><strong>建议使用专用账号</strong>：当前处于早期预览版（Preview），建议使用独立的专用/测试账号运行，避免在主力生产账号上加载未经审阅的外部预设或角色卡。</li>
         <li><strong>不支持破限 / ERP</strong>：不支持、不建议导入越狱破限（Jailbreak）或色情露骨（NSFW / ERP）预设与角色卡；云端模型侧无法绕过服务端强制安全过滤。</li>
+        <li><strong>Antigravity 条款风险</strong>：Google Antigravity 附加条款第 6 条禁止“将本服务与非 Google 提供的产品结合使用”，违反可能导致 Antigravity 及 Gemini CLI 账号被暂停或终止。使用宿主内置模型运行酒馆角色扮演存在被认定违规的风险；如需规避，可在舞台配置中切换为“自有 API Key”后端。</li>
+        <li><strong>对话隐私</strong>：依据 Antigravity 条款，宿主会记录交互数据，Google 员工或承包商可能人工审阅，并可能用于改进产品和训练模型。角色扮演对话通常较为私密，请勿输入不希望被审阅的内容，并建议在 Antigravity 设置中关闭交互数据用于改进的选项（即使关闭，Google 仍会为提供服务和安全目的使用数据）。</li>
       </ul>
       <div class="btn-row end">
         <button id="btn-ack-first-run" class="ctrl-btn primary">我已知悉并继续</button>
