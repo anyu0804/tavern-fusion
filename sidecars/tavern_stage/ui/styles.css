@@ -892,3 +892,10 @@ html, body {
   font-size: 12px;
   color: var(--tf-muted-fg);
 }
+
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}

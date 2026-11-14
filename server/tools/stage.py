@@ -11,8 +11,9 @@ import time
 from typing import Any
 
 from ..byok_backend import (
+    build_byok_cached_messages,
     build_byok_messages,
-    byok_chat_completion,
+    byok_chat_completion_with_usage,
     read_byok_api_key,
     resolve_byok_config,
 )
@@ -183,7 +184,9 @@ def handle_sidecar_op(ctx: RuntimeContext, op: str, args: dict[str, Any]) -> dic
     if op == "byok_turn":
         return sidecar_byok_turn(ctx, args)
     if op == "byok_status":
-        return resolve_byok_config(ctx.load_plugin_settings(), ctx.state_dir)
+        status = resolve_byok_config(ctx.load_plugin_settings(), ctx.state_dir)
+        status["last_usage"] = ctx.sessions.load().get("last_byok_usage")
+        return status
     if op == "read_lorebook":
         return sidecar_read_lorebook(ctx, args)
     if op == "evolve_lore":
@@ -351,7 +354,7 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
     return {
         "data_root_name": ctx.st_data_root.name,
         "plugin_settings": plugin_cfg,
-        "byok": resolve_byok_config(plugin_cfg, ctx.state_dir),
+        "byok": {**resolve_byok_config(plugin_cfg, ctx.state_dir), "last_usage": session.get("last_byok_usage")},
         "first_run_notice": FIRST_RUN_NOTICE,
         "minor_risk_gate": active_minor_gate,
         "presets": list_openai_presets(ctx.st_data_root),
@@ -585,27 +588,42 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
     ctx.sessions.update({"pending_sidecar_launch": None})
     try:
         session = ctx.sessions.load()
+        cache_mode = cfg["cache_mode"]
         frame = st_dump_prompt_frame(ctx, {
             "character_name": session.get("card_file") or prep["character_name"],
-            "user_input": str(args.get("user_text", "")),
+            # The user floor was already appended by `sidecar_prepare_agent_turn`; passing the text
+            # again would make the lore engine append it a second time to the rendered history.
+            "user_input": "" if session.get("user_floor_already_appended") else str(args.get("user_text", "")),
             "agentic_hands": False,
+            "cache_mode": cache_mode,
+            "_include_parts": cache_mode != "off",
         })
+        if cache_mode != "off":
+            messages = build_byok_cached_messages(frame["frame_parts"], prep["prompt"], cache_control=cfg["cache_control"])
+        else:
+            messages = build_byok_messages(frame["ephemeral_frame"], prep["prompt"])
         preset = load_openai_preset(ctx.st_data_root, session.get("preset_name"))
-        reply = byok_chat_completion(
+        reply, usage = byok_chat_completion_with_usage(
             base_url=cfg["base_url"],
             api_key=api_key,
             model=cfg["model"],
-            messages=build_byok_messages(frame["ephemeral_frame"], prep["prompt"]),
+            messages=messages,
             temperature=preset.get("temperature"),
             max_tokens=int(args["max_tokens"]) if args.get("max_tokens") else None,
         )
+        extra_meta: dict[str, Any] = {"generation_backend": "byok", "byok_model": cfg["model"], "byok_cache_mode": cache_mode}
+        if usage.get("prompt_tokens") is not None:
+            extra_meta["byok_prompt_tokens"] = usage["prompt_tokens"]
+        if usage.get("cached_tokens") is not None:
+            extra_meta["byok_cached_tokens"] = usage["cached_tokens"]
         commit = st_commit_turn(ctx, {
             "character_name": session.get("card_file") or prep["character_name"],
             "user_mes": None,
             "char_mes": reply,
             "swipe_mode": action_kind == "swipe_reroll",
-            "extra_meta": {"generation_backend": "byok", "byok_model": cfg["model"]},
+            "extra_meta": extra_meta,
         })
+        ctx.sessions.update({"last_byok_usage": {**usage, "cache_mode": cache_mode, "at": int(time.time())}})
     finally:
         # Never leave the stage busy or a pending turn for the host Stop hook to pick up.
         ctx.sessions.update({
@@ -621,6 +639,8 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
         "character_name": prep["character_name"],
         "turn_hash": commit.get("turn_hash"),
         "gentle_notice": prep.get("gentle_notice", ""),
+        "cache_mode": cache_mode,
+        "usage": usage,
     }
 
 
