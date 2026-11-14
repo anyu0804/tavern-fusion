@@ -275,6 +275,14 @@
             <input id="cfg-byok-cache-control" type="checkbox" />
             附加 Claude 式 cache_control 断点（仅在网关支持时开启）
           </label>
+          <label class="inline-check">
+            <input id="cfg-byok-stream" type="checkbox" checked />
+            自有 API 流式输出（边生成边显示）
+          </label>
+          <label class="inline-check">
+            <input id="cfg-typewriter" type="checkbox" checked />
+            宿主模型回复打字机效果（点击正文可直接显示全文）
+          </label>
         </div>
         <div id="cfg-byok-status" class="hint-text"></div>
         <label class="block-label">当前对话 Author's Note

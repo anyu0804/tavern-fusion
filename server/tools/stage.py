@@ -11,8 +11,10 @@ import time
 from typing import Any
 
 from ..byok_backend import (
+    STREAM_PREVIEW_FILE,
     build_byok_cached_messages,
     build_byok_messages,
+    byok_chat_completion_stream,
     byok_chat_completion_with_usage,
     read_byok_api_key,
     resolve_byok_config,
@@ -557,6 +559,35 @@ def sidecar_prepare_agent_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dic
     }
 
 
+class _StreamPreviewWriter:
+    """Throttled writer for the live BYOK preview file polled by the Stage sidecar."""
+
+    MIN_INTERVAL_S = 0.12
+
+    def __init__(self, path: Path, action_kind: str) -> None:
+        self.path = path
+        self.action_kind = action_kind
+        self.started_at = time.time()
+        self._last_write = 0.0
+        self._pending = ""
+
+    def write(self, text: str, force: bool = False) -> None:
+        self._pending = text
+        now = time.time()
+        if not force and now - self._last_write < self.MIN_INTERVAL_S:
+            return
+        self._last_write = now
+        try:
+            atomic_write_json(self.path, {
+                "active": True,
+                "action_kind": self.action_kind,
+                "started_at": self.started_at,
+                "text": self._pending,
+            }, indent=0)
+        except OSError:
+            pass  # The preview is cosmetic; never fail the turn over it.
+
+
 def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, Any]:
     """Runs one stage turn through the user's own OpenAI-compatible API key instead of the host model.
 
@@ -586,6 +617,7 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
     # Withdraw the host launch claim right away so a concurrent host invocation in the bound
     # conversation cannot pick up this BYOK prompt while the API call is in flight.
     ctx.sessions.update({"pending_sidecar_launch": None})
+    preview_path = Path(ctx.state_dir) / STREAM_PREVIEW_FILE
     try:
         session = ctx.sessions.load()
         cache_mode = cfg["cache_mode"]
@@ -603,14 +635,20 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
         else:
             messages = build_byok_messages(frame["ephemeral_frame"], prep["prompt"])
         preset = load_openai_preset(ctx.st_data_root, session.get("preset_name"))
-        reply, usage = byok_chat_completion_with_usage(
-            base_url=cfg["base_url"],
-            api_key=api_key,
-            model=cfg["model"],
-            messages=messages,
-            temperature=preset.get("temperature"),
-            max_tokens=int(args["max_tokens"]) if args.get("max_tokens") else None,
-        )
+        call_kwargs = {
+            "base_url": cfg["base_url"],
+            "api_key": api_key,
+            "model": cfg["model"],
+            "messages": messages,
+            "temperature": preset.get("temperature"),
+            "max_tokens": int(args["max_tokens"]) if args.get("max_tokens") else None,
+        }
+        if cfg["stream"]:
+            preview = _StreamPreviewWriter(preview_path, action_kind)
+            preview.write("", force=True)
+            reply, usage = byok_chat_completion_stream(on_delta=preview.write, **call_kwargs)
+        else:
+            reply, usage = byok_chat_completion_with_usage(**call_kwargs)
         extra_meta: dict[str, Any] = {"generation_backend": "byok", "byok_model": cfg["model"], "byok_cache_mode": cache_mode}
         if usage.get("prompt_tokens") is not None:
             extra_meta["byok_prompt_tokens"] = usage["prompt_tokens"]
@@ -625,6 +663,11 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
         })
         ctx.sessions.update({"last_byok_usage": {**usage, "cache_mode": cache_mode, "at": int(time.time())}})
     finally:
+        # The committed floor (or the error toast) replaces the live preview.
+        try:
+            preview_path.unlink()
+        except OSError:
+            pass
         # Never leave the stage busy or a pending turn for the host Stop hook to pick up.
         ctx.sessions.update({
             "pending_uncommitted_turn": False,

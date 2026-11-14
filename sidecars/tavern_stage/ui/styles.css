@@ -899,3 +899,24 @@ html, body {
   gap: 6px;
   font-size: 12px;
 }
+
+.stream-draft {
+  opacity: 0.92;
+}
+
+.stream-caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  opacity: 0.6;
+  animation: stream-caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes stream-caret-blink {
+  to {
+    visibility: hidden;
+  }
+}

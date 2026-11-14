@@ -699,6 +699,31 @@ app.api(
   'GET'
 );
 
+// Live BYOK streaming preview: the Python op writes this file while tokens arrive. Read it
+// directly (no Python spawn) so the UI can poll it every ~150 ms during a turn.
+const STREAM_PREVIEW_PATH = join(STATE_DIR, 'byok_stream_preview.json');
+const STREAM_PREVIEW_MAX_AGE_S = 600;
+app.api(
+  '/api/stream_preview',
+  async () => {
+    try {
+      if (!existsSync(STREAM_PREVIEW_PATH)) return { active: false };
+      const preview = JSON.parse(readFileSync(STREAM_PREVIEW_PATH, 'utf-8'));
+      const age = Date.now() / 1000 - Number(preview.started_at || 0);
+      if (!preview.active || age > STREAM_PREVIEW_MAX_AGE_S) return { active: false };
+      return {
+        active: true,
+        action_kind: String(preview.action_kind || ''),
+        text: String(preview.text || ''),
+      };
+    } catch {
+      // Mid-rename or partially written: report "no change" rather than an error.
+      return { active: true, text: null };
+    }
+  },
+  'GET'
+);
+
 app.api(
   '/api/media',
   async (data) => serveMediaAsset(data, ResponseClass),
