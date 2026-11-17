@@ -44,6 +44,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--tf-border);
@@ -105,6 +106,7 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
@@ -215,6 +217,7 @@ html, body {
 
 .hero-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
 }
@@ -287,6 +290,19 @@ html, body {
 .ctrl-btn.danger {
   color: #fca5a5;
   border-color: rgba(239, 68, 68, 0.4);
+}
+
+.ctrl-btn:disabled,
+.mini-btn:disabled,
+.tool-icon-btn:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.ctrl-btn:disabled:hover,
+.mini-btn:disabled:hover,
+.tool-icon-btn:disabled:hover {
+  border-color: var(--tf-border);
 }
 
 .mode-pill {
@@ -390,6 +406,8 @@ html, body {
   flex-wrap: wrap;
   gap: 5px;
   min-width: 0;
+  max-height: 58px;
+  overflow-y: auto;
 }
 
 .var-chip {
@@ -418,13 +436,20 @@ html, body {
 
 .inline-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.inline-form .ctrl-input {
+  flex: 1;
+  min-width: 90px;
 }
 
 /* Chat Floors Stream */
 .chat-stream {
   flex: 1;
+  min-height: 110px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -604,14 +629,21 @@ html, body {
 
 .composer-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 6px;
 }
 
-.lever-group {
+.lever-group,
+.send-group {
   display: flex;
+  align-items: center;
   gap: 5px;
+}
+
+.send-group {
+  margin-left: auto;
 }
 
 /* Secondary Tabs */
@@ -702,6 +734,13 @@ html, body {
   white-space: nowrap;
 }
 
+.doctor-list,
+.lore-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .doctor-item,
 .lore-item {
   padding: 7px 9px;
@@ -733,6 +772,20 @@ html, body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.form-grid > * {
+  min-width: 0;
+}
+
+.form-grid .inline-check {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 420px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .form-grid label,
@@ -829,6 +882,8 @@ html, body {
 .modal-panel {
   width: 100%;
   max-width: 440px;
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
   background: var(--tf-card);
   border: 1px solid var(--tf-border);
   border-radius: 10px;
@@ -919,4 +974,27 @@ html, body {
   to {
     visibility: hidden;
   }
+}
+
+.recovery-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tool-icon-btn.confirm-armed,
+.ctrl-btn.confirm-armed,
+.mini-btn.confirm-armed {
+  background: rgba(239, 68, 68, 0.24);
+  border-color: rgba(248, 113, 113, 0.78);
+  color: #fecaca;
+  font-weight: 600;
 }

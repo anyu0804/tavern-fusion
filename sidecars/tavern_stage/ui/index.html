@@ -17,12 +17,12 @@
         <span class="brand-sub" id="data-profile-badge">default-user</span>
       </div>
       <nav class="tab-nav" role="tablist" aria-label="Tavern Stage Views">
-        <button class="tab-btn active" data-tab="stage" role="tab">舞台</button>
-        <button class="tab-btn" data-tab="cards" role="tab">
+        <button class="tab-btn active" data-tab="stage" role="tab" aria-selected="true" aria-controls="panel-stage">舞台</button>
+        <button class="tab-btn" data-tab="cards" role="tab" aria-selected="false" aria-controls="panel-cards">
           卡库<span class="pill-count hidden" id="doctor-badge">0</span>
         </button>
-        <button class="tab-btn" data-tab="lore" role="tab">世界书</button>
-        <button class="tab-btn" data-tab="inspector" role="tab">透视</button>
+        <button class="tab-btn" data-tab="lore" role="tab" aria-selected="false" aria-controls="panel-lore">世界书</button>
+        <button class="tab-btn" data-tab="inspector" role="tab" aria-selected="false" aria-controls="panel-inspector">透视</button>
       </nav>
     </header>
 
@@ -31,9 +31,19 @@
 
     <!-- ==================== TAB 1: STAGE ==================== -->
     <main class="tab-panel active" id="panel-stage">
+      <div id="recovery-banner" class="recovery-banner hidden" role="alert">
+        <span id="recovery-text">上一轮回复尚未写入存档，关闭外部占用后可补写。</span>
+        <button id="btn-retry-uncommitted" class="mini-btn accent">重试落盘</button>
+      </div>
+
       <section class="hero-card">
         <div class="portrait-wrap">
-          <img id="stage-portrait" class="portrait-img" alt="Character Portrait" />
+          <img
+            id="stage-portrait"
+            class="portrait-img"
+            src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22150%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%231e2433%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2252%25%22%20fill%3D%22%23fbbf24%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%20text-anchor%3D%22middle%22%3ETavern%3C%2Ftext%3E%3C%2Fsvg%3E"
+            alt="Character Portrait"
+          />
           <span id="expr-badge" class="expr-badge hidden">neutral</span>
         </div>
         <div class="hero-controls">
@@ -111,7 +121,10 @@
               🪄 扩写意图
             </button>
           </div>
-          <button id="btn-send-turn" class="ctrl-btn primary">发送推进 ▶</button>
+          <div class="send-group">
+            <button id="btn-cancel-turn" class="ctrl-btn danger hidden" title="停止当前生成或强制解除舞台忙碌状态">⏹ 停止</button>
+            <button id="btn-send-turn" class="ctrl-btn primary">发送推进 ▶</button>
+          </div>
         </div>
       </footer>
     </main>
@@ -191,7 +204,12 @@
             <select id="le-position" class="ctrl-select">
               <option value="before_char">角色定义前 (before_char)</option>
               <option value="after_char">角色定义后 (after_char)</option>
+              <option value="before_examples">对话示例前 (before_examples)</option>
+              <option value="after_examples">对话示例后 (after_examples)</option>
+              <option value="an_top">作者注释前 (an_top)</option>
+              <option value="an_bottom">作者注释后 (an_bottom)</option>
               <option value="at_depth">按对话深度注入 (@D at_depth)</option>
+              <option value="outlet">命名插槽输出 (outlet)</option>
             </select>
           </label>
           <label>深度 (@D) / 权重 (Order)
@@ -218,6 +236,7 @@
           <span class="section-title">📚 条目列表</span>
           <span id="lore-count-label" class="muted-label">0 条</span>
         </div>
+        <div id="lore-issues-list" class="doctor-list hidden"></div>
         <div id="lore-entries-list" class="lore-list"></div>
       </section>
     </main>
