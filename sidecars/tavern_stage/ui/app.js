@@ -21,6 +21,8 @@ let editingFloorState = null; // { chatFile, idx, draft, selStart, selEnd, focus
 let expandedBackstageChat = '';
 const expandedBackstageIdxs = new Set();
 let loadedLorebook = { lorebook_name: '', entries: [], issues: [] };
+let loadingLorebookName = '';
+let failedLorebookCooldown = { name: '', until: 0 };
 let lastLoreCardWorld = '';
 let lastRenderedFloorSig = '';
 let lastRenderedDoctorSig = '';
@@ -122,23 +124,25 @@ async function sidecarFetchJson(url, options = {}) {
   return data;
 }
 
-async function callOp(op, args = {}) {
+async function callOp(op, args = {}, opts = {}) {
   const res = await sidecarFetchJson('/api/op', {
     method: 'POST',
     body: serializeAsciiJson({ op, args, workspaceUri: activeWorkspaceUri }),
   });
+  if (!opts.skipStateRefresh) {
+    if (res && res.state && res.etag) {
+      pollSeq += 1;
+      currentEtag = res.etag;
+      appState = res.state;
+      pollErrorStreak = 0;
+      renderAll();
+    } else {
+      currentEtag = '';
+      await pollState(true);
+    }
+  }
   if (op === 'byok_turn' && activeStreamStop) {
     activeStreamStop();
-  }
-  if (res && res.state && res.etag) {
-    pollSeq += 1;
-    currentEtag = res.etag;
-    appState = res.state;
-    pollErrorStreak = 0;
-    renderAll();
-  } else {
-    currentEtag = '';
-    await pollState(true);
   }
   return res.data;
 }
@@ -193,6 +197,7 @@ const BYOK_ACTIONS = new Set(['send_turn', 'swipe_reroll']);
 let byokBusy = false;
 let hostDispatchInFlight = false;
 let cancelInFlight = false;
+let userCancelledTurn = false;
 let activeStreamStop = null;
 
 let streamDraftText = null;
@@ -217,6 +222,7 @@ async function dispatchByokTurn(actionKind, extraArgs = {}, meta = {}) {
     return false;
   }
   byokBusy = true;
+  userCancelledTurn = false;
   renderActionLocks(appState?.session || {});
   showToast(`正在通过自有 API（${appState.byok.model}）生成…`, false);
   const stopPreview = appState.byok.stream === false ? () => {} : startStreamPreview(actionKind);
@@ -228,7 +234,7 @@ async function dispatchByokTurn(actionKind, extraArgs = {}, meta = {}) {
     return true;
   } catch (err) {
     const errMsg = err?.message || String(err);
-    if (!/已取消|cancelled/i.test(errMsg)) {
+    if (!userCancelledTurn && !/已取消|cancelled/i.test(errMsg)) {
       showToast(errMsg, true);
     }
     await pollState(true).catch(() => {});
@@ -239,6 +245,7 @@ async function dispatchByokTurn(actionKind, extraArgs = {}, meta = {}) {
     stopPreview();
     if (activeStreamStop === stopPreview) activeStreamStop = null;
     byokBusy = false;
+    userCancelledTurn = false;
     renderActionLocks(appState?.session || {});
   }
 }
@@ -1151,22 +1158,40 @@ function syncLorebookDropdown() {
     sel.innerHTML = html || '<option value="">暂无世界书</option>';
   }
   syncSelectValue(sel, targetBook);
-  if (targetBook && !loadedLorebook.lorebook_name) {
+  const onCooldown =
+    failedLorebookCooldown.name === targetBook && Date.now() < failedLorebookCooldown.until;
+  if (targetBook && !loadedLorebook.lorebook_name && !loadingLorebookName && !onCooldown) {
     loadLorebookDetail(targetBook);
   }
 }
 
 async function loadLorebookDetail(bookName) {
-  if (!bookName) return;
+  if (!bookName || loadingLorebookName === bookName) return;
+  loadingLorebookName = bookName;
   try {
-    loadedLorebook = await callOp('read_lorebook', { lorebook_name: bookName });
+    const detail = await callOp(
+      'read_lorebook',
+      { lorebook_name: bookName },
+      { skipStateRefresh: true }
+    );
+    loadedLorebook = {
+      lorebook_name: detail?.lorebook_name || bookName,
+      entries: Array.isArray(detail?.entries) ? detail.entries : [],
+      issues: Array.isArray(detail?.issues) ? detail.issues : [],
+    };
+    failedLorebookCooldown = { name: '', until: 0 };
     syncLorebookDropdown();
     if ($('lorebook-select') && loadedLorebook.lorebook_name) {
       $('lorebook-select').value = loadedLorebook.lorebook_name;
     }
     renderLoreEntries();
   } catch (err) {
+    failedLorebookCooldown = { name: bookName, until: Date.now() + 15000 };
     showToast(err.message, true);
+  } finally {
+    if (loadingLorebookName === bookName) {
+      loadingLorebookName = '';
+    }
   }
 }
 
@@ -1468,6 +1493,7 @@ function bindWorkbenchEvents() {
     if (cancelInFlight) return;
     cancelInFlight = true;
     const wasByok = byokBusy;
+    if (wasByok) userCancelledTurn = true;
     if (activeStreamStop) activeStreamStop();
     finishTypewriter();
     renderActionLocks(appState?.session || {});
@@ -1846,10 +1872,14 @@ async function runLoreSimulation() {
   const book = loadedLorebook.lorebook_name || $('lorebook-select')?.value || '';
   if (!queryText) return;
   try {
-    const res = await callOp('query_lore', {
-      lorebook_names: book ? [book] : [],
-      query_text: queryText,
-    });
+    const res = await callOp(
+      'query_lore',
+      {
+        lorebook_names: book ? [book] : [],
+        query_text: queryText,
+      },
+      { skipStateRefresh: true }
+    );
     const box = $('lore-sim-results');
     if (!box) return;
     const act = res.active_entries || [];
@@ -1941,7 +1971,9 @@ if (typeof globalThis !== 'undefined' && globalThis.__TAVERN_STAGE_HEADLESS_TEST
       editingFloorState,
       inspectorDirty,
       loadedLorebook,
+      loadingLorebookName,
       streamDraftText,
+      typewriterActive: typewriterTimer !== null,
     }),
     setInternalState: (patch) => {
       if ('currentEtag' in patch) currentEtag = patch.currentEtag;
@@ -1954,6 +1986,8 @@ if (typeof globalThis !== 'undefined' && globalThis.__TAVERN_STAGE_HEADLESS_TEST
       if ('inspectorDirty' in patch) inspectorDirty = patch.inspectorDirty;
       if ('editingFloorState' in patch) editingFloorState = patch.editingFloorState;
       if ('loadedLorebook' in patch) loadedLorebook = patch.loadedLorebook;
+      if ('lastLoreCardWorld' in patch) lastLoreCardWorld = patch.lastLoreCardWorld;
+      if ('failedLorebookCooldown' in patch) failedLorebookCooldown = patch.failedLorebookCooldown;
       if ('lastRenderedFloorSig' in patch) lastRenderedFloorSig = patch.lastRenderedFloorSig;
       if ('lastRenderedCardsSig' in patch) lastRenderedCardsSig = patch.lastRenderedCardsSig;
     },

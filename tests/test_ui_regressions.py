@@ -274,6 +274,14 @@ class ElementStub {
     }
     const editMatch = /<textarea[^>]*id="(edit-floor-ta-(\d+))"[^>]*>([\s\S]*?)<\/textarea>/.exec(this._innerHTML);
     if (this.id === 'chat-stream') {
+      this._floorBodies = [];
+      const bodyRe = /<div class="floor-body">([\s\S]*?)<\/div>/g;
+      let bm;
+      while ((bm = bodyRe.exec(this._innerHTML)) !== null) {
+        const fb = new ElementStub('div', '', ['floor-body']);
+        fb.innerHTML = bm[1];
+        this._floorBodies.push(fb);
+      }
       for (const [k] of elements) {
         if (k.startsWith('edit-floor-ta-')) elements.delete(k);
       }
@@ -322,9 +330,17 @@ class ElementStub {
   }
   remove() {
     this.isConnected = false;
+    if (this.parentNode) {
+      this.parentNode.children = this.parentNode.children.filter((c) => c !== this);
+    }
     if (this.id) elements.delete(this.id);
   }
-  querySelectorAll() { return []; }
+  querySelectorAll(sel) {
+    if (this.id === 'chat-stream' && sel === '.floor-body') {
+      return this._floorBodies || [];
+    }
+    return [];
+  }
   get lastElementChild() { return this.children[this.children.length - 1] || null; }
 }
 
@@ -591,13 +607,64 @@ const baseState = {
   suggestions: {},
 };
 
-// Avoid auto read_lorebook network op during pure render checks by pre-seeding loadedLorebook
+// 3b. [Verifier #19 P0 Regression] Cold start with empty loadedLorebook must issue AT MOST 1 read_lorebook request (zero recursion)
+let readLorebookCount = 0;
+let resolveColdLore;
+const coldLoreBarrier = new Promise((r) => { resolveColdLore = r; });
+customFetchHandler = async (url, opts) => {
+  const bodyObj = opts?.body ? JSON.parse(opts.body) : {};
+  if (url === '/api/op' && bodyObj.op === 'read_lorebook') {
+    readLorebookCount += 1;
+    await coldLoreBarrier;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        data: { lorebook_name: 'Eldoria', entries: [{ uid: 1, comment: '古树盟约', keys: ['盟约'], enabled: true, position: 'before_char', depth: 4, order: 100 }], issues: [] },
+        etag: 'etag001',
+        state: structuredClone(baseState),
+      }),
+    };
+  }
+  throw new Error('Unexpected fetch during cold start: ' + url);
+};
+
 T.setInternalState({
   currentEtag: 'etag001',
   appState: structuredClone(baseState),
-  loadedLorebook: { lorebook_name: 'Eldoria', entries: [], issues: [] },
+  loadedLorebook: { lorebook_name: '', entries: [], issues: [] },
+  lastLoreCardWorld: '',
+});
+// Trigger multiple renderAll() calls while read_lorebook is still in flight
+T.renderAll();
+T.renderAll();
+T.renderAll();
+assert.equal(readLorebookCount, 1, 'In-flight guard must block duplicate read_lorebook dispatches');
+resolveColdLore();
+await new Promise((r) => setTimeout(r, 20));
+assert.equal(readLorebookCount, 1, 'read_lorebook completion must NOT re-trigger recursive read_lorebook');
+assert.equal(T.getInternalState().loadedLorebook.lorebook_name, 'Eldoria');
+
+// Verify failure cooldown: if read_lorebook fails, subsequent renderAll() within cooldown does not loop
+let failLoreCalls = 0;
+customFetchHandler = async () => {
+  failLoreCalls += 1;
+  return { ok: false, status: 500, json: async () => ({ ok: false, error: 'corrupt lorebook' }) };
+};
+T.setInternalState({
+  loadedLorebook: { lorebook_name: '', entries: [], issues: [] },
+  failedLorebookCooldown: { name: '', until: 0 },
 });
 T.renderAll();
+await new Promise((r) => setTimeout(r, 20));
+T.renderAll();
+T.renderAll();
+assert.equal(failLoreCalls, 1, 'Failed read_lorebook must enter cooldown instead of retrying on every renderAll');
+T.setInternalState({
+  loadedLorebook: { lorebook_name: 'Eldoria', entries: [], issues: [] },
+  failedLorebookCooldown: { name: '', until: 0 },
+});
 
 const portraitSrc = elements.get('stage-portrait').src;
 assert.match(portraitSrc, /kind=expression/);
@@ -823,7 +890,131 @@ await elements.get('btn-cancel-turn').dispatch('click');
 assert.equal(opCalls[0].op, 'cancel_turn');
 assert.deepEqual(opCalls[0].args, {});
 
-// 12. Deferred gallery rendering while hidden + .json card avatar uses PLACEHOLDER_SVG when opened
+// 12. [Verifier #19 P1 & P2 Regressions]
+// (a) Contrast check: host (non-streamed) new character reply arrival DOES trigger typewriter when stage panel is active
+elements.get('panel-cards').classList.remove('active');
+elements.get('panel-stage').classList.add('active');
+sandbox.localStorage.setItem('tf_typewriter', '1');
+const hostBase = structuredClone(baseState);
+T.setInternalState({ currentEtag: 'etag_tw_0', appState: hostBase, editingFloorState: null, lastRenderedFloorSig: '' });
+T.renderAll();
+assert.equal(T.getInternalState().typewriterActive, false);
+
+const hostArrived = structuredClone(baseState);
+hostArrived.messages.push({ name: '你', is_user: true, mes: '"推进剧情"', swipes: ['"推进剧情"'], swipe_id: 0 });
+hostArrived.messages.push({ name: '塞拉菲娜', is_user: false, mes: '*轻抚银灯* "宿主模式非流式新回复抵达。"', swipes: ['*轻抚银灯* "宿主模式非流式新回复抵达。"'], swipe_id: 0 });
+T.setInternalState({ currentEtag: 'etag_tw_1', appState: hostArrived });
+T.renderAll();
+assert.equal(T.getInternalState().typewriterActive, true, 'Contrast check: host non-streamed reply must activate typewriter');
+// Click floor body to finish typewriter cleanly
+const floorBodies = elements.get('chat-stream').querySelectorAll('.floor-body');
+await floorBodies[floorBodies.length - 1].dispatch('click');
+assert.equal(T.getInternalState().typewriterActive, false);
+
+// (b) BYOK live stream turn completion must NOT trigger secondary typewriter replay & must remove stream draft cleanly
+const byokReadyState = structuredClone(baseState);
+byokReadyState.plugin_settings.generation_backend = 'byok';
+byokReadyState.byok = { ready: true, key_present: true, key_source: 'env', model: 'gemini-2.5-flash', stream: true };
+T.setInternalState({
+  currentEtag: 'etag_byok_0',
+  appState: byokReadyState,
+  byokBusy: false,
+  loadedLorebook: { lorebook_name: 'Eldoria', entries: [], issues: [] },
+  lastRenderedFloorSig: '',
+});
+T.renderAll();
+
+const byokCommittedState = structuredClone(byokReadyState);
+byokCommittedState.messages.push({ name: '你', is_user: true, mes: '"早安"', swipes: ['"早安"'], swipe_id: 0 });
+byokCommittedState.messages.push({
+  name: '塞拉菲娜',
+  is_user: false,
+  mes: '*微笑点头* "这是实时流式生成完毕的回复，不应二次重播打字机。"',
+  swipes: ['*微笑点头* "这是实时流式生成完毕的回复，不应二次重播打字机。"'],
+  swipe_id: 0,
+});
+
+let resolveByokOp;
+const byokOpGate = new Promise((r) => { resolveByokOp = r; });
+customFetchHandler = async (url, opts) => {
+  if (url === '/api/stream_preview') {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ active: true, action_kind: 'send_turn', text: '*微笑点头* "这是实时流式生成完毕的回复"' }),
+    };
+  }
+  if (url === '/api/op') {
+    const bodyObj = JSON.parse(opts.body);
+    if (bodyObj.op === 'byok_turn') {
+      await byokOpGate;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          data: { committed: true },
+          etag: 'etag_byok_1',
+          state: byokCommittedState,
+        }),
+      };
+    }
+  }
+  throw new Error('Unexpected url during BYOK stream test: ' + url);
+};
+
+elements.get('composer-input').value = '"早安"';
+const turnPromise = T.submitComposerTurn();
+await new Promise((r) => setTimeout(r, 170));
+assert.ok(elements.get('stream-draft'), 'Live #stream-draft bubble must exist while BYOK stream is active');
+resolveByokOp();
+await turnPromise;
+assert.equal(sandbox.document.getElementById('stream-draft'), null, 'Live #stream-draft bubble must be removed on completion');
+assert.equal(T.getInternalState().typewriterActive, false, 'BYOK streamed reply must NOT trigger secondary typewriter replay');
+const finalBodies = elements.get('chat-stream').querySelectorAll('.floor-body');
+assert.ok(
+  finalBodies[finalBodies.length - 1].innerHTML.includes('这是实时流式生成完毕的回复，不应二次重播打字机。'),
+  'Full committed BYOK reply must remain intact in DOM immediately'
+);
+assert.ok(!finalBodies[finalBodies.length - 1].innerHTML.includes('stream-caret'), 'Committed BYOK floor must not have blinking caret');
+
+// (c) User cancel during hung BYOK turn suppresses raw killed-process error toast
+T.setInternalState({ currentEtag: 'etag_cancel_0', appState: structuredClone(byokReadyState), lastRenderedFloorSig: '' });
+T.renderAll();
+let rejectHungByok;
+const hungByokGate = new Promise((_, rej) => { rejectHungByok = rej; });
+customFetchHandler = async (url, opts) => {
+  if (url === '/api/stream_preview') {
+    return { ok: true, status: 200, json: async () => ({ active: false }) };
+  }
+  if (url.startsWith('/api/state')) {
+    return { ok: true, status: 200, json: async () => ({ unchanged: true, etag: 'etag_cancel_0' }) };
+  }
+  const bodyObj = JSON.parse(opts.body);
+  if (bodyObj.op === 'byok_turn') {
+    return await hungByokGate;
+  }
+  if (bodyObj.op === 'cancel_turn') {
+    rejectHungByok(new Error("Empty response from Python sidecar-op 'byok_turn'"));
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, data: { cancelled: true }, etag: 'etag_cancel_1', state: structuredClone(byokReadyState) }),
+    };
+  }
+  throw new Error('Unexpected op: ' + bodyObj.op);
+};
+elements.get('composer-input').value = '"测试中途停止"';
+const cancelledTurnPromise = T.submitComposerTurn();
+await new Promise((r) => setTimeout(r, 10));
+await elements.get('btn-cancel-turn').dispatch('click');
+await cancelledTurnPromise;
+assert.equal(elements.get('toast-bar').textContent, '已停止当前生成');
+assert.equal(elements.get('toast-bar').classList.contains('error'), false, 'User-initiated cancel must not overwrite toast with red error');
+
+// 13. Deferred gallery rendering while hidden + .json card avatar uses PLACEHOLDER_SVG when opened
+elements.get('panel-stage').classList.add('active');
+elements.get('panel-cards').classList.remove('active');
 T.setInternalState({ currentEtag: 'etag_gal_9', appState: structuredClone(baseState), lastRenderedCardsSig: '' });
 elements.get('cards-grid').innerHTML = '';
 T.renderCardsAndDoctor(false);
