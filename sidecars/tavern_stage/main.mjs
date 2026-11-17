@@ -542,7 +542,7 @@ async function statStamp(p) {
 
 async function listDirCached(dirPath, dirSt) {
   const key = normalizeWinPath(dirPath);
-  const dirSig = `${Math.trunc(dirSt.mtimeMs)}:${Math.trunc(dirSt.ctimeMs)}`;
+  const dirSig = `${dirSt.mtimeMs}:${dirSt.ctimeMs}`;
   const hit = dirListingCache.get(key);
   if (hit && hit.dirSig === dirSig) {
     return hit.names;
@@ -766,18 +766,19 @@ export function serveMediaAsset(data, ResponseClass = FallbackResponse) {
       const rawCard = String(data.card || '').trim();
       const rawChar = String(data.char || '').trim();
       const rawExpr = String(data.expr || '').trim();
+      const safeCharStem = rawChar ? sanitizeFilenameStem(rawChar) : '';
       if (
         !rawExpr ||
-        (!rawCard && !rawChar) ||
         !isSafeSingleSegment(rawExpr) ||
         WIN_RESERVED_DEVICE_RE.test(rawExpr) ||
         (rawCard && !isSafeSingleSegment(rawCard)) ||
-        (rawChar && !isSafeSingleSegment(rawChar))
+        (!rawCard && !safeCharStem)
       ) {
         return jsonResponse(ResponseClass, { error: 'Invalid expression parameters' }, 400, 'no-cache');
       }
 
-      // Prefer `card` (avatar filename stem) matching SillyTavern & Python `snapshot`, then fall back to `char`.
+      // Prefer `card` (avatar filename stem) matching SillyTavern & Python `snapshot`,
+      // then fall back to sanitized `char` (`sanitizeFilenameStem` + `isContainedInside`).
       const dirCandidates = [];
       const addCandidate = (v) => {
         if (v && !dirCandidates.includes(v)) dirCandidates.push(v);
@@ -786,9 +787,8 @@ export function serveMediaAsset(data, ResponseClass = FallbackResponse) {
         addCandidate(normalizeAvatarStem(rawCard));
         addCandidate(rawCard.replace(/\.(?:png|json)$/i, '').trim());
       }
-      if (rawChar) {
-        addCandidate(sanitizeFilenameStem(rawChar));
-        addCandidate(rawChar);
+      if (safeCharStem) {
+        addCandidate(safeCharStem);
       }
 
       outer: for (const candDirName of dirCandidates) {
@@ -1272,28 +1272,47 @@ export async function startSidecarServer() {
       const dataRoot = resolveStDataRoot(data.workspaceUri || '');
 
       // Two-phase `cancel_turn`: cooperative Python flag first, then exact-PID tree kill + force_reset after grace window.
+      // Waits for the cancelled `byok_turn` dispatch lock to release BEFORE returning 200 so an immediate next turn
+      // never hits a stale HTTP 409 or has its freshly populated snapshot cache wiped by late `catch` cleanup.
       if (op === 'cancel_turn') {
         mutationEpoch += 1;
         cachedSnapshot = null;
         cachedEtag = '';
         const runningByok = activeTurnDispatch?.op === 'byok_turn' ? activeTurnDispatch : null;
+        if (runningByok) {
+          runningByok.cancelled = true;
+        }
         try {
           let cancelRes = await invokePythonOp('cancel_turn', data.args || {}, dataRoot, {
             includeSnapshot: !runningByok,
           });
-          if (runningByok && runningByok.child && runningByok.child.exitCode === null) {
-            await Promise.race([runningByok.closedPromise, sleep(resolveCancelGraceMs())]);
-            if (runningByok.child.exitCode === null) {
+          if (runningByok) {
+            if (runningByok.child && runningByok.child.exitCode === null) {
+              await Promise.race([runningByok.closedPromise, sleep(resolveCancelGraceMs())]);
+            }
+            if (runningByok.child && runningByok.child.exitCode === null) {
               await terminateChildProcessTree(runningByok.child);
               await unlink(STREAM_PREVIEW_PATH).catch(() => {});
+              await Promise.race([runningByok.releasedPromise, sleep(2000)]);
+              if (activeTurnDispatch === runningByok) {
+                activeTurnDispatch = null;
+              }
               cancelRes = await invokePythonOp(
                 'cancel_turn',
                 { ...(data.args || {}), force_reset: true },
                 dataRoot,
                 { includeSnapshot: true }
               );
-            } else if (!cancelRes.snapshot) {
+            } else {
+              await Promise.race([runningByok.releasedPromise, sleep(2000)]);
+              if (activeTurnDispatch === runningByok) {
+                activeTurnDispatch = null;
+              }
               await unlink(STREAM_PREVIEW_PATH).catch(() => {});
+              if (!cancelRes.snapshot) {
+                const snapOnly = await invokePythonOp('snapshot', {}, dataRoot, { includeSnapshot: false });
+                cancelRes = { data: cancelRes.data, snapshot: snapOnly.data };
+              }
             }
           }
           mutationEpoch += 1;
@@ -1332,8 +1351,22 @@ export async function startSidecarServer() {
         );
       }
 
+      let releaseDispatchResolve = () => {};
+      const releasedPromise = isTurnDispatch
+        ? new Promise((r) => {
+            releaseDispatchResolve = r;
+          })
+        : Promise.resolve();
       const dispatchRecord = isTurnDispatch
-        ? { op, child: null, closedPromise: Promise.resolve(), dataRoot }
+        ? {
+            op,
+            child: null,
+            closedPromise: Promise.resolve(),
+            releasedPromise,
+            markReleased: releaseDispatchResolve,
+            dataRoot,
+            cancelled: false,
+          }
         : null;
       if (dispatchRecord) {
         activeTurnDispatch = dispatchRecord;
@@ -1353,6 +1386,10 @@ export async function startSidecarServer() {
               }
             : null,
         });
+        if (dispatchRecord?.cancelled) {
+          const etag = await computeDiskEtag(dataRoot);
+          return jsonResponse(ResponseClass, { ok: true, data: resObj.data, etag });
+        }
         mutationEpoch += 1;
         const finishEpoch = mutationEpoch;
         const etag = await computeDiskEtag(dataRoot);
@@ -1375,11 +1412,13 @@ export async function startSidecarServer() {
           etag,
         });
       } catch (err) {
-        mutationEpoch += 1;
-        cachedSnapshot = null;
-        cachedEtag = '';
-        if (op === 'byok_turn') {
-          await cleanupStuckByokState(dataRoot);
+        if (!dispatchRecord?.cancelled) {
+          mutationEpoch += 1;
+          cachedSnapshot = null;
+          cachedEtag = '';
+          if (op === 'byok_turn') {
+            await cleanupStuckByokState(dataRoot);
+          }
         }
         return jsonResponse(
           ResponseClass,
@@ -1387,8 +1426,11 @@ export async function startSidecarServer() {
           400
         );
       } finally {
-        if (dispatchRecord && activeTurnDispatch === dispatchRecord) {
-          activeTurnDispatch = null;
+        if (dispatchRecord) {
+          if (activeTurnDispatch === dispatchRecord) {
+            activeTurnDispatch = null;
+          }
+          dispatchRecord.markReleased();
         }
       }
     },

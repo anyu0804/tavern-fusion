@@ -461,6 +461,36 @@ class SidecarServerRegressionsTest(unittest.TestCase):
             self.assertEqual(c_sad, 200)
             self.assertEqual(h_sad.get("cache-control"), "no-cache")
 
+            # Display names containing `:` or `/` (e.g. `Fate: Saber`) MUST NOT fail with 400:
+            # `card="saber_v1.png"` hits `characters/saber_v1/smile.png` (200), and fallback hits
+            # sanitized `characters/Fate_ Saber/anger.png` (200)!
+            saber_stem_dir = st_root / "characters" / "saber_v1"
+            saber_name_dir = st_root / "characters" / "Fate_ Saber"
+            saber_stem_dir.mkdir(parents=True, exist_ok=True)
+            saber_name_dir.mkdir(parents=True, exist_ok=True)
+            (saber_stem_dir / "smile.png").write_bytes(png_bytes)
+            (saber_name_dir / "anger.png").write_bytes(png_bytes)
+
+            q_saber_stem = urllib.parse.urlencode({
+                "kind": "expression",
+                "card": "saber_v1.png",
+                "char": "Fate: Saber",
+                "expr": "smile",
+            })
+            c_sb1, h_sb1, b_sb1 = _http_get(f"{base}/api/media?{q_saber_stem}")
+            self.assertEqual(c_sb1, 200)
+            self.assertEqual(h_sb1.get("cache-control"), "no-cache")
+            self.assertEqual(b_sb1, png_bytes)
+
+            q_saber_fallback = urllib.parse.urlencode({
+                "kind": "expression",
+                "card": "saber_v1.png",
+                "char": "Fate: Saber",
+                "expr": "anger",
+            })
+            c_sb2, _, _ = _http_get(f"{base}/api/media?{q_saber_fallback}")
+            self.assertEqual(c_sb2, 200)
+
             # Disguised SVG -> 415 with `no-cache`; ADS colon & reserved device `CON` -> 400 with `no-cache`
             c415, h415, _ = _http_get(f"{base}/api/media?kind=avatar&file=evil.png")
             self.assertEqual(c415, 415)
@@ -659,16 +689,69 @@ class SidecarServerRegressionsTest(unittest.TestCase):
                 self.assertEqual(c_cancel, 200)
                 self.assertTrue(cancel_body["ok"])
                 self.assertTrue(cancel_body["data"]["force_reset"])
+                self.assertFalse(cancel_body["state"]["session"]["stage_busy"])
+
+                # IMMEDIATELY dispatch a next turn BEFORE `byok_fut.result()` is awaited by caller:
+                # `activeTurnDispatch` MUST already be released (200, NEVER 409)!
+                c_imm, _, imm_body = _http_post_json(f"{base}/api/op", {"op": "prepare_agent_turn", "args": {}})
+                self.assertEqual(c_imm, 200, f"Immediate retry after cancel_turn hit {c_imm}: {imm_body}")
+                self.assertTrue(imm_body["ok"])
 
                 byok_code, _, _ = byok_fut.result()
                 self.assertEqual(byok_code, 400)
 
             # Grandchild MUST be terminated by tree kill, preview removed, and `stage_busy` reset!
-            time.sleep(0.1)
+            time.sleep(0.05)
             self.assertFalse(_is_pid_alive(gpid), f"Grandchild PID {gpid} leaked after cancel_turn tree kill!")
             self.assertFalse(preview_file.exists())
             sess_after_cancel = json.loads((state_dir / "active_session.json").read_text(encoding="utf-8"))
             self.assertFalse(sess_after_cancel["stage_busy"])
+
+            # 2b. Cooperative `byok_turn` cancel (`mock_mode: "cooperative_cancel"`):
+            #     Exits cleanly on `byok_cancel.flag` within grace window (`force_reset == False`),
+            #     returns fresh `stage_busy == False` snapshot, and allows immediate next dispatch without 409!
+            gpid_file.unlink(missing_ok=True)
+            log_file = state_dir / "mock_invocations.jsonl"
+            log_file.unlink(missing_ok=True)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                coop_fut = pool.submit(
+                    _http_post_json,
+                    f"{base}/api/op",
+                    {"op": "byok_turn", "args": {"mock_mode": "cooperative_cancel"}},
+                    15.0,
+                )
+                deadline = time.time() + 4.0
+                while not gpid_file.exists() and time.time() < deadline:
+                    time.sleep(0.03)
+                self.assertTrue(gpid_file.exists(), "Cooperative byok_turn did not start in time")
+                coop_gpid = int(gpid_file.read_text(encoding="utf-8").strip())
+
+                c_coop_cancel, _, coop_cancel_body = _http_post_json(
+                    f"{base}/api/op", {"op": "cancel_turn", "args": {}}
+                )
+                self.assertEqual(c_coop_cancel, 200)
+                self.assertTrue(coop_cancel_body["ok"])
+                self.assertFalse(coop_cancel_body["data"]["force_reset"])
+                self.assertFalse(coop_cancel_body["state"]["session"]["stage_busy"])
+
+                # Immediate next dispatch MUST succeed with 200 (zero 409 race)
+                c_imm2, _, imm2_body = _http_post_json(f"{base}/api/op", {"op": "prepare_agent_turn", "args": {}})
+                self.assertEqual(c_imm2, 200, f"Immediate retry after cooperative cancel hit {c_imm2}: {imm2_body}")
+                self.assertTrue(imm2_body["ok"])
+
+                coop_code, _, coop_err = coop_fut.result()
+                self.assertEqual(coop_code, 400)
+                self.assertIn("已取消", coop_err["error"])
+
+            self.assertFalse(_is_pid_alive(coop_gpid), f"Cooperative grandchild PID {coop_gpid} leaked!")
+            coop_logs = [
+                json.loads(line)
+                for line in log_file.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            # Verify `byok_turn`'s `catch` skipped redundant `cleanupStuckByokState` (`force_reset` == 0 calls!)
+            force_resets = [x for x in coop_logs if x["op"] == "cancel_turn" and x["args"].get("force_reset")]
+            self.assertEqual(len(force_resets), 0, f"Unexpected redundant force_reset calls: {force_resets}")
 
             # 3. Timeout on `byok_turn` (~900ms) ALSO kills grandchild tree, cleans preview, and resets `stage_busy`!
             gpid_file.unlink(missing_ok=True)
