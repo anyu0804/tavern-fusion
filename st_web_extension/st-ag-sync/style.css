@@ -10,6 +10,7 @@
   color: #fbbf24;
   cursor: pointer;
   user-select: none;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
 }
 
 .st-ag-sync-dot {
@@ -17,4 +18,23 @@
   height: 7px;
   border-radius: 50%;
   background: #10b981;
+  transition: background-color 0.15s ease;
+}
+
+.st-ag-sync-pill.is-disabled {
+  opacity: 0.52;
+  border-color: rgba(156, 163, 175, 0.4);
+  color: #d1d5db;
+}
+
+.st-ag-sync-pill.is-disabled .st-ag-sync-dot {
+  background: #9ca3af;
+}
+
+.st-ag-sync-pill.has-error {
+  border-color: rgba(239, 68, 68, 0.65);
+}
+
+.st-ag-sync-pill.has-error .st-ag-sync-dot {
+  background: #ef4444;
 }
