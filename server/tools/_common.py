@@ -48,7 +48,7 @@ def find_character_card_path(ctx: RuntimeContext, character_query: str) -> Path:
             if q_low in p.stem.lower():
                 return p
             try:
-                c_name = read_character_card(p, include_avatar_data_uri=False)["card"]["data"]["name"]
+                c_name = read_character_card(p, include_avatar_data_uri=False, fast_metadata_only=True)["card"]["data"]["name"]
                 if q_low == c_name.lower() or q_low in c_name.lower():
                     return p
             except Exception:
@@ -93,10 +93,20 @@ def collect_merged_lore_entries(
                 p.stem for p in sorted(worlds_dir.glob("*.json"), key=lambda item: (item.name.lower(), item.name))[:5]
             )
 
+    worlds_resolved = worlds_dir.resolve()
     for b_name in book_names:
-        fname = b_name if b_name.endswith(".json") else f"{b_name}.json"
-        b_path = worlds_dir / fname
-        if b_path.exists():
+        raw_b = str(b_name or "").strip()
+        if not raw_b:
+            continue
+        fname = raw_b if raw_b.endswith(".json") else f"{raw_b}.json"
+        b_cand = Path(fname)
+        if b_cand.is_absolute() or b_cand.anchor or ".." in b_cand.parts or len(b_cand.parts) != 1:
+            continue
+        try:
+            b_path = ensure_under_dir(worlds_resolved / b_cand, worlds_resolved)
+        except ValueError:
+            continue
+        if b_path.exists() and b_path.is_file():
             tier = 2 if b_name == linked_world else 3
             try:
                 entries.extend(load_lorebook_file(b_path, source_tier=tier))
@@ -159,15 +169,17 @@ def validate_contained_path(
         ctx.st_data_root.resolve(),
         Path.cwd().resolve(),
     ]
-    if not cand.is_absolute() and not cand.root:
+    if not cand.is_absolute() and not cand.anchor:
         base = (ctx.state_dir / default_subdir).resolve() if default_subdir else ctx.state_dir.resolve()
         base.mkdir(parents=True, exist_ok=True)
         return ensure_under_dir(base / cand, base)
 
-    resolved = cand.resolve()
     for root in allowed_roots:
-        if resolved.is_relative_to(root):
-            return resolved
+        try:
+            return ensure_under_dir(cand, root)
+        except ValueError:
+            continue
+    resolved = cand.resolve()
     raise ValueError(
         f"Path containment violation: {label} '{resolved.name}' must reside inside "
         "plugin state_dir, SillyTavern data root, or the current workspace."

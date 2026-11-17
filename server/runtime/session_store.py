@@ -42,7 +42,7 @@ class SessionStore:
         if not self.path.exists():
             return {}
         try:
-            loaded = json.loads(self.path.read_text(encoding="utf-8"))
+            loaded = json.loads(self.path.read_text(encoding="utf-8-sig"))
             return loaded if isinstance(loaded, dict) else {}
         except Exception:
             return {}

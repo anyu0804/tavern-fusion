@@ -55,8 +55,6 @@ class TavernFusionRuntime(RuntimeContext):
 
     def __init__(self, st_data_root: str | Path | None = None, state_dir: str | Path | None = None) -> None:
         super().__init__(st_data_root=st_data_root, state_dir=state_dir)
-        # The long-lived server opens the lore vector cache eagerly (as before the refactor).
-        _ = self.lore_engine
 
     # -- shared helpers ------------------------------------------------
     def find_character_card_path(self, character_query: str) -> Path:
@@ -171,12 +169,16 @@ def main() -> None:
 
     raw_args_str = sys.stdin.read() if parsed.args == "-" else parsed.args
     call_args = json.loads(raw_args_str) if raw_args_str.strip() else {}
+    want_snap = bool(isinstance(call_args, dict) and call_args.pop("_include_snapshot", False))
 
     runtime = TavernFusionRuntime(st_data_root=parsed.data_root, state_dir=parsed.state_dir)
     try:
         if parsed.sidecar_op:
             out = runtime.handle_sidecar_op(parsed.sidecar_op, call_args)
-            sys.stdout.write(json.dumps({"ok": True, "data": out}, ensure_ascii=False) + "\n")
+            envelope: dict[str, Any] = {"ok": True, "data": out}
+            if parsed.sidecar_op != "snapshot" and want_snap:
+                envelope["snapshot"] = runtime.handle_sidecar_op("snapshot", {})
+            sys.stdout.write(json.dumps(envelope, ensure_ascii=False) + "\n")
             return
 
         if parsed.cli:

@@ -3,7 +3,7 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "node ./scripts/run_py.mjs ./hooks/session_init.py",
+        "command": "node \"${PLUGIN_ROOT}/scripts/run_py.mjs\" \"${PLUGIN_ROOT}/hooks/session_init.py\"",
         "timeout": 10
       }
     ]
@@ -12,7 +12,7 @@
     "PreInvocation": [
       {
         "type": "command",
-        "command": "node ./scripts/run_py.mjs ./hooks/pre_invocation_gate.py",
+        "command": "node \"${PLUGIN_ROOT}/scripts/run_py.mjs\" \"${PLUGIN_ROOT}/hooks/pre_invocation_gate.py\"",
         "timeout": 15
       }
     ]
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./scripts/run_py.mjs ./hooks/pre_tool_guard.py",
+            "command": "node \"${PLUGIN_ROOT}/scripts/run_py.mjs\" \"${PLUGIN_ROOT}/hooks/pre_tool_guard.py\"",
             "timeout": 10
           }
         ]
@@ -35,7 +35,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "node ./scripts/run_py.mjs ./hooks/stop_persistence_check.py",
+        "command": "node \"${PLUGIN_ROOT}/scripts/run_py.mjs\" \"${PLUGIN_ROOT}/hooks/stop_persistence_check.py\"",
         "timeout": 10
       }
     ]

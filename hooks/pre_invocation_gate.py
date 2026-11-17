@@ -81,6 +81,7 @@ def main() -> None:
         #    keeps `payload.lastUserInput` at the last message typed in the main chat box.
         pending_launch = session.get("pending_sidecar_launch")
         claimed_from_sidecar = False
+        claimed_launch_ts: float | None = None
         effective_raw_input = last_input
         sidecar_user_text = ""
         sidecar_floor_appended = False
@@ -108,6 +109,7 @@ def main() -> None:
                 sidecar_floor_appended = bool(pending_launch.get("user_floor_already_appended", False))
                 session.pop("pending_sidecar_launch", None)
                 claimed_from_sidecar = True
+                claimed_launch_ts = launch_ts
 
         rp_match = RP_SLASH_RE.match(effective_raw_input)
         is_utility_slash = effective_raw_input.lower().startswith(UTILITY_SLASHES)
@@ -167,8 +169,27 @@ def main() -> None:
                 is_bootstrap_turn = True
                 effective_user_input = trailing_msg
                 sidecar_floor_appended = False
-            except Exception:
-                pass
+            except Exception as boot_exc:
+                # Never swallow minor-risk-gate blocks or missing-card errors into a previously
+                # bound character's `.jsonl` as if the `/rp ...` command were story dialogue!
+                if session.get("stage_busy") or session.get("pending_uncommitted_turn"):
+                    runtime.sessions.update({
+                        "stage_busy": False,
+                        "pending_uncommitted_turn": False,
+                        "user_floor_already_appended": False,
+                    })
+                boot_err_out = {
+                    "injectSteps": [
+                        {
+                            "errorMessage": {
+                                "userMessage": f"[Tavern Fusion] 无法载入角色「{char_arg}」：{boot_exc}"
+                            }
+                        }
+                    ],
+                    "terminationBehavior": "terminate",
+                }
+                sys.stdout.write(json.dumps(boot_err_out, ensure_ascii=False) + "\n")
+                return
 
         is_rp_conv = (
             bool(session.get("active"))
@@ -266,7 +287,8 @@ def main() -> None:
 
         frame_info = _run_tool(runtime, "st_dump_prompt_frame", {
             "character_name": char_ref,
-            "user_input": effective_user_input,
+            "user_input": "" if (is_swipe_reroll or sidecar_floor_appended) else effective_user_input,
+            "_swipe_reroll": is_swipe_reroll,
             "mode": session.get("mode", "play"),
             "compact_agent_delta": already_bootstrapped_here,
             "boundary_notice": boundary_notice,
@@ -378,7 +400,9 @@ def main() -> None:
                 if k in session:
                     cur[k] = session[k]
             if claimed_from_sidecar:
-                cur.pop("pending_sidecar_launch", None)
+                cur_launch = cur.get("pending_sidecar_launch")
+                if not isinstance(cur_launch, dict) or cur_launch.get("ts") == claimed_launch_ts:
+                    cur.pop("pending_sidecar_launch", None)
             return cur
 
         runtime.sessions.update(_merge_pre_inv)

@@ -43,7 +43,7 @@ def resolve_data_root(explicit: str | Path | None, state_dir: Path | None = None
         settings_file = state_dir / PLUGIN_SETTINGS_FILENAME
         if settings_file.exists():
             try:
-                s_obj = json.loads(settings_file.read_text(encoding="utf-8"))
+                s_obj = json.loads(settings_file.read_text(encoding="utf-8-sig"))
                 if isinstance(s_obj, dict) and s_obj.get("last_st_data_root"):
                     remembered = str(s_obj["last_st_data_root"])
             except Exception:
@@ -157,7 +157,7 @@ class RuntimeContext:
         if not self.plugin_settings_file.exists():
             return defaults
         try:
-            loaded = json.loads(self.plugin_settings_file.read_text(encoding="utf-8"))
+            loaded = json.loads(self.plugin_settings_file.read_text(encoding="utf-8-sig"))
             if isinstance(loaded, dict):
                 defaults.update(loaded)
         except Exception:

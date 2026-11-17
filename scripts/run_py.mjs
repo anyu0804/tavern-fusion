@@ -15,19 +15,18 @@ if (rawArgs.length === 0) {
   process.exit(2);
 }
 
-// Lifecycle hooks are not guaranteed to run with the plugin root as cwd. Keep the
-// historic cwd-relative behaviour first, then fall back to the launcher's own
-// location (derived from import.meta.url in py_resolver.mjs) so a hook script is
-// still found when the host starts us from a workspace directory. An unexpanded
-// ${PLUGIN_ROOT} placeholder is also normalized here as a defensive measure.
+// Lifecycle hooks are not guaranteed to run with the plugin root as cwd. Resolve
+// plugin-owned scripts against PLUGIN_ROOT first so an untrusted workspace containing
+// a homonymous `./hooks/*.py` or `./server/*.py` can never hijack hook execution,
+// then fall back to cwd for developer CLI invocations (e.g. `tests/*.py`).
 const rawScript = rawArgs[0].replace(/\$\{PLUGIN_ROOT\}/g, PLUGIN_ROOT);
-const cwdCandidate = resolve(process.cwd(), rawScript);
 const pluginCandidate = resolve(PLUGIN_ROOT, rawScript);
-const scriptPath = existsSync(cwdCandidate)
-  ? cwdCandidate
-  : existsSync(pluginCandidate)
-    ? pluginCandidate
-    : cwdCandidate;
+const cwdCandidate = resolve(process.cwd(), rawScript);
+const scriptPath = existsSync(pluginCandidate)
+  ? pluginCandidate
+  : existsSync(cwdCandidate)
+    ? cwdCandidate
+    : pluginCandidate;
 const restArgs = rawArgs.slice(1);
 const { command, prefixArgs } = resolvePythonCommand();
 

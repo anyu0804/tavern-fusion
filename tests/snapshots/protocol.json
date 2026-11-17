@@ -180,6 +180,14 @@
           "description": "Dry-runs the Hybrid Lorebook Engine and full OpenAI Settings prompt_order compiler (--dump-prompt), returning active @D lore, budget usage, evicted entries, and assembled prompt.",
           "inputSchema": {
             "properties": {
+              "cache_mode": {
+                "default": "off",
+                "enum": [
+                  "off",
+                  "prefix_pinned"
+                ],
+                "type": "string"
+              },
               "character_name": {
                 "type": "string"
               },
@@ -387,7 +395,7 @@
           "name": "st_stage_floor_op"
         },
         {
-          "description": "Switches active OpenAI Preset, User Persona, --play/--chat mode, policy_mode, or per-chat Author's Note & @D depth.",
+          "description": "Switches active OpenAI Preset, User Persona, --play/--chat mode, policy_mode, BYOK backend settings, or per-chat Author's Note & @D depth.",
           "inputSchema": {
             "properties": {
               "agentic_hands": {
@@ -399,6 +407,25 @@
               "authors_note": {
                 "type": "string"
               },
+              "byok_base_url": {
+                "type": "string"
+              },
+              "byok_cache_control": {
+                "type": "boolean"
+              },
+              "byok_cache_mode": {
+                "enum": [
+                  "off",
+                  "prefix_pinned"
+                ],
+                "type": "string"
+              },
+              "byok_model": {
+                "type": "string"
+              },
+              "byok_stream": {
+                "type": "boolean"
+              },
               "director_mode": {
                 "type": "boolean"
               },
@@ -409,6 +436,13 @@
                   100
                 ],
                 "type": "integer"
+              },
+              "generation_backend": {
+                "enum": [
+                  "host",
+                  "byok"
+                ],
+                "type": "string"
               },
               "mode": {
                 "enum": [

@@ -33,7 +33,17 @@ function isWorkingPython(cmd, prefixArgs = []) {
     const out = execFileSync(
       cmd,
       [...prefixArgs, '-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}:{sys.executable}")'],
-      { encoding: 'utf-8', timeout: 4000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }
+      {
+        encoding: 'utf-8',
+        timeout: 4000,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: {
+          ...process.env,
+          PYTHONIOENCODING: 'utf-8',
+          PYTHONUTF8: '1',
+        },
+      }
     ).trim();
     return Boolean(parsePythonProbeOutput(out));
   } catch {
@@ -78,6 +88,21 @@ export function resolvePythonCommand() {
       if (!existsSync(root)) continue;
       try {
         for (const sub of readdirSync(root).sort().reverse()) {
+          const exe = join(root, sub, 'python.exe');
+          if (existsSync(exe) && isWorkingPython(exe)) {
+            return { command: exe, prefixArgs: [] };
+          }
+        }
+      } catch {
+        // Ignore unreadable dirs
+      }
+    }
+    const progRoots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(Boolean);
+    for (const root of progRoots) {
+      if (!existsSync(root)) continue;
+      try {
+        const pyDirs = readdirSync(root).filter((n) => /^python3\d+$/i.test(n)).sort().reverse();
+        for (const sub of pyDirs) {
           const exe = join(root, sub, 'python.exe');
           if (existsSync(exe) && isWorkingPython(exe)) {
             return { command: exe, prefixArgs: [] };

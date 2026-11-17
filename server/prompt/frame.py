@@ -6,6 +6,7 @@ Moved verbatim from `server/st_runtime_compat.py`, which re-exports these names.
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 import re
 from typing import Any
 
@@ -13,6 +14,7 @@ from ..lore_engine import estimate_tokens
 from .epistemic import SYSTEM_INSTRUCTION_BY_EPISTEMIC, normalize_epistemic_level
 from .macros import resolve_st_macros
 from .presets import DEFAULT_RP_MAIN_PROMPT
+from .regex_pipeline import run_regex_pipeline
 
 HISTORY_WINDOW = 12
 """Minimum number of recent chat items rendered into the frame."""
@@ -85,6 +87,8 @@ def compile_st_prompt_frame(
     agentic_hands: bool = False,
     director_mode: bool = False,
     cache_mode: str = "off",
+    st_data_root: str | Path | None = None,
+    exclude_trailing_user: bool = False,
 ) -> dict[str, Any]:
     """Full Dynamic Prompt Re-assembler implementing the Four Dimensional Locks & Dimension Mixer:
 
@@ -144,22 +148,28 @@ def compile_st_prompt_frame(
     card_sys = str(data.get("system_prompt", "")).strip()
     slot1_sys = _r(card_sys, original_prompt=base_main) if card_sys else base_main
 
-    # All `before_char` and `after_char` lore (both constant and keyword/semantic triggered) placed in proper slots
+    # All `before_char`, `after_char`, `before_examples`, `after_examples` lore placed in proper slots.
     # In prefix-cache mode only constant (blue) entries stay in the prefix; triggered (green)
     # entries are re-stated in the dynamic tail so a new trigger never invalidates the cache.
     tail_lore_items: list[str] = []
     wi_before_items: list[str] = []
     wi_after_items: list[str] = []
+    wi_before_ex_items: list[str] = []
+    wi_after_ex_items: list[str] = []
     for item in lore_result.get("active_trace", []):
         pos = item.get("position")
-        if pos not in ("before_char", "after_char"):
+        if pos not in ("before_char", "after_char", "before_examples", "after_examples"):
             continue
         if pinned and not item.get("constant"):
             tail_lore_items.append(str(item["content"]))
         elif pos == "before_char":
             wi_before_items.append(item["content"])
-        else:
+        elif pos == "after_char":
             wi_after_items.append(item["content"])
+        elif pos == "before_examples":
+            wi_before_ex_items.append(item["content"])
+        else:
+            wi_after_ex_items.append(item["content"])
     at_depth_trace = [
         item
         for item in lore_result.get("active_trace", [])
@@ -167,13 +177,27 @@ def compile_st_prompt_frame(
     ]
 
     prefix_sections: list[str] = [top_system_instruction]
+    post_history_custom_sections: list[str] = []
+    in_chat_custom_prompts: list[dict[str, Any]] = []
     slot3_parts: list[str] = []
     slot4_parts: list[str] = []
     lexical_block_count = 0
+    seen_chat_history = False
 
     for ident in ordered_ids:
         if ident == "chatHistory":
-            break
+            seen_chat_history = True
+            continue
+        if seen_chat_history:
+            if ident in custom_prompts:
+                cp_def = custom_prompts[ident]
+                cp_txt = _r(cp_def["content"])
+                if cp_txt:
+                    if int(cp_def.get("injection_position", 0)) == 1:
+                        in_chat_custom_prompts.append({**cp_def, "resolved_content": cp_txt})
+                    else:
+                        post_history_custom_sections.append(f"[{cp_def['name']}]\n{cp_txt}")
+            continue
         if ident == "main":
             if slot1_sys:
                 prefix_sections.append(slot1_sys)
@@ -205,22 +229,37 @@ def compile_st_prompt_frame(
             wa_txt = _r("\n".join(wi_after_items))
             slot4_parts.append(wa_txt)
             prefix_sections.append(f"[World Info (After)]\n{wa_txt}")
-        elif ident == "dialogueExamples" and str(data.get("mes_example", "")).strip():
-            ex_txt, lexical_block_count = format_lexical_dialogue_examples(
-                str(data["mes_example"]), char_name, user_name, variables, outlets, defer_volatile=pinned
-            )
-            if ex_txt:
-                slot4_parts.append(ex_txt)
-                prefix_sections.append(ex_txt)
+        elif ident == "dialogueExamples":
+            if wi_before_ex_items:
+                bex_txt = _r("\n".join(wi_before_ex_items))
+                slot4_parts.append(bex_txt)
+                prefix_sections.append(f"[World Info (Before Examples)]\n{bex_txt}")
+            if str(data.get("mes_example", "")).strip():
+                ex_txt, lexical_block_count = format_lexical_dialogue_examples(
+                    str(data["mes_example"]), char_name, user_name, variables, outlets, defer_volatile=pinned
+                )
+                if ex_txt:
+                    slot4_parts.append(ex_txt)
+                    prefix_sections.append(ex_txt)
+            if wi_after_ex_items:
+                aex_txt = _r("\n".join(wi_after_ex_items))
+                slot4_parts.append(aex_txt)
+                prefix_sections.append(f"[World Info (After Examples)]\n{aex_txt}")
         elif ident in custom_prompts:
-            cp_txt = _r(custom_prompts[ident]["content"])
+            cp_def = custom_prompts[ident]
+            cp_txt = _r(cp_def["content"])
             if cp_txt:
-                prefix_sections.append(f"[{custom_prompts[ident]['name']}]\n{cp_txt}")
+                if int(cp_def.get("injection_position", 0)) == 1:
+                    in_chat_custom_prompts.append({**cp_def, "resolved_content": cp_txt})
+                else:
+                    prefix_sections.append(f"[{cp_def['name']}]\n{cp_txt}")
 
     static_prefix_block = "\n\n".join(s for s in prefix_sections if s.strip())
 
     # Lock #3: Golden @Depth 1~4 Splicing directly inside `spliced_chat` (with Backstage Quarantine)
     raw_spliced = list(lore_result.get("spliced_chat", []))
+    if exclude_trailing_user and raw_spliced and (raw_spliced[-1].get("is_user") or raw_spliced[-1].get("role") == "user"):
+        raw_spliced = raw_spliced[:-1]
     spliced_msgs: list[dict[str, Any]] = []
     for m in raw_spliced:
         if quarantine_active and isinstance(m.get("extra"), dict) and m["extra"].get("is_backstage"):
@@ -230,6 +269,24 @@ def compile_st_prompt_frame(
             tail_lore_items.append(str(m.get("mes", "")))
             continue
         spliced_msgs.append(dict(m))
+
+    for cp_item in in_chat_custom_prompts:
+        cp_depth = max(0, int(cp_item.get("injection_depth", 4)))
+        cp_role = str(cp_item.get("role", "system"))
+        if pinned:
+            post_history_custom_sections.append(f"[{cp_item['name']}]\n{cp_item['resolved_content']}")
+        else:
+            cp_idx = max(0, len(spliced_msgs) - cp_depth)
+            spliced_msgs.insert(
+                cp_idx,
+                {
+                    "role": cp_role,
+                    "name": f"{cp_item['name']}@D{cp_depth}",
+                    "is_user": cp_role == "user",
+                    "is_system": cp_role == "system",
+                    "mes": cp_item["resolved_content"],
+                },
+            )
 
     note_prompt = str(meta.get("note_prompt", "")).strip()
     an_depth = int(meta.get("note_depth", 4))
@@ -250,15 +307,29 @@ def compile_st_prompt_frame(
                 },
             )
 
+    card_ext = data.get("extensions") if isinstance(data.get("extensions"), dict) else None
     hist_slice = spliced_msgs[history_window_start(len(spliced_msgs), cache_mode):]
     rendered_history_lines: list[str] = []
     history_messages: list[dict[str, str]] = []
     for m in hist_slice:
         m_name = str(m.get("name", "Msg"))
-        m_mes = _r(str(m.get("mes", "")))
-        if m.get("is_user") or m.get("role") == "user":
+        is_u = bool(m.get("is_user") or m.get("role") == "user")
+        is_s = bool(m.get("is_system") or m.get("role") == "system")
+        raw_m_mes = str(m.get("mes", ""))
+        if not is_s and (st_data_root or card_ext):
+            raw_m_mes = run_regex_pipeline(
+                raw_m_mes,
+                st_data_root=st_data_root,
+                card_extensions=card_ext,
+                is_storage_pass=False,
+                char_name=char_name,
+                user_name=user_name,
+                is_user_message=is_u,
+            )
+        m_mes = _r(raw_m_mes)
+        if is_u:
             h_role = "user"
-        elif m.get("is_system") or m.get("role") == "system":
+        elif is_s:
             h_role = "system"
         else:
             h_role = "assistant"
@@ -299,6 +370,9 @@ def compile_st_prompt_frame(
         live_card_lines.append(
             f"[Live Context] 当前日期 {now.strftime('%Y-%m-%d')} 时间 {now.strftime('%H:%M')} | Variables: {live_vars}"
         )
+
+    for post_cp in post_history_custom_sections:
+        live_card_lines.append(post_cp)
 
     post_hist = str(data.get("post_history_instructions") or preset.get("post_history_instructions") or "").strip()
     if post_hist:

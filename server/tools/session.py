@@ -6,6 +6,7 @@ from pathlib import Path
 import time
 from typing import Any
 
+from ..byok_backend import _validate_base_url
 from ..card_codec import (
     list_character_expressions,
 )
@@ -58,13 +59,14 @@ ST_DUMP_PROMPT_FRAME_SCHEMA: dict[str, Any] = {
             "user_input": {"type": "string"},
             "token_budget": {"type": "integer", "default": 2048},
             "mode": {"type": "string", "enum": ["play", "chat"]},
+            "cache_mode": {"type": "string", "enum": ["off", "prefix_pinned"], "default": "off"},
         },
     },
 }
 
 ST_SWITCH_PROFILE_SCHEMA: dict[str, Any] = {
     "name": "st_switch_profile",
-    "description": "Switches active OpenAI Preset, User Persona, --play/--chat mode, policy_mode, or per-chat Author's Note & @D depth.",
+    "description": "Switches active OpenAI Preset, User Persona, --play/--chat mode, policy_mode, BYOK backend settings, or per-chat Author's Note & @D depth.",
     "inputSchema": {
         "type": "object",
         "properties": {
@@ -77,6 +79,12 @@ ST_SWITCH_PROFILE_SCHEMA: dict[str, Any] = {
             "policy_mode": {"type": "string", "enum": ["host_gentle", "strict_block"]},
             "authors_note": {"type": "string"},
             "an_depth": {"type": "integer"},
+            "generation_backend": {"type": "string", "enum": ["host", "byok"]},
+            "byok_base_url": {"type": "string"},
+            "byok_model": {"type": "string"},
+            "byok_cache_mode": {"type": "string", "enum": ["off", "prefix_pinned"]},
+            "byok_cache_control": {"type": "boolean"},
+            "byok_stream": {"type": "boolean"},
         },
     },
 }
@@ -88,6 +96,18 @@ def st_session_bootstrap(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str,
     force_new = bool(args.get("new_chat", False))
     greeting_idx = int(args.get("greeting_index", 0))
 
+    clean_lbooks: list[str] | None = None
+    if "lorebooks" in args and args["lorebooks"] is not None:
+        raw_lbooks = [args["lorebooks"]] if isinstance(args["lorebooks"], str) else list(args["lorebooks"])
+        clean_lbooks = []
+        for lb in raw_lbooks:
+            lb_str = str(lb or "").strip()
+            if not lb_str:
+                continue
+            lb_p = Path(lb_str.replace("\\", "/"))
+            if lb_p.is_absolute() or lb_p.anchor or ".." in lb_p.parts or len(lb_p.parts) != 1:
+                raise ValueError(f"Invalid lorebook name '{lb_str}': path traversal is forbidden.")
+            clean_lbooks.append(lb_str)
     prev = ctx.sessions.load()
     card_path, card_bundle, char_name, avatar_stem = resolve_card_and_identity(ctx, char_query, prev)
     minor_gate = evaluate_minor_risk_gate(card_bundle)
@@ -139,30 +159,51 @@ def st_session_bootstrap(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str,
         seeded_new = True
 
     header, messages = read_jsonl_chat(active_chat_path)
-    rp_conv_id = str(args.get("rp_conv_id") or "").strip()
     activate_rp = bool(args.get("activate_rp", True))
-    session_state = {
-        "active": activate_rp,
-        "rp_conv_id": rp_conv_id,
-        "character_name": char_name,
-        "card_file": card_path.name,
-        "avatar_stem": avatar_stem,
-        "card_path": str(card_path),
-        "chat_path": str(active_chat_path),
-        "persona_name": persona["name"],
-        "preset_name": preset["preset_name"],
-        "mode": mode,
-        "extra_lorebooks": args.get("lorebooks", prev.get("extra_lorebooks", [])),
-        "last_bootstrapped_at": time.time(),
-        "pending_uncommitted_turn": False,
-        "pending_turn_mode": "normal",
-        "stage_busy": False,
-        "stop_retry_count": 0,
-        # Reset conversation prefix cache tracker on character/chat switch
-        "bootstrapped_conv_id": "",
-        "bootstrapped_char": "",
-    }
-    ctx.sessions.save(session_state)
+
+    def _merge_bootstrap_session(cur: dict[str, Any]) -> dict[str, Any]:
+        base_prev = cur if cur else prev
+        if "rp_conv_id" in args and args["rp_conv_id"] is not None:
+            resolved_cid = str(args["rp_conv_id"]).strip()
+        elif activate_rp:
+            resolved_cid = str(base_prev.get("rp_conv_id") or "").strip()
+        else:
+            resolved_cid = ""
+        next_state: dict[str, Any] = {
+            "active": activate_rp,
+            "rp_conv_id": resolved_cid,
+            "character_name": char_name,
+            "card_file": card_path.name,
+            "avatar_stem": avatar_stem,
+            "card_path": str(card_path),
+            "chat_path": str(active_chat_path),
+            "persona_name": persona["name"],
+            "preset_name": preset["preset_name"],
+            "mode": mode,
+            "extra_lorebooks": clean_lbooks if clean_lbooks is not None else base_prev.get("extra_lorebooks", []),
+            "last_bootstrapped_at": time.time(),
+            "pending_uncommitted_turn": False,
+            "pending_turn_mode": "normal",
+            "stage_busy": False,
+            "stop_retry_count": 0,
+            # Reset conversation prefix cache tracker on character/chat switch
+            "bootstrapped_conv_id": "",
+            "bootstrapped_char": "",
+        }
+        for preserved_key in (
+            "epistemic_level",
+            "agentic_hands",
+            "director_mode",
+            "last_byok_usage",
+            "last_seen_host_input",
+            "last_persistence_error",
+            "persistence_failure_count",
+        ):
+            if preserved_key in base_prev:
+                next_state[preserved_key] = base_prev[preserved_key]
+        return next_state
+
+    ctx.sessions.update(_merge_bootstrap_session)
     settings_updates: dict[str, Any] = {}
     if (ctx.st_data_root / "characters").exists() and "mock_st_data" not in str(ctx.st_data_root):
         settings_updates["last_st_data_root"] = str(ctx.st_data_root)
@@ -225,6 +266,12 @@ def st_dump_prompt_frame(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str,
     quarantine_backstage = (epistemic_level < 100) and (not director_mode)
 
     card_path, card_bundle, char_name, avatar_stem = resolve_card_and_identity(ctx, char_query, session)
+    minor_gate = evaluate_minor_risk_gate(card_bundle)
+    if minor_gate["gate_action"] == "block_load":
+        raise ValueError(
+            f"[Card Doctor 未成年风险闸] 默认拒绝装载角色卡「{char_name}」 ({card_path.name})："
+            f"{'；'.join(minor_gate['reasons'])}"
+        )
     card_v3 = card_bundle["card"]
 
     chat_path_str = session.get("chat_path")
@@ -241,6 +288,9 @@ def st_dump_prompt_frame(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str,
             header, messages = read_jsonl_chat(chats[0])
         else:
             header, messages = {"chat_metadata": {"variables": {}, "timed_effects": {}}}, []
+
+    if args.get("_swipe_reroll") and messages and not messages[-1].get("is_user", False):
+        messages = messages[:-1]
 
     entries = collect_merged_lore_entries(ctx, card_v3, session.get("extra_lorebooks"))
     lore_res = ctx.lore_engine.evaluate_and_splice(
@@ -266,6 +316,8 @@ def st_dump_prompt_frame(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str,
         agentic_hands=agentic_hands,
         director_mode=director_mode,
         cache_mode=str(args.get("cache_mode") or "off"),
+        st_data_root=ctx.st_data_root,
+        exclude_trailing_user=bool(args.get("_exclude_trailing_user", False)),
     )
     result = {
         "character_name": char_name,
@@ -324,7 +376,8 @@ def st_switch_profile(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
     if args.get("generation_backend") in ("host", "byok"):
         backend_patch["generation_backend"] = str(args["generation_backend"])
     if "byok_base_url" in args and args["byok_base_url"] is not None:
-        backend_patch["byok_base_url"] = str(args["byok_base_url"]).strip()
+        raw_burl = str(args["byok_base_url"]).strip()
+        backend_patch["byok_base_url"] = _validate_base_url(raw_burl) if raw_burl else ""
     if "byok_model" in args and args["byok_model"] is not None:
         backend_patch["byok_model"] = str(args["byok_model"]).strip()
     if args.get("byok_cache_mode") in ("off", "prefix_pinned"):

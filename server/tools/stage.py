@@ -26,11 +26,13 @@ from ..card_codec import (
     write_character_card_png,
 )
 from ..chat_sync import (
+    exclusive_file_lock,
     list_chat_files,
     list_groups,
     read_jsonl_chat,
+    write_jsonl_chat_atomic,
 )
-from ..fs_safety import atomic_write_json, ensure_under_dir, sanitize_filename_stem
+from ..fs_safety import atomic_write_json, atomic_write_text, ensure_under_dir, sanitize_filename_stem
 from ..lore_engine import (
     lint_lorebook_file,
     load_lorebook_file,
@@ -56,6 +58,9 @@ from .lore import st_evolve_lore_entry, st_query_lorebook
 from .session import st_dump_prompt_frame, st_session_bootstrap, st_switch_profile
 
 BYOK_SUPPORTED_ACTIONS = ("send_turn", "swipe_reroll")
+BYOK_CANCEL_FILE = "byok_cancel.flag"
+_CARD_SUMMARY_CACHE: dict[str, tuple[int, int, dict[str, Any]]] = {}
+_CARD_SUMMARY_CACHE_MAX = 512
 
 
 # MCP input schemas (verbatim from the pre-refactor MCP_TOOL_SCHEMAS list)
@@ -185,6 +190,10 @@ def handle_sidecar_op(ctx: RuntimeContext, op: str, args: dict[str, Any]) -> dic
         return sidecar_prepare_agent_turn(ctx, args)
     if op == "byok_turn":
         return sidecar_byok_turn(ctx, args)
+    if op == "cancel_turn":
+        return sidecar_cancel_turn(ctx, args)
+    if op == "retry_uncommitted_turn":
+        return sidecar_retry_uncommitted_turn(ctx)
     if op == "byok_status":
         status = resolve_byok_config(ctx.load_plugin_settings(), ctx.state_dir)
         status["last_usage"] = ctx.sessions.load().get("last_byok_usage")
@@ -243,21 +252,36 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
         for p in sorted(char_dir.iterdir(), key=lambda item: (item.name.lower(), item.name)):
             if p.is_file() and p.suffix.lower() in (".png", ".json"):
                 try:
-                    b = read_character_card(p, include_avatar_data_uri=False)
-                    d = b["card"]["data"]
-                    c_name = d["name"]
-                    c_gate = evaluate_minor_risk_gate(b)
+                    st_info = p.stat()
+                    cache_key = str(p.resolve())
+                    cached_entry = _CARD_SUMMARY_CACHE.get(cache_key)
+                    if cached_entry and cached_entry[0] == st_info.st_size and cached_entry[1] == st_info.st_mtime_ns:
+                        base_meta = cached_entry[2]
+                    else:
+                        b = read_character_card(p, include_avatar_data_uri=False, fast_metadata_only=True)
+                        d = b["card"]["data"]
+                        c_gate = evaluate_minor_risk_gate(b)
+                        base_meta = {
+                            "file": p.name,
+                            "name": d["name"],
+                            "scenario": str(d.get("scenario", ""))[:120],
+                            "tags": list(d.get("tags") or [])[:6],
+                            "world": str(d.get("extensions", {}).get("world", "")),
+                            "spec": b["detected_chunk"],
+                            "has_dual_chunks": b["has_dual_chunks"],
+                            "minor_gate_action": c_gate["gate_action"],
+                            "minor_gate_reasons": c_gate["reasons"],
+                        }
+                        if len(_CARD_SUMMARY_CACHE) >= _CARD_SUMMARY_CACHE_MAX:
+                            _CARD_SUMMARY_CACHE.clear()
+                        _CARD_SUMMARY_CACHE[cache_key] = (st_info.st_size, st_info.st_mtime_ns, base_meta)
+                    c_name = base_meta["name"]
+                    exprs_for_card = list_character_expressions(ctx.st_data_root, p.stem) or list_character_expressions(
+                        ctx.st_data_root, c_name
+                    )
                     cards_summary.append({
-                        "file": p.name,
-                        "name": c_name,
-                        "scenario": str(d.get("scenario", ""))[:120],
-                        "tags": list(d.get("tags") or [])[:6],
-                        "world": str(d.get("extensions", {}).get("world", "")),
-                        "spec": b["detected_chunk"],
-                        "has_dual_chunks": b["has_dual_chunks"],
-                        "expressions_count": len(list_character_expressions(ctx.st_data_root, c_name)),
-                        "minor_gate_action": c_gate["gate_action"],
-                        "minor_gate_reasons": c_gate["reasons"],
+                        **base_meta,
+                        "expressions_count": len(exprs_for_card),
                     })
                 except Exception:
                     continue
@@ -288,6 +312,9 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
     dump_data: dict[str, Any] = {}
     doctor_data: dict[str, Any] = {"healthy": True, "total_issues": 0, "card_issues": [], "lorebook_issues": []}
 
+    plugin_cfg = ctx.load_plugin_settings()
+    byok_cfg = resolve_byok_config(plugin_cfg, ctx.state_dir)
+
     if active_char:
         try:
             c_query = str(session.get("card_file") or active_char)
@@ -295,7 +322,7 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
             active_char = resolved_char
             active_card_file = c_path.name
             active_card_data = c_bundle["card"]["data"]
-            expressions = list_character_expressions(ctx.st_data_root, avatar_stem) or list_character_expressions(
+            expressions = list_character_expressions(ctx.st_data_root, Path(active_card_file).stem) or list_character_expressions(
                 ctx.st_data_root, active_char
             )
             all_chats = list_chat_files(ctx.st_data_root, avatar_stem, legacy_character_name=active_char)
@@ -323,7 +350,8 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
             elif expressions:
                 current_expression = "neutral" if "neutral" in expressions else expressions[0]
 
-            dump_data = st_dump_prompt_frame(ctx, {"character_name": active_card_file})
+            active_cache_mode = byok_cfg["cache_mode"] if plugin_cfg.get("generation_backend") == "byok" else "off"
+            dump_data = st_dump_prompt_frame(ctx, {"character_name": active_card_file, "cache_mode": active_cache_mode})
             doctor_data = st_lint_card_and_lore(ctx, {"character_name": active_card_file})
         except Exception as err:
             dump_data = {"dump_report": f"Inspector error: {err}", "active_lore": [], "prefix_cache_ratio_pct": 0}
@@ -336,11 +364,10 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
     suggestions_obj: dict[str, Any] = {}
     if ctx.stage_suggestions_file.exists():
         try:
-            suggestions_obj = json.loads(ctx.stage_suggestions_file.read_text(encoding="utf-8"))
+            suggestions_obj = json.loads(ctx.stage_suggestions_file.read_text(encoding="utf-8-sig"))
         except Exception:
             suggestions_obj = {}
 
-    plugin_cfg = ctx.load_plugin_settings()
     acked_warn_cards = set(plugin_cfg.get("minor_warn_acked_cards") or [])
     active_minor_gate = dict(
         doctor_data.get("minor_risk_gate")
@@ -356,7 +383,7 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
     return {
         "data_root_name": ctx.st_data_root.name,
         "plugin_settings": plugin_cfg,
-        "byok": {**resolve_byok_config(plugin_cfg, ctx.state_dir), "last_usage": session.get("last_byok_usage")},
+        "byok": {**byok_cfg, "last_usage": session.get("last_byok_usage")},
         "first_run_notice": FIRST_RUN_NOTICE,
         "minor_risk_gate": active_minor_gate,
         "presets": list_openai_presets(ctx.st_data_root),
@@ -378,6 +405,7 @@ def sidecar_snapshot(ctx: RuntimeContext) -> dict[str, Any]:
             "stage_busy": bool(session.get("stage_busy", False)),
             "pending_uncommitted_turn": bool(session.get("pending_uncommitted_turn", False)),
             "pending_turn_mode": str(session.get("pending_turn_mode", "normal")),
+            "last_persistence_error": session.get("last_persistence_error") or None,
             "authors_note": str(meta.get("note_prompt", "")),
             "an_depth": int(meta.get("note_depth", 4)),
         },
@@ -588,6 +616,59 @@ class _StreamPreviewWriter:
             pass  # The preview is cosmetic; never fail the turn over it.
 
 
+def _is_active_stream_preview(preview_path: Path, max_age_s: float = 180.0) -> bool:
+    if not preview_path.is_file():
+        return False
+    try:
+        obj = json.loads(preview_path.read_text(encoding="utf-8-sig"))
+        if not isinstance(obj, dict) or not obj.get("active"):
+            return False
+        return (time.time() - float(obj.get("started_at") or 0.0)) < max_age_s
+    except Exception:
+        return False
+
+
+def sidecar_cancel_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, Any]:
+    """Signals an in-flight BYOK turn to abort via `byok_cancel.flag`, or force-resets stuck busy state."""
+    force_reset = bool(args.get("force_reset", False))
+    cancel_path = Path(ctx.state_dir) / BYOK_CANCEL_FILE
+    preview_path = Path(ctx.state_dir) / STREAM_PREVIEW_FILE
+    sess = ctx.sessions.load() if ctx.sessions.exists() else {}
+    is_active_byok = _is_active_stream_preview(preview_path, max_age_s=600.0) or (
+        bool(sess.get("stage_busy")) and not bool(sess.get("pending_uncommitted_turn"))
+    )
+    atomic_write_text(cancel_path, str(time.time()))
+    if force_reset or not is_active_byok:
+        preview_path.unlink(missing_ok=True)
+        cancel_path.unlink(missing_ok=True)
+        if ctx.sessions.exists():
+            ctx.sessions.update({
+                "stage_busy": False,
+                "pending_uncommitted_turn": False,
+                "user_floor_already_appended": False,
+                "pending_sidecar_launch": None,
+            })
+    return {"cancelled": True, "force_reset": force_reset}
+
+
+def sidecar_retry_uncommitted_turn(ctx: RuntimeContext) -> dict[str, Any]:
+    """Replays `last_persistence_error.uncommitted_turn` saved by the Stop hook on lock contention."""
+    sess = ctx.sessions.load()
+    err_info = sess.get("last_persistence_error")
+    uncommitted = err_info.get("uncommitted_turn") if isinstance(err_info, dict) else None
+    if not isinstance(uncommitted, dict) or not str(uncommitted.get("char_mes") or "").strip():
+        raise ValueError("当前没有待重试落盘的回复记录。")
+    commit_res = st_commit_turn(ctx, dict(uncommitted))
+
+    def _clear_err(cur: dict[str, Any]) -> dict[str, Any]:
+        cur.pop("last_persistence_error", None)
+        cur["persistence_failure_count"] = 0
+        return cur
+
+    ctx.sessions.update(_clear_err)
+    return {"retried": True, "commit": commit_res}
+
+
 def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, Any]:
     """Runs one stage turn through the user's own OpenAI-compatible API key instead of the host model.
 
@@ -598,8 +679,15 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
     action_kind = str(args.get("action_kind", "send_turn"))
     if action_kind not in BYOK_SUPPORTED_ACTIONS:
         raise ValueError(f"BYOK 后端暂只支持发送回合与重抽（Swipe），不支持「{action_kind}」。")
-    if ctx.sessions.load().get("director_mode"):
+    init_sess = ctx.sessions.load()
+    if init_sess.get("director_mode"):
         raise ValueError("BYOK 后端暂不支持导演穿梭模式，请先关闭导演模式或切回宿主后端。")
+
+    preview_path = Path(ctx.state_dir) / STREAM_PREVIEW_FILE
+    cancel_path = Path(ctx.state_dir) / BYOK_CANCEL_FILE
+    if _is_active_stream_preview(preview_path, max_age_s=180.0):
+        raise ValueError("上一轮 BYOK 生成仍在进行中，请等待完成或先点击停止。")
+    cancel_path.unlink(missing_ok=True)
 
     cfg = resolve_byok_config(ctx.load_plugin_settings(), ctx.state_dir)
     api_key = read_byok_api_key(ctx.state_dir)
@@ -611,27 +699,65 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
             missing.append("模型名")
         raise ValueError("BYOK 后端未配置完整：缺少 " + "、".join(missing))
 
+    pre_chat_path = Path(init_sess["chat_path"]) if init_sess.get("chat_path") and Path(init_sess["chat_path"]).exists() else None
+    pre_floor_count: int | None = None
+    if pre_chat_path is not None:
+        try:
+            _, pre_msgs = read_jsonl_chat(pre_chat_path)
+            pre_floor_count = len(pre_msgs)
+        except Exception:
+            pre_floor_count = None
+
     prep_args = {k: v for k, v in args.items() if k != "rp_conv_id"}
     prep_args["action_kind"] = action_kind
     prep = sidecar_prepare_agent_turn(ctx, prep_args)
-    # Withdraw the host launch claim right away so a concurrent host invocation in the bound
-    # conversation cannot pick up this BYOK prompt while the API call is in flight.
-    ctx.sessions.update({"pending_sidecar_launch": None})
-    preview_path = Path(ctx.state_dir) / STREAM_PREVIEW_FILE
+    session = ctx.sessions.load()
+    already_appended = bool(session.get("user_floor_already_appended", False))
+    active_chat_path = Path(session["chat_path"]) if session.get("chat_path") else None
+    appended_new_user_floor = False
+    if already_appended and active_chat_path is not None and active_chat_path.exists():
+        if pre_chat_path != active_chat_path:
+            appended_new_user_floor = True
+        elif pre_floor_count is not None:
+            try:
+                _, post_prep_msgs = read_jsonl_chat(active_chat_path)
+                appended_new_user_floor = len(post_prep_msgs) == pre_floor_count + 1
+            except Exception:
+                appended_new_user_floor = False
+
+    # Clear both `pending_sidecar_launch` and `pending_uncommitted_turn` immediately so host
+    # PreToolUse / Stop hooks in a bound conversation never collide with an in-flight BYOK turn.
+    ctx.sessions.update({
+        "pending_sidecar_launch": None,
+        "pending_uncommitted_turn": False,
+    })
+
+    def _check_cancelled() -> None:
+        if cancel_path.exists():
+            cancel_path.unlink(missing_ok=True)
+            raise ValueError("BYOK 生成已取消")
+
+    committed = False
     try:
-        session = ctx.sessions.load()
         cache_mode = cfg["cache_mode"]
         frame = st_dump_prompt_frame(ctx, {
             "character_name": session.get("card_file") or prep["character_name"],
-            # The user floor was already appended by `sidecar_prepare_agent_turn`; passing the text
-            # again would make the lore engine append it a second time to the rendered history.
-            "user_input": "" if session.get("user_floor_already_appended") else str(args.get("user_text", "")),
+            # For `send_turn`, the user floor is already on disk; for `swipe_reroll`, any direction
+            # hint belongs strictly in `prep["prompt"]` rather than as a fake in-scene user floor.
+            "user_input": "",
+            "_swipe_reroll": action_kind == "swipe_reroll",
+            "_exclude_trailing_user": already_appended and cache_mode == "off",
             "agentic_hands": False,
             "cache_mode": cache_mode,
             "_include_parts": cache_mode != "off",
         })
         if cache_mode != "off":
-            messages = build_byok_cached_messages(frame["frame_parts"], prep["prompt"], cache_control=cfg["cache_control"])
+            messages = build_byok_cached_messages(
+                frame["frame_parts"],
+                prep["prompt"],
+                cache_control=cfg["cache_control"],
+                user_already_in_history=already_appended,
+            )
         else:
             messages = build_byok_messages(frame["ephemeral_frame"], prep["prompt"])
         preset = load_openai_preset(ctx.st_data_root, session.get("preset_name"))
@@ -643,12 +769,19 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
             "temperature": preset.get("temperature"),
             "max_tokens": int(args["max_tokens"]) if args.get("max_tokens") else None,
         }
+        _check_cancelled()
         if cfg["stream"]:
             preview = _StreamPreviewWriter(preview_path, action_kind)
             preview.write("", force=True)
-            reply, usage = byok_chat_completion_stream(on_delta=preview.write, **call_kwargs)
+
+            def _on_stream_delta(text_so_far: str) -> None:
+                _check_cancelled()
+                preview.write(text_so_far)
+
+            reply, usage = byok_chat_completion_stream(on_delta=_on_stream_delta, **call_kwargs)
         else:
             reply, usage = byok_chat_completion_with_usage(**call_kwargs)
+        _check_cancelled()
         extra_meta: dict[str, Any] = {"generation_backend": "byok", "byok_model": cfg["model"], "byok_cache_mode": cache_mode}
         if usage.get("prompt_tokens") is not None:
             extra_meta["byok_prompt_tokens"] = usage["prompt_tokens"]
@@ -661,13 +794,26 @@ def sidecar_byok_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, An
             "swipe_mode": action_kind == "swipe_reroll",
             "extra_meta": extra_meta,
         })
+        committed = True
         ctx.sessions.update({"last_byok_usage": {**usage, "cache_mode": cache_mode, "at": int(time.time())}})
     finally:
+        if not committed and appended_new_user_floor and active_chat_path is not None and active_chat_path.exists():
+            clean_u = str(args.get("user_text", "")).strip()
+            try:
+                with exclusive_file_lock(active_chat_path):
+                    rb_hdr, rb_msgs = read_jsonl_chat(active_chat_path)
+                    if (
+                        len(rb_msgs) > 1
+                        and bool(rb_msgs[-1].get("is_user"))
+                        and str(rb_msgs[-1].get("mes", "")).strip() == clean_u
+                    ):
+                        rb_msgs.pop()
+                        write_jsonl_chat_atomic(active_chat_path, rb_hdr, rb_msgs)
+            except Exception:
+                pass
         # The committed floor (or the error toast) replaces the live preview.
-        try:
-            preview_path.unlink()
-        except OSError:
-            pass
+        preview_path.unlink(missing_ok=True)
+        cancel_path.unlink(missing_ok=True)
         # Never leave the stage busy or a pending turn for the host Stop hook to pick up.
         ctx.sessions.update({
             "pending_uncommitted_turn": False,
@@ -741,8 +887,8 @@ def sidecar_import_card(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, 
     stem = sanitize_filename_stem(Path(filename).stem)
     out_png = ensure_under_dir(char_dir / f"{stem}.png", char_dir)
 
-    if filename.lower().endswith(".json") or raw_bytes.lstrip().startswith(b"{"):
-        card_obj = json.loads(raw_bytes.decode("utf-8"))
+    if filename.lower().endswith(".json") or raw_bytes.lstrip().startswith((b"{", b"\xef\xbb\xbf{")):
+        card_obj = json.loads(raw_bytes.decode("utf-8-sig"))
         minor_gate = evaluate_minor_risk_gate(card_obj)
         if minor_gate["gate_action"] == "block_load":
             raise ValueError(

@@ -41,17 +41,22 @@ def _run_tool(ctx: RuntimeContext, name: str, args: dict) -> dict:
 
 
 def _clear_persistence_failure_state(runtime, sess: dict) -> None:
-    """Resets the retry counter after a successful commit.
+    """Resets the retry counter and error banner after a successful commit.
 
     `tool_st_commit_turn` reloads and saves its own session snapshot, so the
     counter must be cleared from a fresh read rather than from our stale `sess`.
     This is pure bookkeeping: a failure here must never make the caller treat an
     already-committed turn as failed and write the same floor a second time.
     """
-    if not sess.get("persistence_failure_count"):
+    if not sess.get("persistence_failure_count") and not sess.get("last_persistence_error"):
         return
     try:
-        runtime.sessions.update({"persistence_failure_count": 0})
+        def _clear(cur: dict) -> dict:
+            cur["persistence_failure_count"] = 0
+            cur.pop("last_persistence_error", None)
+            return cur
+
+        runtime.sessions.update(_clear)
     except Exception:
         pass
 
@@ -106,15 +111,18 @@ def extract_latest_model_prose(transcript_path: str, conv_id: str, fallback_text
                     continue
                 row_type = str(row.get("type") or "")
                 row_source = str(row.get("source") or "")
-                if row_type == "USER_INPUT" or row_source == "USER_EXPLICIT":
+                if row_type == "USER_INPUT" or row_source in ("USER_EXPLICIT", "USER", "SIDECAR"):
                     latest_pure = ""
                     continue
                 if row_source == "MODEL" and row_type in ("PLANNER_RESPONSE", "ASSISTANT_RESPONSE", "MODEL_RESPONSE"):
-                    content = str(row.get("content") or "").strip()
-                    if not content:
-                        continue
                     tool_calls = row.get("tool_calls") or []
-                    if not tool_calls:
+                    if tool_calls:
+                        # Any model step invoking tools invalidates prose from an earlier turn/step;
+                        # final narrative prose must come after the last tool call.
+                        latest_pure = ""
+                        continue
+                    content = str(row.get("content") or "").strip()
+                    if content:
                         latest_pure = content
             if latest_pure:
                 return latest_pure

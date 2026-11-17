@@ -21,6 +21,7 @@ import base64
 import copy
 import io
 import json
+import os
 from pathlib import Path
 import re
 import struct
@@ -152,13 +153,75 @@ def iter_png_chunks(png_bytes: bytes) -> list[tuple[bytes, bytes]]:
     return chunks
 
 
+MAX_TEXT_CHUNK_DECOMPRESSED_BYTES = 32 * 1024 * 1024
+
+
+def _safe_zlib_decompress(data: bytes, max_bytes: int = MAX_TEXT_CHUNK_DECOMPRESSED_BYTES) -> bytes | None:
+    """Decompresses zlib payload with a strict memory cap against decompression bombs."""
+    try:
+        decomp = zlib.decompressobj()
+        out = decomp.decompress(data, max_bytes + 1)
+        if len(out) > max_bytes or decomp.unconsumed_tail:
+            raise CardCodecError(f"Compressed PNG text chunk exceeds {max_bytes} bytes limit.")
+        out += decomp.flush()
+        if len(out) > max_bytes:
+            raise CardCodecError(f"Compressed PNG text chunk exceeds {max_bytes} bytes limit.")
+        return out
+    except zlib.error:
+        return None
+
+
+def iter_png_text_chunks_fast(path: Path) -> list[tuple[bytes, bytes]]:
+    """Streams PNG chunk headers and reads ONLY text metadata chunks (`tEXt`/`zTXt`/`iTXt`),
+    seeking past multi-megabyte `IDAT` image payloads for fast card directory scanning."""
+    total = path.stat().st_size
+    if total < len(PNG_SIGNATURE) + 12:
+        raise CardCodecError("Invalid PNG signature: file is not a valid PNG image.")
+    chunks: list[tuple[bytes, bytes]] = []
+    with open(path, "rb") as fh:
+        sig = fh.read(len(PNG_SIGNATURE))
+        if sig != PNG_SIGNATURE:
+            raise CardCodecError("Invalid PNG signature: file is not a valid PNG image.")
+        offset = len(PNG_SIGNATURE)
+        while offset + 8 <= total:
+            hdr = fh.read(8)
+            if len(hdr) < 8:
+                break
+            length = struct.unpack(">I", hdr[:4])[0]
+            chunk_type = hdr[4:8]
+            data_end = offset + 8 + length
+            if data_end + 4 > total:
+                raise CardCodecError(f"Truncated PNG chunk {chunk_type!r} at offset {offset}.")
+            if chunk_type in (b"tEXt", b"zTXt", b"iTXt", b"IHDR"):
+                chunk_data = fh.read(length)
+                crc_bytes = fh.read(4)
+                expected_crc = struct.unpack(">I", crc_bytes)[0]
+                actual_crc = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+                if expected_crc != actual_crc:
+                    raise CardCodecError(
+                        f"CRC mismatch in PNG chunk {chunk_type.decode('latin1', 'replace')}."
+                    )
+                if chunk_type != b"IHDR":
+                    chunks.append((chunk_type, chunk_data))
+            elif chunk_type == b"IEND":
+                break
+            else:
+                fh.seek(length + 4, os.SEEK_CUR)
+            offset = data_end + 4
+    return chunks
+
+
 def _decode_text_chunk(chunk_type: bytes, data: bytes) -> tuple[str, str] | None:
     """Extracts `(keyword, text_value)` from `tEXt`, `zTXt`, or `iTXt` chunks."""
     if chunk_type == b"tEXt":
         if b"\x00" not in data:
             return None
         key_raw, val_raw = data.split(b"\x00", 1)
-        return key_raw.decode("latin1"), val_raw.decode("latin1")
+        try:
+            val_str = val_raw.decode("utf-8")
+        except UnicodeDecodeError:
+            val_str = val_raw.decode("latin1")
+        return key_raw.decode("latin1"), val_str
 
     if chunk_type == b"zTXt":
         if b"\x00" not in data:
@@ -166,7 +229,9 @@ def _decode_text_chunk(chunk_type: bytes, data: bytes) -> tuple[str, str] | None
         key_raw, rest = data.split(b"\x00", 1)
         if not rest or rest[0] != 0:
             return None
-        decompressed = zlib.decompress(rest[1:])
+        decompressed = _safe_zlib_decompress(rest[1:])
+        if decompressed is None:
+            return None
         return key_raw.decode("latin1"), decompressed.decode("utf-8", errors="replace")
 
     if chunk_type == b"iTXt":
@@ -175,6 +240,9 @@ def _decode_text_chunk(chunk_type: bytes, data: bytes) -> tuple[str, str] | None
             return None
         keyword = data[:nul1].decode("latin1")
         comp_flag = data[nul1 + 1]
+        comp_method = data[nul1 + 2]
+        if comp_flag not in (0, 1) or (comp_flag == 1 and comp_method != 0):
+            return None
         rest = data[nul1 + 3 :]
         nul2 = rest.find(b"\x00")
         if nul2 == -1:
@@ -183,9 +251,12 @@ def _decode_text_chunk(chunk_type: bytes, data: bytes) -> tuple[str, str] | None
         nul3 = rest2.find(b"\x00")
         if nul3 == -1:
             return None
-        payload = rest2[nul3 + 1 :]
-        if comp_flag == 1:
-            payload = zlib.decompress(payload)
+        payload: bytes | None = rest2[nul3 + 1 :]
+        if comp_flag == 1 and payload is not None:
+            payload = _safe_zlib_decompress(payload)
+            if payload is None:
+                return None
+        assert payload is not None
         return keyword, payload.decode("utf-8", errors="replace")
 
     return None
@@ -231,6 +302,10 @@ def sanitize_and_normalize_v3(raw_card: dict[str, Any]) -> dict[str, Any]:
         if v is not None:
             normalized_data[k] = v
 
+    _frame_tag_re = re.compile(
+        r"<\|im_(?:start|end)\|>|</?ST_RUNTIME_FRAME[^>]*>|</?SYSTEM_INSTRUCTION[^>]*>",
+        re.IGNORECASE,
+    )
     for str_field in (
         "description",
         "personality",
@@ -242,12 +317,13 @@ def sanitize_and_normalize_v3(raw_card: dict[str, Any]) -> dict[str, Any]:
     ):
         val = normalized_data.get(str_field)
         if isinstance(val, str) and val:
-            normalized_data[str_field] = re.sub(
-                r"<\|im_(?:start|end)\|>|</?ST_RUNTIME_FRAME[^>]*>",
-                "",
-                val,
-                flags=re.IGNORECASE,
-            )
+            normalized_data[str_field] = _frame_tag_re.sub("", val)
+    for greet_list_key in ("alternate_greetings", "group_only_greetings"):
+        g_list = normalized_data.get(greet_list_key)
+        if isinstance(g_list, list):
+            normalized_data[greet_list_key] = [
+                _frame_tag_re.sub("", g) if isinstance(g, str) else g for g in g_list
+            ]
 
     if not str(normalized_data.get("name", "")).strip():
         raise CardCodecError("Character card requires a non-empty 'name' field.")
@@ -312,6 +388,7 @@ def extract_avatar_data_uri(png_bytes: bytes, max_size: int = 384) -> str | None
 def read_character_card(
     card_path: str | Path,
     include_avatar_data_uri: bool = True,
+    fast_metadata_only: bool = False,
 ) -> dict[str, Any]:
     """Reads a `.png` or `.json` character card, preferring `ccv3` over `chara`."""
     path = Path(card_path)
@@ -319,7 +396,7 @@ def read_character_card(
         raise CardCodecError(f"Character card file not found: {path}")
 
     if path.suffix.lower() == ".json":
-        raw_obj = json.loads(path.read_text(encoding="utf-8"))
+        raw_obj = json.loads(path.read_text(encoding="utf-8-sig"))
         card_v3 = sanitize_and_normalize_v3(raw_obj)
         return {
             "source_path": str(path.resolve()),
@@ -330,8 +407,12 @@ def read_character_card(
             "avatar_data_uri": None,
         }
 
-    png_bytes = path.read_bytes()
-    chunks = iter_png_chunks(png_bytes)
+    png_bytes: bytes | None = None
+    if fast_metadata_only and not include_avatar_data_uri:
+        chunks = iter_png_text_chunks_fast(path)
+    else:
+        png_bytes = path.read_bytes()
+        chunks = iter_png_chunks(png_bytes)
     text_entries: dict[str, str] = {}
     for c_type, c_data in chunks:
         if c_type in (b"tEXt", b"zTXt", b"iTXt"):
@@ -358,7 +439,7 @@ def read_character_card(
         "has_dual_chunks": ("ccv3" in text_entries and "chara" in text_entries),
         "raw_card": raw_obj,
         "card": card_v3,
-        "avatar_data_uri": extract_avatar_data_uri(png_bytes) if include_avatar_data_uri else None,
+        "avatar_data_uri": extract_avatar_data_uri(png_bytes) if (include_avatar_data_uri and png_bytes is not None) else None,
     }
 
 
@@ -446,11 +527,40 @@ def list_character_expressions(st_data_root: str | Path, character_name: str) ->
     return sorted(p.stem for p in expr_dir.iterdir() if p.is_file() and p.suffix.lower() in allowed)
 
 
+_ASCII_EXACT_SUFFIX_TRIGGERS: dict[str, str] = {
+    "awe": r"d?",
+    "aha": r"",
+    "phew": r"",
+    "tsk": r"",
+    "sob": r"(?:s|bed|bing)?",
+    "nod": r"(?:s|ded|ding)?",
+    "grin": r"(?:s|ned|ning)?",
+    "beam": r"(?:s|ed|ing)?",
+    "sad": r"(?:ly|ness)?",
+    "pale": r"(?:s|d|r)?",
+}
+_EMOTION_ASCII_RE_CACHE: dict[str, re.Pattern[str]] = {}
+
+
+def _match_emotion_trigger(trig: str, haystack: str) -> bool:
+    if not trig.isascii():
+        return trig in haystack
+    pat = _EMOTION_ASCII_RE_CACHE.get(trig)
+    if pat is None:
+        if trig in _ASCII_EXACT_SUFFIX_TRIGGERS:
+            suf = _ASCII_EXACT_SUFFIX_TRIGGERS[trig]
+            pat = re.compile(rf"\b{re.escape(trig)}{suf}\b", re.IGNORECASE)
+        else:
+            pat = re.compile(rf"\b{re.escape(trig)}(?:s|es|ed|d|ing|ly)?\b", re.IGNORECASE)
+        _EMOTION_ASCII_RE_CACHE[trig] = pat
+    return bool(pat.search(haystack))
+
+
 def detect_message_emotion(text: str, available_expressions: list[str]) -> str | None:
     """Infers the best matching expression sprite name for a character reply.
 
     Scores all 28 GoEmotions candidates across stage directions (`*...*`, 2x weight)
-    and dialogue (`1x` weight) while filtering negated-smile false positives.
+    and dialogue (`1x` weight) while filtering negated-smile and English substring false positives.
     """
     if not available_expressions:
         return None
@@ -471,9 +581,9 @@ def detect_message_emotion(text: str, available_expressions: list[str]) -> str |
         act_hay = action_spans_joy if expr_key == "joy" else action_spans
         score = 0.0
         for trig in triggers:
-            if trig in act_hay:
+            if _match_emotion_trigger(trig, act_hay):
                 score += 2.0
-            elif trig in full_hay:
+            elif _match_emotion_trigger(trig, full_hay):
                 score += 1.0
         if score > 0:
             # Slight specificity bonus for earlier-ranked nuanced emotions over generic fallbacks

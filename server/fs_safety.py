@@ -17,9 +17,12 @@ from typing import Any
 
 def sanitize_filename_stem(raw_name: str) -> str:
     """Sanitizes an arbitrary string into a safe single-component filename stem."""
-    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(raw_name).strip())
+    raw_str = str(raw_name).strip()
+    if ".." in Path(raw_str.replace("\\", "/")).parts:
+        raise ValueError(f"Invalid filename stem after sanitization: {raw_name!r}")
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", raw_str)
     cleaned = cleaned.rstrip(". ").strip()
-    if not cleaned or cleaned in {".", ".."} or ".." in cleaned:
+    if not cleaned or cleaned in {".", ".."}:
         raise ValueError(f"Invalid filename stem after sanitization: {raw_name!r}")
     # Windows reserved device names (CON, NUL, COM1-9, LPT1-9, optionally with an
     # extension) cannot be created as-is — prefix an underscore to make them legal.

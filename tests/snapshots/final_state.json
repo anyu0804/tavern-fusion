@@ -1,6 +1,7 @@
 {
   "active_session": {
     "active": false,
+    "agentic_hands": false,
     "avatar_stem": "Seraphina",
     "bootstrapped_char": "",
     "bootstrapped_conv_id": "",
@@ -8,6 +9,8 @@
     "card_path": "<TMP>/data/default-user/characters/Seraphina.png",
     "character_name": "Seraphina",
     "chat_path": "<TMP>/data/default-user/chats/Seraphina/<STAMP>.jsonl",
+    "director_mode": false,
+    "epistemic_level": 0,
     "extra_lorebooks": [],
     "last_bootstrapped_at": "<VOLATILE>",
     "mode": "play",

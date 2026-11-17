@@ -34,8 +34,8 @@ def resolve_st_macros(
     if "{{original}}" in out:
         out = out.replace("{{original}}", original_prompt)
 
-    out = re.sub(r"\{\{char\}\}", char_name, out, flags=re.IGNORECASE)
-    out = re.sub(r"\{\{user\}\}", user_name, out, flags=re.IGNORECASE)
+    out = re.sub(r"\{\{char\}\}", lambda _: char_name, out, flags=re.IGNORECASE)
+    out = re.sub(r"\{\{user\}\}", lambda _: user_name, out, flags=re.IGNORECASE)
     if defer_volatile:
         out = re.sub(r"\{\{time\}\}", "[当前时间，见末尾 Live Context]", out, flags=re.IGNORECASE)
         out = re.sub(r"\{\{date\}\}", "[当前日期，见末尾 Live Context]", out, flags=re.IGNORECASE)

@@ -12,6 +12,7 @@ lifecycle (`close()` / context manager) so temporary directories release cleanly
 from __future__ import annotations
 
 from collections import Counter
+from contextlib import contextmanager
 import copy
 from dataclasses import dataclass, field
 import hashlib
@@ -23,7 +24,7 @@ import random
 import re
 import sqlite3
 import time
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 import urllib.error
 import urllib.request
 
@@ -258,6 +259,8 @@ class SQLiteLoreVectorCache:
         self.db_path = str(db_path) if db_path else ":memory:"
         self._is_memory = self.db_path == ":memory:"
         self._mem_conn: sqlite3.Connection | None = None
+        self._batch_conn: sqlite3.Connection | None = None
+        self._batch_dirty: bool = False
         if self._is_memory:
             self._mem_conn = sqlite3.connect(":memory:")
             self._init_schema(self._mem_conn)
@@ -268,6 +271,25 @@ class SQLiteLoreVectorCache:
                 self._init_schema(conn)
             finally:
                 conn.close()
+
+    @contextmanager
+    def batch(self) -> Iterator[None]:
+        """Reuses a single short-lived SQLite connection + single commit across one evaluation pass,
+        releasing the file handle immediately on exit so Windows never holds a persistent lock."""
+        if self._is_memory or self._batch_conn is not None:
+            yield
+            return
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
+        self._batch_conn = conn
+        self._batch_dirty = False
+        try:
+            yield
+            if self._batch_dirty:
+                conn.commit()
+        finally:
+            self._batch_conn = None
+            self._batch_dirty = False
+            conn.close()
 
     @staticmethod
     def _init_schema(conn: sqlite3.Connection) -> None:
@@ -306,32 +328,52 @@ class SQLiteLoreVectorCache:
         digest = _stable_text_digest(text[:2000])
 
         if self._mem_conn is not None:
-            return self._query_or_fetch_dense(self._mem_conn, model_key, digest, text)
+            return self._query_or_fetch_dense(self._mem_conn, model_key, digest, text, commit_now=True)
+        if self._batch_conn is not None:
+            vec, failed, mutated = self._query_or_fetch_dense_ex(self._batch_conn, model_key, digest, text, commit_now=False)
+            if mutated:
+                self._batch_dirty = True
+            return vec, failed
 
         conn = sqlite3.connect(self.db_path, timeout=5.0)
         try:
-            return self._query_or_fetch_dense(conn, model_key, digest, text)
+            return self._query_or_fetch_dense(conn, model_key, digest, text, commit_now=True)
         finally:
             conn.close()
 
-    @staticmethod
+    @classmethod
     def _query_or_fetch_dense(
+        cls,
         conn: sqlite3.Connection,
         model_key: str,
         digest: str,
         text: str,
+        *,
+        commit_now: bool = True,
     ) -> tuple[list[float] | None, bool]:
+        vec, failed, _ = cls._query_or_fetch_dense_ex(conn, model_key, digest, text, commit_now=commit_now)
+        return vec, failed
+
+    @staticmethod
+    def _query_or_fetch_dense_ex(
+        conn: sqlite3.Connection,
+        model_key: str,
+        digest: str,
+        text: str,
+        *,
+        commit_now: bool = True,
+    ) -> tuple[list[float] | None, bool, bool]:
         cur = conn.execute(
             "SELECT vec_json FROM dense_embeddings WHERE model_key = ? AND text_digest = ?",
             (model_key, digest),
         )
         row = cur.fetchone()
         if row:
-            return json.loads(row[0]), False
+            return json.loads(row[0]), False, False
 
         fetched = try_external_embedding(text)
         if fetched is None:
-            return None, True
+            return None, True, False
 
         conn.execute(
             """
@@ -343,36 +385,57 @@ class SQLiteLoreVectorCache:
             """,
             (model_key, digest, json.dumps(fetched), time.time()),
         )
-        conn.commit()
-        return fetched, False
+        if commit_now:
+            conn.commit()
+        return fetched, False, True
 
     def get_or_compute(self, entry: NormalizedLoreEntry) -> dict[str, float]:
         combined = " ".join(entry.keys + entry.keys_secondary + [entry.comment, entry.content])
         digest = _stable_text_digest(combined)
 
         if self._mem_conn is not None:
-            return self._query_or_upsert(self._mem_conn, entry, digest, combined)
+            return self._query_or_upsert(self._mem_conn, entry, digest, combined, commit_now=True)
+        if self._batch_conn is not None:
+            vec, mutated = self._query_or_upsert_ex(self._batch_conn, entry, digest, combined, commit_now=False)
+            if mutated:
+                self._batch_dirty = True
+            return vec
 
         conn = sqlite3.connect(self.db_path, timeout=5.0)
         try:
-            return self._query_or_upsert(conn, entry, digest, combined)
+            return self._query_or_upsert(conn, entry, digest, combined, commit_now=True)
         finally:
             conn.close()
 
-    @staticmethod
+    @classmethod
     def _query_or_upsert(
+        cls,
         conn: sqlite3.Connection,
         entry: NormalizedLoreEntry,
         digest: str,
         combined: str,
+        *,
+        commit_now: bool = True,
     ) -> dict[str, float]:
+        vec, _ = cls._query_or_upsert_ex(conn, entry, digest, combined, commit_now=commit_now)
+        return vec
+
+    @staticmethod
+    def _query_or_upsert_ex(
+        conn: sqlite3.Connection,
+        entry: NormalizedLoreEntry,
+        digest: str,
+        combined: str,
+        *,
+        commit_now: bool = True,
+    ) -> tuple[dict[str, float], bool]:
         cur = conn.execute(
             "SELECT text_digest, vec_json FROM lore_vectors WHERE book_name = ? AND uid = ?",
             (entry.source_book, entry.uid),
         )
         row = cur.fetchone()
         if row and row[0] == digest:
-            return json.loads(row[1])
+            return json.loads(row[1]), False
 
         vec = build_feature_vector(combined)
         conn.execute(
@@ -386,8 +449,9 @@ class SQLiteLoreVectorCache:
             """,
             (entry.source_book, entry.uid, digest, json.dumps(vec, ensure_ascii=False), time.time()),
         )
-        conn.commit()
-        return vec
+        if commit_now:
+            conn.commit()
+        return vec, True
 
     def close(self) -> None:
         if self._mem_conn is not None:
@@ -513,11 +577,20 @@ def parse_lorebook_dict(
     return parsed
 
 
+def _safe_int_uid(raw_uid: Any, fallback: int = 0) -> tuple[int, bool]:
+    try:
+        if raw_uid is None or isinstance(raw_uid, bool):
+            return fallback, False
+        return int(raw_uid), True
+    except (TypeError, ValueError):
+        return fallback, False
+
+
 def load_lorebook_file(path: str | Path, source_tier: int = 3) -> list[NormalizedLoreEntry]:
     p = Path(path)
     if not p.exists():
         return []
-    raw = json.loads(p.read_text(encoding="utf-8"))
+    raw = json.loads(p.read_text(encoding="utf-8-sig"))
     return parse_lorebook_dict(raw, book_name=p.stem, source_tier=source_tier)
 
 
@@ -526,30 +599,39 @@ def lint_lorebook_file(path: str | Path) -> list[dict[str, Any]]:
     p = Path(path)
     if not p.exists():
         return [{"code": "FILE_NOT_FOUND", "severity": "error", "field": str(p.name), "message": "Lorebook file does not exist."}]
-    raw = json.loads(p.read_text(encoding="utf-8"))
+    raw = json.loads(p.read_text(encoding="utf-8-sig"))
     entries_raw = raw.get("entries", {})
     items = entries_raw.values() if isinstance(entries_raw, dict) else (entries_raw if isinstance(entries_raw, list) else [])
 
     issues: list[dict[str, Any]] = []
-    seen_uids: set[int] = set()
+    seen_uids: set[int | str] = set()
     for idx, item in enumerate(items):
         if not isinstance(item, dict):
             continue
-        uid = int(item.get("uid", idx))
-        title = item.get("comment") or item.get("name") or f"uid={uid}"
-        if uid in seen_uids:
+        raw_u = item.get("uid", item.get("id", idx))
+        uid, valid_int = _safe_int_uid(raw_u, idx)
+        uid_key: int | str = uid if valid_int else str(raw_u)
+        title = item.get("comment") or item.get("name") or f"uid={uid_key}"
+        if not valid_int and raw_u is not None:
+            issues.append({
+                "code": "INVALID_UID",
+                "severity": "warning",
+                "field": f"entries[{idx}].uid",
+                "message": f"Entry '{title}' has non-integer UID {raw_u!r}; coerced to sequential ID.",
+            })
+        if uid_key in seen_uids:
             issues.append({
                 "code": "DUPLICATE_UID",
                 "severity": "error",
-                "field": f"entries[{uid}]",
-                "message": f"Duplicate entry UID {uid} ('{title}').",
+                "field": f"entries[{uid_key}]",
+                "message": f"Duplicate entry UID {uid_key} ('{title}').",
             })
-        seen_uids.add(uid)
+        seen_uids.add(uid_key)
 
         keys = _parse_key_list(item.get("key", item.get("keys", [])))
         sec = _parse_key_list(item.get("keysecondary", item.get("secondary_keys", [])))
         constant = bool(item.get("constant", False))
-        disabled = bool(item.get("disable", False))
+        disabled = bool(item.get("disable", False)) if "disable" in item else (not bool(item.get("enabled", True)))
 
         if sec and item.get("selective") is False:
             issues.append({
@@ -710,56 +792,58 @@ class HybridLoreEngine:
         query_vec = build_feature_vector(sem_query_text)
         dense_query: list[float] | None = None
         dense_endpoint_failed = False
-        if sem_query_text.strip():
-            dense_query, dense_endpoint_failed = self.vector_cache.get_or_fetch_dense(sem_query_text)
 
         candidates: dict[tuple[str, int], tuple[int, float, int, NormalizedLoreEntry, str]] = {}
 
-        for e in entries:
-            if not e.enabled or not e.content.strip():
-                continue
-            state_key = f"{e.source_book}:{e.uid}"
+        with self.vector_cache.batch():
+            if sem_query_text.strip():
+                dense_query, dense_endpoint_failed = self.vector_cache.get_or_fetch_dense(sem_query_text)
 
-            if e.delay > 0 and total_msgs < e.delay:
-                continue
-            if cooldown_map.get(state_key, 0) > 0 and sticky_map.get(state_key, 0) <= 0:
-                continue
+            for e in entries:
+                if not e.enabled or not e.content.strip():
+                    continue
+                state_key = f"{e.source_book}:{e.uid}"
 
-            if e.constant:
-                candidates[(e.source_book, e.uid)] = (4, 1.0, 999, e, "constant")
-                continue
-
-            if sticky_map.get(state_key, 0) > 0:
-                candidates[(e.source_book, e.uid)] = (4, 0.99, 999, e, f"sticky({sticky_map[state_key]})")
-                continue
-
-            if e.delay_until_recursion:
-                continue
-
-            if e.use_probability and e.probability < 100:
-                if e.probability <= 0 or rng.randint(1, 100) > e.probability:
+                if e.delay > 0 and total_msgs < e.delay:
+                    continue
+                if cooldown_map.get(state_key, 0) > 0 and sticky_map.get(state_key, 0) <= 0:
                     continue
 
-            kw_ok, grp_score = count_key_matches(e, scan_buffer)
-            if kw_ok:
-                candidates[(e.source_book, e.uid)] = (3, 1.0, grp_score, e, "keyword")
-                continue
+                if e.constant:
+                    candidates[(e.source_book, e.uid)] = (4, 1.0, 999, e, "constant")
+                    continue
 
-            if e.vectorized and (query_vec or dense_query):
-                sim = 0.0
-                if dense_query is not None and not dense_endpoint_failed:
-                    dense_entry, failed_now = self.vector_cache.get_or_fetch_dense(
-                        " ".join(e.keys + [e.comment, e.content])
-                    )
-                    if failed_now:
-                        dense_endpoint_failed = True
-                    elif dense_entry is not None:
-                        sim = cosine_dense(dense_query, dense_entry)
-                if sim <= 0.0 and query_vec:
-                    entry_vec = self.vector_cache.get_or_compute(e)
-                    sim = cosine_sparse(query_vec, entry_vec)
-                if sim >= semantic_threshold and passes_negative_secondary_gate(e, scan_buffer):
-                    candidates[(e.source_book, e.uid)] = (2, sim, 1, e, f"semantic({sim:.2f})")
+                if sticky_map.get(state_key, 0) > 0:
+                    candidates[(e.source_book, e.uid)] = (4, 0.99, 999, e, f"sticky({sticky_map[state_key]})")
+                    continue
+
+                if e.delay_until_recursion:
+                    continue
+
+                if e.use_probability and e.probability < 100:
+                    if e.probability <= 0 or rng.randint(1, 100) > e.probability:
+                        continue
+
+                kw_ok, grp_score = count_key_matches(e, scan_buffer)
+                if kw_ok:
+                    candidates[(e.source_book, e.uid)] = (3, 1.0, grp_score, e, "keyword")
+                    continue
+
+                if e.vectorized and (query_vec or dense_query):
+                    sim = 0.0
+                    if dense_query is not None and not dense_endpoint_failed:
+                        dense_entry, failed_now = self.vector_cache.get_or_fetch_dense(
+                            " ".join(e.keys + [e.comment, e.content])
+                        )
+                        if failed_now:
+                            dense_endpoint_failed = True
+                        elif dense_entry is not None:
+                            sim = cosine_dense(dense_query, dense_entry)
+                    if sim <= 0.0 and query_vec:
+                        entry_vec = self.vector_cache.get_or_compute(e)
+                        sim = cosine_sparse(query_vec, entry_vec)
+                    if sim >= semantic_threshold and passes_negative_secondary_gate(e, scan_buffer):
+                        candidates[(e.source_book, e.uid)] = (2, sim, 1, e, f"semantic({sim:.2f})")
 
         for _step in range(max(0, max_recursion_steps)):
             rec_sources = [item[3].content for item in candidates.values() if not item[3].prevent_recursion]
@@ -769,8 +853,16 @@ class HybridLoreEngine:
             added_any = False
             for e in entries:
                 key_id = (e.source_book, e.uid)
-                if not e.enabled or key_id in candidates or e.exclude_recursion or e.constant:
+                if not e.enabled or not e.content.strip() or key_id in candidates or e.exclude_recursion or e.constant:
                     continue
+                state_key = f"{e.source_book}:{e.uid}"
+                if e.delay > 0 and total_msgs < e.delay:
+                    continue
+                if cooldown_map.get(state_key, 0) > 0 and sticky_map.get(state_key, 0) <= 0:
+                    continue
+                if e.use_probability and e.probability < 100:
+                    if e.probability <= 0 or rng.randint(1, 100) > e.probability:
+                        continue
                 kw_ok, grp_score = count_key_matches(e, rec_buffer)
                 if kw_ok:
                     candidates[key_id] = (1, 0.75, grp_score, e, "recursive")
@@ -920,7 +1012,7 @@ def evolve_lorebook_file(
     """`Dramaturgi` Lore Evolution persistence: atomically mutates SillyTavern `worlds/*.json`."""
     path = Path(lorebook_path)
     if path.exists():
-        raw_book = json.loads(path.read_text(encoding="utf-8"))
+        raw_book = json.loads(path.read_text(encoding="utf-8-sig"))
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         raw_book = {"entries": {}}
@@ -945,9 +1037,9 @@ def evolve_lorebook_file(
     if operation == "delete":
         if existing_key is None:
             raise ValueError(f"Lorebook entry uid={target_uid} not found in {path.name}.")
-        entries_dict.pop(existing_key, None)
+        removed = entries_dict.pop(existing_key, None) or {}
         action_taken = "deleted"
-        final_uid = int(target_uid)
+        final_uid = _safe_int_uid(removed.get("uid", target_uid), 0)[0]
 
     elif operation == "toggle":
         if existing_key is None:
@@ -956,7 +1048,7 @@ def evolve_lorebook_file(
         new_enabled = entry_payload.get("enabled", cur_disable)
         entries_dict[existing_key]["disable"] = not bool(new_enabled)
         action_taken = "toggled"
-        final_uid = int(entries_dict[existing_key].get("uid", existing_key))
+        final_uid = _safe_int_uid(entries_dict[existing_key].get("uid", existing_key), 0)[0]
 
     elif operation == "archive":
         if existing_key is None:
@@ -966,12 +1058,21 @@ def evolve_lorebook_file(
         if not comment_old.startswith("[ARCHIVED]"):
             entries_dict[existing_key]["comment"] = f"[ARCHIVED] {comment_old}".strip()
         action_taken = "archived"
-        final_uid = int(entries_dict[existing_key].get("uid", existing_key))
+        final_uid = _safe_int_uid(entries_dict[existing_key].get("uid", existing_key), 0)[0]
 
     elif operation == "upsert":
         if existing_key is None:
-            existing_uids = [int(v.get("uid", k)) for k, v in entries_dict.items() if str(v.get("uid", k)).isdigit()]
-            final_uid = int(target_uid) if target_uid is not None else (max(existing_uids, default=99) + 1)
+            existing_uids = [
+                parsed_u
+                for k, v in entries_dict.items()
+                for parsed_u, ok_u in (_safe_int_uid(v.get("uid", k)),)
+                if ok_u
+            ]
+            if target_uid is not None:
+                parsed_t, ok_t = _safe_int_uid(target_uid)
+                final_uid = parsed_t if ok_t else (max(existing_uids, default=99) + 1)
+            else:
+                final_uid = max(existing_uids, default=99) + 1
             existing_key = str(final_uid)
             entries_dict[existing_key] = {
                 "uid": final_uid,
@@ -1008,7 +1109,7 @@ def evolve_lorebook_file(
             }
             action_taken = "inserted"
         else:
-            final_uid = int(entries_dict[existing_key].get("uid", existing_key))
+            final_uid = _safe_int_uid(entries_dict[existing_key].get("uid", existing_key), 0)[0]
             action_taken = "updated"
 
         rec = entries_dict[existing_key]
@@ -1035,11 +1136,26 @@ def evolve_lorebook_file(
             ("vectorized", "vectorized", bool),
             ("sticky", "sticky", int),
             ("cooldown", "cooldown", int),
+            ("delay", "delay", int),
+            ("probability", "probability", int),
+            ("group", "group", str),
         ):
             if field_key in entry_payload:
                 rec[target_key] = cast(entry_payload[field_key])
+        if "group_weight" in entry_payload or "groupWeight" in entry_payload:
+            rec["groupWeight"] = int(entry_payload.get("group_weight", entry_payload.get("groupWeight", 100)))
+        if "use_probability" in entry_payload or "useProbability" in entry_payload:
+            rec["useProbability"] = bool(entry_payload.get("use_probability", entry_payload.get("useProbability", True)))
+        if "outlet_name" in entry_payload or "outletName" in entry_payload:
+            rec["outletName"] = str(entry_payload.get("outlet_name", entry_payload.get("outletName", ""))).strip()
+        if "role" in entry_payload:
+            role_in = entry_payload["role"]
+            rev_role = {"system": 0, "user": 1, "assistant": 2}
+            rec["role"] = rev_role.get(str(role_in).lower(), int(role_in) if isinstance(role_in, int) else 0)
         if "enabled" in entry_payload:
             rec["disable"] = not bool(entry_payload["enabled"])
+        elif "disable" in entry_payload:
+            rec["disable"] = bool(entry_payload["disable"])
         if "position" in entry_payload:
             pos_in = entry_payload["position"]
             rev_pos = {

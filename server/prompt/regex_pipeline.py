@@ -117,19 +117,23 @@ def run_regex_pipeline(
     is_storage_pass: bool = True,
     epistemic_level: int = 0,
     is_backstage: bool = False,
+    char_name: str = "",
+    user_name: str = "",
+    is_user_message: bool = False,
 ) -> str:
     """Runs built-in reasoning/state-tag stripping, Lock #4 Immersion Guard Regex, and ST `regex_scripts`."""
     if not text:
         return ""
     cleaned = text
-    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"<st_state>[\s\S]*?</st_state>", "", cleaned, flags=re.IGNORECASE)
-    cleaned = cleaned.replace("<START>", "")
+    if is_storage_pass:
+        cleaned = re.sub(r"<think>[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"<st_state>[\s\S]*?</st_state>", "", cleaned, flags=re.IGNORECASE)
+        cleaned = cleaned.replace("<START>", "")
 
-    norm_epistemic = normalize_epistemic_level(epistemic_level)
-    if norm_epistemic < 100 and not is_backstage:
-        for pat, repl_str in BUILTIN_IMMERSION_GUARD_REGEX:
-            cleaned = pat.sub(repl_str, cleaned)
+        norm_epistemic = normalize_epistemic_level(epistemic_level)
+        if norm_epistemic < 100 and not is_backstage:
+            for pat, repl_str in BUILTIN_IMMERSION_GUARD_REGEX:
+                cleaned = pat.sub(repl_str, cleaned)
 
     scripts: list[dict[str, Any]] = []
     if st_data_root:
@@ -140,21 +144,31 @@ def run_regex_pipeline(
     if isinstance(card_extensions, dict) and isinstance(card_extensions.get("regex_scripts"), list):
         scripts.extend(card_extensions["regex_scripts"])
 
+    applied_any = False
     for rule in scripts:
         if not isinstance(rule, dict) or rule.get("disabled"):
             continue
-        # ST semantics: a field absent means `false`. Only skip scripts explicitly scoped
-        # away from storage: `markdownOnly` (display-only) and `promptOnly` / `is_user_regex`
-        # (never alter the character's stored text). The old `get("markdownOnly", True)`
-        # default silently skipped every script that did not set the field explicitly.
-        if is_storage_pass and (
-            rule.get("markdownOnly") or rule.get("promptOnly") or rule.get("is_user_regex")
-        ):
-            continue
+        # ST semantics: a field absent means `false`.
+        # - Storage pass (`is_storage_pass=True`): skip `markdownOnly` (display-only) and
+        #   `promptOnly` / `is_user_regex` (never alter the character's stored text).
+        # - Prompt pass (`is_storage_pass=False`): run ONLY `promptOnly` scripts (never `markdownOnly`),
+        #   honoring `is_user_regex` when scoped to user vs character messages.
+        if is_storage_pass:
+            if rule.get("markdownOnly") or rule.get("promptOnly") or rule.get("is_user_regex"):
+                continue
+        else:
+            if not rule.get("promptOnly") or rule.get("markdownOnly"):
+                continue
+            if rule.get("is_user_regex") and not is_user_message:
+                continue
         raw_pat = str(rule.get("findRegex", "")).strip()
         repl = str(rule.get("replaceString", ""))
         if not raw_pat:
             continue
+        if char_name:
+            raw_pat = re.sub(r"\{\{char\}\}", lambda _: re.escape(char_name), raw_pat, flags=re.IGNORECASE)
+        if user_name:
+            raw_pat = re.sub(r"\{\{user\}\}", lambda _: re.escape(user_name), raw_pat, flags=re.IGNORECASE)
         flags = 0
         if raw_pat.startswith("/") and raw_pat.count("/") >= 2:
             idx = raw_pat.rfind("/")
@@ -169,7 +183,8 @@ def run_regex_pipeline(
             expr = raw_pat
         try:
             cleaned = re.sub(expr, lambda m, r=repl: _apply_js_regex_replacement(m, r), cleaned, flags=flags)
+            applied_any = True
         except re.error:
             continue
 
-    return cleaned.strip()
+    return cleaned.strip() if (is_storage_pass or applied_any) else cleaned

@@ -1830,7 +1830,7 @@ export class SidecarApp {
             self.assertEqual(ext_ver, expected_ver)
 
 
-    def test_14_byok_prefix_cache_mode(self) -> None:
+    def test_16_byok_prefix_cache_mode(self) -> None:
         import threading
         from http.server import BaseHTTPRequestHandler, HTTPServer
 

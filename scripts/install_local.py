@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -47,7 +48,7 @@ def register_workspace_plugin(workspace_dir: Path) -> Path:
     config_obj: dict = {"entries": []}
     if plugins_json.exists():
         try:
-            loaded = json.loads(plugins_json.read_text(encoding="utf-8"))
+            loaded = json.loads(plugins_json.read_text(encoding="utf-8-sig"))
             if isinstance(loaded, dict):
                 config_obj = loaded
         except Exception:
@@ -70,20 +71,26 @@ def register_workspace_plugin(workspace_dir: Path) -> Path:
     return plugins_json
 
 
+def _is_tavern_fusion_entry(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    inc = entry.get("include_only")
+    if isinstance(inc, list) and PLUGIN_ROOT.name in inc:
+        return True
+    raw_p = str(entry.get("path") or "").replace("\\", "/").rstrip("/")
+    return bool(not inc and (raw_p == PLUGIN_ROOT.name or raw_p.endswith(f"/{PLUGIN_ROOT.name}")))
+
+
 def remove_duplicate_workspace_entry(workspace_dir: Path) -> bool:
     plugins_json = workspace_dir.resolve() / ".agents" / "plugins.json"
     if not plugins_json.exists():
         return False
     try:
-        loaded = json.loads(plugins_json.read_text(encoding="utf-8"))
+        loaded = json.loads(plugins_json.read_text(encoding="utf-8-sig"))
         if not isinstance(loaded, dict) or not isinstance(loaded.get("entries"), list):
             return False
         orig_len = len(loaded["entries"])
-        loaded["entries"] = [
-            e
-            for e in loaded["entries"]
-            if not (isinstance(e, dict) and "tavern-fusion" in (e.get("include_only") or []))
-        ]
+        loaded["entries"] = [e for e in loaded["entries"] if not _is_tavern_fusion_entry(e)]
         if len(loaded["entries"]) != orig_len:
             plugins_json.write_text(json.dumps(loaded, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             return True
@@ -102,22 +109,63 @@ def install_st_web_extension(st_root: Path, user_handle: str = "default-user") -
     return dest_ext
 
 
-def install_global_plugin_and_sidecar() -> Path:
+_SYNC_EXCLUDED_NAMES = frozenset({
+    ".runtime_state",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".git",
+    ".github",
+    "tests",
+})
+
+
+def _prune_stale_plugin_files(src_root: Path, dst_root: Path) -> None:
+    """Removes deleted/renamed files and stale `__pycache__`/`*.pyc` from `dst_root`."""
+    if not dst_root.exists():
+        return
+    for cur_dir_str, dirnames, filenames in os.walk(dst_root, topdown=False):
+        cur_dst = Path(cur_dir_str)
+        rel_dir = cur_dst.relative_to(dst_root)
+        if any(part in _SYNC_EXCLUDED_NAMES for part in rel_dir.parts):
+            shutil.rmtree(cur_dst, ignore_errors=True)
+            continue
+        cur_src = src_root / rel_dir
+        for fname in filenames:
+            dst_file = cur_dst / fname
+            if fname in _SYNC_EXCLUDED_NAMES or fname.endswith((".pyc", ".pyo")) or not (cur_src / fname).is_file():
+                dst_file.unlink(missing_ok=True)
+        for dname in dirnames:
+            dst_sub = cur_dst / dname
+            if dname in _SYNC_EXCLUDED_NAMES or not (cur_src / dname).is_dir():
+                if dst_sub.is_symlink():
+                    dst_sub.unlink(missing_ok=True)
+                else:
+                    shutil.rmtree(dst_sub, ignore_errors=True)
+
+
+def install_global_plugin_and_sidecar(target_dir: Path | None = None) -> Path:
     ignore = shutil.ignore_patterns(
-        ".runtime_state",
-        "__pycache__",
+        *_SYNC_EXCLUDED_NAMES,
         "*.pyc",
-        ".pytest_cache",
-        "node_modules",
-        ".git",
-        "tests",
+        "*.pyo",
     )
-    global_plugin_dir = Path.home() / ".gemini" / "config" / "plugins" / "tavern-fusion"
+    global_plugin_dir = (
+        Path(target_dir)
+        if target_dir is not None
+        else Path.home() / ".gemini" / "config" / "plugins" / "tavern-fusion"
+    )
     global_plugin_dir.mkdir(parents=True, exist_ok=True)
     legacy_link = global_plugin_dir / ".runtime_state"
     if legacy_link.is_symlink():
         legacy_link.unlink(missing_ok=True)
+    _prune_stale_plugin_files(PLUGIN_ROOT, global_plugin_dir)
     shutil.copytree(PLUGIN_ROOT, global_plugin_dir, ignore=ignore, dirs_exist_ok=True)
+    _prune_stale_plugin_files(PLUGIN_ROOT, global_plugin_dir)
     # Only deploy under plugins/tavern-fusion so Antigravity mounts `tavern-fusion/tavern_stage`
     # once (with plugin.json's custom logo) instead of duplicating a puzzle-icon sidecar.
     return global_plugin_dir
@@ -164,7 +212,11 @@ def seed_mock_card_if_missing() -> Path:
     return card_png
 
 
-def remember_st_data_root(st_root: Path | None, user_handle: str = "default-user") -> Path | None:
+def remember_st_data_root(
+    st_root: Path | None,
+    user_handle: str = "default-user",
+    state_dir: Path | None = None,
+) -> Path | None:
     candidates: list[Path] = []
     if st_root is not None:
         candidates.append(st_root.resolve() / "data" / user_handle)
@@ -180,46 +232,38 @@ def remember_st_data_root(st_root: Path | None, user_handle: str = "default-user
     if chosen is None:
         return None
 
-    from server.fs_safety import atomic_write_json
+    from server.runtime.context import RuntimeContext
 
-    st_dir = unified_state_dir()
-    cfg_file = st_dir / "plugin_settings.json"
-    cfg: dict = {}
-    if cfg_file.exists():
-        try:
-            cfg = json.loads(cfg_file.read_text(encoding="utf-8"))
-        except Exception:
-            cfg = {}
-    cfg["last_st_data_root"] = str(chosen)
-    atomic_write_json(cfg_file, cfg, indent=2)
+    rt = RuntimeContext(st_data_root=chosen, state_dir=state_dir or unified_state_dir())
+    try:
+        rt.save_plugin_settings({"last_st_data_root": str(chosen)})
+    finally:
+        rt.close()
     return chosen
 
 
-def emit_one_time_cli_notice() -> None:
-    from server.fs_safety import atomic_write_json
-    from server.mcp_server import FIRST_RUN_NOTICE_V1
+def emit_one_time_cli_notice(state_dir: Path | None = None) -> None:
+    from server.runtime.context import RuntimeContext
+    from server.runtime.notice import FIRST_RUN_NOTICE, FIRST_RUN_NOTICE_VERSION
 
-    st_dir = unified_state_dir()
-    cfg_file = st_dir / "plugin_settings.json"
-    cfg: dict = {}
-    if cfg_file.exists():
-        try:
-            loaded = json.loads(cfg_file.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                cfg = loaded
-        except Exception:
-            cfg = {}
-    if cfg.get("first_run_notice_ack_v1") or cfg.get("first_run_cli_shown_v1"):
-        return
+    rt = RuntimeContext(state_dir=state_dir or unified_state_dir())
+    try:
+        cfg = rt.load_plugin_settings()
+        if cfg.get("first_run_notice_ack_v1") or cfg.get("first_run_cli_shown_v1"):
+            return
 
-    print("\n" + "=" * 68)
-    print(f"[NOTICE] {FIRST_RUN_NOTICE_V1['title']}")
-    for idx, item in enumerate(FIRST_RUN_NOTICE_V1["items"], start=1):
-        print(f"  {idx}. {item}")
-    print("=" * 68 + "\n")
+        print("\n" + "=" * 68)
+        print(f"[NOTICE] {FIRST_RUN_NOTICE['title']}")
+        for idx, item in enumerate(FIRST_RUN_NOTICE["items"], start=1):
+            print(f"  {idx}. {item}")
+        print("=" * 68 + "\n")
 
-    cfg["first_run_cli_shown_v1"] = True
-    atomic_write_json(cfg_file, cfg, indent=2)
+        rt.save_plugin_settings({
+            "first_run_cli_shown_v1": True,
+            "first_run_cli_shown_version": FIRST_RUN_NOTICE_VERSION,
+        })
+    finally:
+        rt.close()
 
 
 def main() -> None:
@@ -250,7 +294,12 @@ def main() -> None:
 
     if args.global_plugin:
         g_plugin = install_global_plugin_and_sidecar()
-        deduped = remove_duplicate_workspace_entry(PLUGIN_ROOT.parent)
+        dedup_targets = [PLUGIN_ROOT.parent.resolve()]
+        if args.workspace:
+            ws_cand = Path(args.workspace).resolve()
+            if ws_cand not in dedup_targets:
+                dedup_targets.append(ws_cand)
+        deduped = any(remove_duplicate_workspace_entry(t) for t in dedup_targets)
         print(f"[OK] Deployed global plugin (with Tavern Stage sidecar): ~/.gemini/config/plugins/{g_plugin.name}")
         if deduped:
             print("[OK] Removed duplicate workspace .agents/plugins.json entry to prevent double Hook execution")

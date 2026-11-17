@@ -17,6 +17,7 @@ Design rules:
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 from pathlib import Path
@@ -55,17 +56,17 @@ def _validate_base_url(base_url: str) -> str:
 
 
 def read_byok_api_key(state_dir: str | Path | None) -> str:
-    key = os.environ.get(KEY_ENV_VAR, "").strip()
+    key = os.environ.get(KEY_ENV_VAR, "").lstrip("\ufeff").strip()
     if key:
         return key
     if state_dir:
         key_file = Path(state_dir) / KEY_FILE_NAME
         if key_file.is_file():
             try:
-                first = key_file.read_text(encoding="utf-8").splitlines()
+                first = key_file.read_text(encoding="utf-8-sig").splitlines()
             except OSError:
                 return ""
-            return first[0].strip() if first else ""
+            return first[0].lstrip("\ufeff").strip() if first else ""
     return ""
 
 
@@ -112,6 +113,7 @@ def build_byok_cached_messages(
     frame_parts: dict[str, Any],
     user_prompt: str,
     cache_control: bool = False,
+    user_already_in_history: bool = False,
 ) -> list[dict[str, Any]]:
     """Prefix-cache friendly request: [system: static prefix] + history turns + [user: tail + prompt].
 
@@ -137,7 +139,9 @@ def build_byok_cached_messages(
     tail = str(frame_parts.get("dynamic_tail_block", "")).strip()
     final = (user_prompt or "").strip() or "(continue the scene)"
     history = frame_parts.get("history_messages") or []
-    if history and history[-1].get("role") == "user" and str(history[-1].get("content", "")).strip() == final:
+    if history and history[-1].get("role") == "user" and (
+        user_already_in_history or str(history[-1].get("content", "")).strip() == final
+    ):
         # The user's line is already the last history turn; don't repeat it after the tail.
         final = "[Respond in character to the latest user message above.]"
     messages.append({"role": "user", "content": f"{tail}\n\n{final}" if tail else final})
@@ -201,6 +205,8 @@ def _build_request(
 ) -> urllib.request.Request:
     if not api_key:
         raise ValueError(f"未找到 BYOK API Key：请设置环境变量 {KEY_ENV_VAR}，或在插件状态目录创建 {KEY_FILE_NAME} 文件。")
+    if not api_key.isascii() or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in api_key):
+        raise ValueError("BYOK API Key 包含非法非 ASCII 或控制字符，请检查密钥文件编码。")
     if not model:
         raise ValueError("未设置 BYOK 模型名：请在舞台配置中填写，或设置环境变量 TAVERN_BYOK_MODEL。")
     endpoint = _validate_base_url(base_url) + "/chat/completions"
@@ -266,6 +272,8 @@ def byok_chat_completion_with_usage(
         raise ValueError(f"BYOK 接口连接失败：{err.reason}") from None
     except TimeoutError:
         raise ValueError(f"BYOK 接口超时（>{int(timeout)}s）") from None
+    except (http.client.HTTPException, OSError) as err:
+        raise ValueError(f"BYOK 接口连接中断：{err}") from None
 
     try:
         data = json.loads(raw)
@@ -291,48 +299,74 @@ def byok_chat_completion_stream(
     """Streaming (`stream: true`, SSE) variant. Calls `on_delta(full_text_so_far)` as tokens arrive.
 
     If the endpoint rejects the streaming request itself (HTTP 400/404/415/422, e.g. a gateway that
-    does not accept `stream_options`), it falls back to one non-streaming request. Any error after
-    tokens started arriving is raised, so a half-written reply is never committed.
+    does not accept `stream_options`), it falls back to one non-streaming request. Any error or
+    premature EOF (missing both `[DONE]` and a choice `finish_reason`) after tokens started arriving
+    is raised, so a half-written reply is never committed.
     """
     req = _build_request(base_url, api_key, model, messages, temperature, max_tokens, stream=True)
     parts: list[str] = []
     usage: dict[str, int | None] = {"prompt_tokens": None, "cached_tokens": None, "completion_tokens": None}
+    saw_done = False
+    saw_finish = False
+
+    def _consume_sse_lines(line_iter: Any) -> None:
+        nonlocal saw_done, saw_finish
+        for raw_item in line_iter:
+            line = (
+                raw_item.decode("utf-8", errors="replace").strip()
+                if isinstance(raw_item, (bytes, bytearray))
+                else str(raw_item).strip()
+            )
+            if not line.startswith("data:"):
+                continue
+            chunk = line[5:].strip()
+            if chunk == "[DONE]":
+                saw_done = True
+                break
+            try:
+                event = json.loads(chunk)
+            except ValueError:
+                continue
+            if isinstance(event, dict) and event.get("error"):
+                e_obj = event["error"]
+                msg = str(e_obj.get("message") if isinstance(e_obj, dict) else e_obj)[:300]
+                raise ValueError(f"BYOK 流式接口中途报错：{msg.replace(api_key, '***') if api_key else msg}")
+            if isinstance(event, dict) and isinstance(event.get("usage"), dict):
+                for uk, uv in extract_cache_usage(event).items():
+                    if uv is not None:
+                        usage[uk] = uv
+            choices = event.get("choices") if isinstance(event, dict) else None
+            if not choices:
+                continue
+            c0 = choices[0] if isinstance(choices[0], dict) else {}
+            if c0.get("finish_reason"):
+                saw_finish = True
+            delta = c0.get("delta") or {}
+            piece = _content_to_text(delta.get("content"))
+            if piece:
+                parts.append(piece)
+                on_delta("".join(parts))
+
     try:
         with open_url(req, timeout) as resp:
-            ctype = str(resp.headers.get("Content-Type") or "")
+            ctype = str(resp.headers.get("Content-Type") or "").lower()
             if "event-stream" not in ctype:
-                # Endpoint ignored `stream` and answered with a single JSON body.
-                data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                text = _content_to_text(data["choices"][0]["message"]["content"]).strip()
-                if not text:
-                    raise ValueError("BYOK 接口返回了空回复（可能被服务端安全策略拦截）。")
-                on_delta(text)
-                return text, extract_cache_usage(data)
-            for raw_line in resp:
-                line = raw_line.decode("utf-8", errors="replace").strip()
-                if not line.startswith("data:"):
-                    continue
-                chunk = line[5:].strip()
-                if chunk == "[DONE]":
-                    break
-                try:
-                    event = json.loads(chunk)
-                except ValueError:
-                    continue
-                if isinstance(event, dict) and event.get("error"):
-                    e_obj = event["error"]
-                    msg = str(e_obj.get("message") if isinstance(e_obj, dict) else e_obj)[:300]
-                    raise ValueError(f"BYOK 流式接口中途报错：{msg.replace(api_key, '***') if api_key else msg}")
-                if isinstance(event, dict) and isinstance(event.get("usage"), dict):
-                    usage = extract_cache_usage(event)
-                choices = event.get("choices") if isinstance(event, dict) else None
-                if not choices:
-                    continue
-                delta = choices[0].get("delta") or {}
-                piece = _content_to_text(delta.get("content"))
-                if piece:
-                    parts.append(piece)
-                    on_delta("".join(parts))
+                raw_body = resp.read().decode("utf-8", errors="replace")
+                if raw_body.lstrip().startswith("data:"):
+                    _consume_sse_lines(raw_body.splitlines())
+                else:
+                    # Endpoint ignored `stream` and answered with a single JSON body.
+                    try:
+                        data = json.loads(raw_body)
+                        text = _content_to_text(data["choices"][0]["message"]["content"]).strip()
+                    except (ValueError, KeyError, IndexError, TypeError):
+                        raise ValueError("BYOK 接口返回格式无法解析（不是 OpenAI 兼容的 chat/completions 响应）。") from None
+                    if not text:
+                        raise ValueError("BYOK 接口返回了空回复（可能被服务端安全策略拦截）。")
+                    on_delta(text)
+                    return text, extract_cache_usage(data)
+            else:
+                _consume_sse_lines(resp)
     except urllib.error.HTTPError as err:
         if not parts and err.code in (400, 404, 415, 422):
             text, usage = byok_chat_completion_with_usage(
@@ -345,9 +379,13 @@ def byok_chat_completion_stream(
         raise ValueError(f"BYOK 接口连接失败：{err.reason}") from None
     except TimeoutError:
         raise ValueError(f"BYOK 接口超时（>{int(timeout)}s）") from None
+    except (http.client.HTTPException, OSError) as err:
+        raise ValueError(f"BYOK 流式连接异常中断：{err}") from None
     except (KeyError, IndexError, TypeError):
         raise ValueError("BYOK 接口返回格式无法解析（不是 OpenAI 兼容的 chat/completions 响应）。") from None
 
+    if parts and not (saw_done or saw_finish):
+        raise ValueError("BYOK 流式响应未正常结束（连接中途断开），已中止落盘以防截断。")
     text = "".join(parts).strip()
     if not text:
         raise ValueError("BYOK 接口返回了空回复（可能被服务端安全策略拦截）。")

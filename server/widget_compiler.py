@@ -44,6 +44,7 @@ def compile_stage_widget_html(
         "<path d='M56 220c14-44 130-44 144 0' fill='%2334d399' fill-opacity='0.4'/></svg>"
     )
     safe_avatar = avatar_data_uri or fallback_svg_uri
+    safe_avatar_html = html.escape(safe_avatar, quote=True)
     is_inline = placement == "inline"
     body_bg_cls = "bg-transparent p-2" if is_inline else "bg-[var(--background)] p-4"
 
@@ -58,7 +59,7 @@ def compile_stage_widget_html(
         "messages": messages[-12:],
         "dumpReport": dump_report,
     }
-    state_json = json.dumps(state_payload, ensure_ascii=False).replace("</", "<\\/")
+    state_json = json.dumps(state_payload, ensure_ascii=False).replace("</", "<\\/").replace("<!--", "<\\!--")
 
     html_doc = f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -77,7 +78,7 @@ def compile_stage_widget_html(
   <div id="stageRoot" class="mx-auto w-full rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden flex flex-col">
     <header class="px-4 py-3 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-3 min-w-0">
-        <img id="avatarImg" src="{safe_avatar}" alt="{char_name_html}" class="w-11 h-11 rounded-full object-cover border-2 border-emerald-500/60 shrink-0" />
+        <img id="avatarImg" src="{safe_avatar_html}" alt="{char_name_html}" class="w-11 h-11 rounded-full object-cover border-2 border-emerald-500/60 shrink-0" />
         <div class="min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <h1 id="charTitle" class="text-sm font-semibold text-[var(--foreground)] truncate"></h1>

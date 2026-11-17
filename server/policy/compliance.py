@@ -64,7 +64,7 @@ def resolve_policy_mode(explicit_mode: str | None = None, state_dir: str | Path 
         cfg_file = Path(state_dir) / "plugin_settings.json"
         if cfg_file.exists():
             try:
-                cfg = json.loads(cfg_file.read_text(encoding="utf-8"))
+                cfg = json.loads(cfg_file.read_text(encoding="utf-8-sig"))
                 cand = str(cfg.get("policy_mode", "")).strip().lower()
             except Exception:
                 cand = ""

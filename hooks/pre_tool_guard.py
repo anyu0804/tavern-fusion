@@ -84,11 +84,12 @@ def main() -> None:
         finally:
             runtime.close()
 
-    # 1. Block generic file tools from corrupting `.jsonl` chat logs or `.png` character cards
+    # 1. Block generic file tools from corrupting `.jsonl` chat logs, `.png` character cards, or plugin state
     if tool_name in FILE_MUTATION_TOOLS:
-        raw_target = str(tool_args.get("Path") or tool_args.get("TargetFile") or "")
-        norm_target = raw_target.replace("\\", "/").lower()
-        if ("/chats/" in norm_target or "/group chats/" in norm_target) and norm_target.endswith(".jsonl"):
+        raw_target = str(tool_args.get("Path") or tool_args.get("TargetFile") or "").strip()
+        norm_target = re.sub(r"/+", "/", raw_target.replace("\\", "/")).rstrip(". ").lower()
+        check_target = norm_target if norm_target.startswith("/") else f"/{norm_target}"
+        if ("/chats/" in check_target or "/group chats/" in check_target) and check_target.endswith(".jsonl"):
             sys.stdout.write(
                 json.dumps({
                     "decision": "deny",
@@ -101,7 +102,7 @@ def main() -> None:
                 + "\n"
             )
             return
-        if "/characters/" in norm_target and norm_target.endswith(".png"):
+        if "/characters/" in check_target and check_target.endswith(".png"):
             sys.stdout.write(
                 json.dumps({
                     "decision": "deny",
@@ -109,6 +110,15 @@ def main() -> None:
                         "Direct raw writes to Character Card `.png` files are blocked. Call "
                         "`st_build_export_card` to guarantee synchronized `ccv3` + `chara` chunks."
                     ),
+                })
+                + "\n"
+            )
+            return
+        if "/tavern-fusion/state/" in check_target and check_target.endswith(("plugin_settings.json", "active_session.json")):
+            sys.stdout.write(
+                json.dumps({
+                    "decision": "deny",
+                    "reason": "Direct raw writes to Tavern Fusion runtime state/policy files are blocked.",
                 })
                 + "\n"
             )
@@ -123,9 +133,11 @@ def main() -> None:
             "card_filename",
             "output_html_path",
             "portrait_image_path",
+            "preset_name",
+            "character_name",
         ):
             val = str(tool_args.get(path_key, ""))
-            if ".." in Path(val.replace("\\", "/")).parts or ".." in val:
+            if ".." in Path(val.replace("\\", "/")).parts or (".." in val and ("/" in val or "\\" in val or val.strip() == "..")):
                 sys.stdout.write(
                     json.dumps({
                         "decision": "deny",
@@ -134,6 +146,23 @@ def main() -> None:
                     + "\n"
                 )
                 return
+        for list_path_key in ("lorebooks", "lorebook_names"):
+            raw_items = tool_args.get(list_path_key)
+            if raw_items is None:
+                continue
+            seq_items = [raw_items] if isinstance(raw_items, str) else (raw_items if isinstance(raw_items, list) else [])
+            for elem in seq_items:
+                elem_str = str(elem or "")
+                elem_p = Path(elem_str.replace("\\", "/"))
+                if elem_p.is_absolute() or elem_p.anchor or ".." in elem_p.parts or "/" in elem_str or "\\" in elem_str:
+                    sys.stdout.write(
+                        json.dumps({
+                            "decision": "deny",
+                            "reason": f"Path traversal ('..') is forbidden in `{list_path_key}`.",
+                        })
+                        + "\n"
+                    )
+                    return
 
         discovered = discover_st_data_from_workspaces(ws_paths)
         runtime = RuntimeContext(st_data_root=discovered)

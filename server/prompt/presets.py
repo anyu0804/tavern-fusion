@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ..fs_safety import ensure_under_dir
+
 DEFAULT_RP_MAIN_PROMPT = (
     "Write {{char}}'s next reply in a fictional adventure and collaborative story with {{user}}. "
     "Stay strictly in character, portray {{char}}'s authentic emotions, sensory perceptions, and agency, "
@@ -31,8 +33,12 @@ def load_openai_preset(st_data_root: str | Path, preset_name: str | None = None)
     chosen_file: Path | None = None
     if preset_dir.exists():
         if preset_name and preset_name != "BuiltIn-Carbon-RP":
-            candidate = preset_dir / (preset_name if preset_name.endswith(".json") else f"{preset_name}.json")
-            if candidate.exists():
+            raw_pname = str(preset_name).strip()
+            p_cand = Path(raw_pname if raw_pname.endswith(".json") else f"{raw_pname}.json")
+            if p_cand.is_absolute() or p_cand.anchor or ".." in p_cand.parts or len(p_cand.parts) != 1:
+                raise ValueError(f"Invalid preset_name '{preset_name}': path traversal is forbidden.")
+            candidate = ensure_under_dir(preset_dir / p_cand, preset_dir)
+            if candidate.exists() and candidate.is_file():
                 chosen_file = candidate
         if chosen_file is None:
             default_cand = preset_dir / "Default.json"
@@ -77,7 +83,7 @@ def load_openai_preset(st_data_root: str | Path, preset_name: str | None = None)
             "custom_prompts": {},
         }
 
-    raw = json.loads(chosen_file.read_text(encoding="utf-8"))
+    raw = json.loads(chosen_file.read_text(encoding="utf-8-sig"))
     prompts_list = raw.get("prompts", [])
     prompt_defs: dict[str, dict[str, Any]] = {}
     if isinstance(prompts_list, list):

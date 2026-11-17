@@ -22,7 +22,7 @@ from ..chat_sync import (
     write_jsonl_chat_atomic,
 )
 from ..fs_safety import atomic_write_json, ensure_under_dir
-from ..policy import evaluate_policy_compliance
+from ..policy import evaluate_minor_risk_gate, evaluate_policy_compliance
 from ..prompt import (
     get_active_persona,
     load_st_settings,
@@ -116,6 +116,12 @@ def st_commit_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("character_name is required to commit a turn.")
 
     card_path, card_bundle, char_name, avatar_stem = resolve_card_and_identity(ctx, char_query, session)
+    minor_gate = evaluate_minor_risk_gate(card_bundle)
+    if minor_gate["gate_action"] == "block_load":
+        raise ValueError(
+            f"[Card Doctor 未成年风险闸] 默认拒绝装载/提交角色卡「{char_name}」 ({card_path.name})："
+            f"{'；'.join(minor_gate['reasons'])}"
+        )
     card_v3 = card_bundle["card"]
     persona = get_active_persona(ctx.st_data_root, session.get("persona_name"))
 
@@ -169,6 +175,8 @@ def st_commit_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, Any]:
         is_storage_pass=True,
         epistemic_level=epistemic_level,
         is_backstage=is_backstage,
+        char_name=char_name,
+        user_name=persona["name"],
     )
     cleaned_char = resolve_st_macros(cleaned_char, char_name, persona["name"], vars_dict)
     cleaned_user = (
@@ -183,14 +191,18 @@ def st_commit_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, Any]:
         k: v for k, v in vars_dict.items() if k not in pre_macro_vars or pre_macro_vars[k] != v
     }
 
-    entries = collect_merged_lore_entries(ctx, card_v3, session.get("extra_lorebooks"))
-    lore_eval = ctx.lore_engine.evaluate_and_splice(
-        entries=entries,
-        chat_messages=messages,
-        latest_user_input=cleaned_user or "",
-        timed_state=header.get("chat_metadata", {}).get("timed_effects"),
-        quarantine_backstage=(epistemic_level < 100 and not is_backstage),
-    )
+    is_swipe = bool(args.get("swipe_mode", False))
+    next_timed_state: dict[str, Any] | None = None
+    if not is_swipe:
+        entries = collect_merged_lore_entries(ctx, card_v3, session.get("extra_lorebooks"))
+        lore_eval = ctx.lore_engine.evaluate_and_splice(
+            entries=entries,
+            chat_messages=messages,
+            latest_user_input=cleaned_user or "",
+            timed_state=header.get("chat_metadata", {}).get("timed_effects"),
+            quarantine_backstage=(epistemic_level < 100 and not is_backstage),
+        )
+        next_timed_state = lore_eval["next_timed_state"]
 
     expr_list = list_character_expressions(ctx.st_data_root, avatar_stem) or list_character_expressions(
         ctx.st_data_root, char_name
@@ -205,9 +217,9 @@ def st_commit_turn(ctx: RuntimeContext, args: dict[str, Any]) -> dict[str, Any]:
         user_name=persona["name"],
         user_mes=cleaned_user,
         char_mes=cleaned_char,
-        swipe_mode=bool(args.get("swipe_mode", False)),
+        swipe_mode=is_swipe,
         variables_delta={**(args.get("variables_delta") or {}), **macro_setvar_delta},
-        next_timed_state=lore_eval["next_timed_state"],
+        next_timed_state=next_timed_state,
         extra_meta=extra_meta,
     )
     commit_res["expression"] = detected_expr

@@ -15,7 +15,7 @@ def load_st_settings(st_data_root: str | Path) -> dict[str, Any]:
     if not settings_path.exists():
         return {}
     try:
-        return json.loads(settings_path.read_text(encoding="utf-8"))
+        return json.loads(settings_path.read_text(encoding="utf-8-sig"))
     except Exception:
         return {}
 

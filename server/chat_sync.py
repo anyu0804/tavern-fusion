@@ -124,7 +124,14 @@ def notify_st_web_bridge(
     payload: dict[str, Any],
     st_web_url: str | None = None,
 ) -> bool:
-    """Optional non-blocking sync ping to local SillyTavern Web (`127.0.0.1:8000`) if running."""
+    """Optional non-blocking sync ping to local SillyTavern Web (`127.0.0.1:8000`) when explicitly opted in.
+
+    Browser-side sync uses the pure client extension `st-ag-sync` (polling without server plugins);
+    short-circuiting by default avoids a 250ms Windows Winsock SYN timeout on every disk write when
+    port 8000 is closed and avoids 403/404 noise in SillyTavern logs when open.
+    """
+    if os.environ.get("TAVERN_ST_BRIDGE_NOTIFY", "").strip().lower() not in ("1", "true", "yes", "on"):
+        return False
     base_url = (st_web_url or os.environ.get("ST_WEB_URL", "http://127.0.0.1:8000")).rstrip("/")
     endpoint = f"{base_url}/api/plugins/tavern-fusion-bridge/notify"
     body = json.dumps({"event": event_type, "timestamp": time.time(), "payload": payload}).encode("utf-8")
@@ -185,7 +192,7 @@ def list_groups(st_data_root: str | Path) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for p in sorted(groups_dir.glob("*.json"), key=lambda item: (item.name.lower(), item.name)):
         try:
-            raw = json.loads(p.read_text(encoding="utf-8"))
+            raw = json.loads(p.read_text(encoding="utf-8-sig"))
             out.append({
                 "id": str(raw.get("id", p.stem)),
                 "name": str(raw.get("name", p.stem)),
@@ -210,7 +217,7 @@ def read_jsonl_chat(chat_path: str | Path) -> tuple[dict[str, Any], list[dict[st
     header: dict[str, Any] = {}
     messages: list[dict[str, Any]] = []
     seen_nonempty = 0
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, "r", encoding="utf-8-sig") as fh:
         for line_idx, raw_line in enumerate(fh):
             stripped = raw_line.strip()
             if not stripped:
@@ -481,6 +488,19 @@ def stage_floor_operation(
             u_extra: dict[str, Any] = {"source": "tavern_stage_sidecar"}
             if isinstance(extra_meta, dict):
                 u_extra.update(extra_meta)
+            want_bs = bool(u_extra.get("is_backstage", False))
+            if (
+                messages
+                and bool(messages[-1].get("is_user"))
+                and str(messages[-1].get("mes", "")).strip() == clean_u
+                and bool((messages[-1].get("extra") or {}).get("is_backstage", False)) == want_bs
+            ):
+                return {
+                    "operation": operation,
+                    "floor_count": len(messages),
+                    "floor_index": len(messages) - 1,
+                    "is_backstage": want_bs,
+                }
             messages.append({
                 "name": user_name,
                 "is_user": True,
@@ -494,7 +514,7 @@ def stage_floor_operation(
                 "operation": operation,
                 "floor_count": len(messages),
                 "floor_index": len(messages) - 1,
-                "is_backstage": bool(u_extra.get("is_backstage", False)),
+                "is_backstage": want_bs,
             }
 
         if operation == "toggle_backstage":
