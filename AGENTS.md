@@ -34,5 +34,6 @@
 - `D:\SillyTavern\tavern-fusion\` — git 旧快照，头提交 `a7cf070` 经核验为主线祖先且存在于 GitHub 远端，删除无历史损失
 - `D:\WB-Workspaces\_archive\sidecar-legacy-tavern-fusion-20261111-130122\` — 2026-11-11 归档副本
 - `%TEMP%\tavern-fusion-{inspect, review-20261111, fix-20261111-122453, isolate-20261111-130122, reinstall-20261111-124631}\` — 临时检查/修复/隔离/重装片段（`fix` 片段为删除时新发现，属同批产物一并清理）
+- `~/.gemini/local-plugins/tavern-fusion/`（2026-11-29 移入回收站）— 2026-11-18 陈旧运行副本，经比对与迁移前的安装副本完全一致（无独有修复，且含旧 `agents/` 与损坏的 `hooks.json`，未被 `config.json` 引用）
 
 再次发现新的散落副本时：先核对其角色与内容差异（有无独有提交、有无领先修复），确认无独有内容后删除，并更新本节记录。

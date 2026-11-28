@@ -152,8 +152,9 @@ class BackendRegressionTests(unittest.TestCase):
             hooks_cfg["st-stop-sync-guarantor"]["Stop"][0]["command"],
         ]
         for cmd in cmds:
-            self.assertIn("${PLUGIN_ROOT}/scripts/run_py.mjs", cmd)
-            self.assertIn("${PLUGIN_ROOT}/hooks/", cmd)
+            self.assertNotIn("${PLUGIN_ROOT}", cmd)
+            self.assertIn("./scripts/run_py.mjs", cmd)
+            self.assertIn("./hooks/", cmd)
 
         node_bin = shutil.which("node")
         self.assertIsNotNone(node_bin, "Node.js is required to verify run_py.mjs")
