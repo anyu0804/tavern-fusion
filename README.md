@@ -61,15 +61,17 @@
 
 ---
 
-## 专家子代理组（Specialist Subagents）与 Slash 技能
+## 专家工作流角色（Persona Playbooks，已并入 1× Skills）与 Slash 技能
+
+> 说明：为避免触发 Antigravity 上游 `#1890` 插件自定义 Agent（`plugins/*/agents/*`）高倍率配额计费，原 5 个 `agents/*.md` 专员已整体迁入 `skills/rp/references/personas.md` 并由默认 Agent 通过下方 Slash Skills 以 1× 标准费率直接执行。
 
 | 组件 | 名称 | 职责说明 |
 | :--- | :--- | :--- |
-| Subagent | `kertoja-director` (**Kertoja**) | 叙事与群像导演，把控单人/多角色发言调度、目击记忆隔离、感官张力与 `*动作*` / `"台词"` 排版纪律 |
-| Subagent | `kartoittaja-brancher` (**Kartoittaja**) | 剧情分支测绘师，为当前楼层构思 3 条平行 Swipe，保持角色性格自洽而剧情走向不同 |
-| Subagent | `seppa-cardsmith` (**Seppä**) | CCv2/CCv3 角色卡锻造与 Card Doctor 修复专家 |
-| Subagent | `toimittaja-state` (**Toimittaja**) | 状态审计官，维护 `/getvar` 聊天变量、好感/线索追踪与长线记忆摘要 |
-| Subagent | `dramaturgi-lore` (**Dramaturgi**) | 世界书织命师，管理 `worlds/*.json` 条目演化、门控逻辑与 `@D` 深度预算 |
+| Playbook | **Kertoja**（`/rp` 内置） | 叙事与群像导演，把控单人/多角色发言调度、目击记忆隔离、感官张力与 `*动作*` / `"台词"` 排版纪律 |
+| Playbook | **Kartoittaja**（`/rp` 内置） | 剧情分支测绘师，为当前楼层构思 3 条平行 Swipe，保持角色性格自洽而剧情走向不同 |
+| Playbook | **Seppä**（`/card-forge` 内置） | CCv2/CCv3 角色卡锻造与 Card Doctor 修复专家 |
+| Playbook | **Toimittaja**（`/rp` 内置） | 状态审计官，维护 `/getvar` 聊天变量、好感/线索追踪与长线记忆摘要 |
+| Playbook | **Dramaturgi**（`/lore-weaver` 内置） | 世界书织命师，管理 `worlds/*.json` 条目演化、门控逻辑与 `@D` 深度预算 |
 | Skill | `/rp` | 启动或恢复指定角色扮演会话并联动 Tavern Stage |
 | Skill | `/tavern-stage` | 打开右侧 Tavern Stage 工作台面板或导出 CSP 合规的 `/generative_ui` 快照 |
 | Skill | `/card-forge` | 运行角色卡无损拆解、Card Doctor 体检与双区块 PNG 铸造 |

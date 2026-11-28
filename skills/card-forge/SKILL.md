@@ -6,7 +6,7 @@ description: >-
 # Character Card V2/V3 Forge & Card Doctor (`/card-forge`)
 
 1. **Run Card Doctor First**: Call `st_lint_card_and_lore(character_name=...)` and `st_read_card(card_filename=...)` (leave `include_avatar_base64=false` by default to avoid injecting raw PNG Base64 tokens into context; pass `include_avatar_base64=true` only when visual inspection of the portrait is explicitly needed) to inspect all V3 fields and check for common pitfalls (missing `ccv3` chunk, `system_prompt` wiping preset without `{{original}}`, `selective: false` secondary-key traps, leaked `creator_notes`, or oversized `mes_example`).
-2. **Design or Repair (`Seppä` Workflow)**:
+2. **Design or Repair (`Seppä` Workflow — see `../rp/references/personas.md`)**:
    - Keep `spec` as `"chara_card_v3"` and `spec_version` as `"3.0"`.
    - Include `{{original}}` in `system_prompt` if the card should layer atop user presets rather than replacing them.
    - Preserve the original author's prose voice when repairing existing cards.

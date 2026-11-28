@@ -191,8 +191,11 @@ class TavernStageUiRegressionTests(unittest.TestCase):
         lore_skill = (ROOT_DIR / "skills" / "lore-weaver" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn('"delete"', lore_skill)
 
-        kartoittaja = (ROOT_DIR / "agents" / "kartoittaja-brancher.md").read_text(encoding="utf-8")
-        self.assertIn("char_mes=", kartoittaja)
+        self.assertFalse((ROOT_DIR / "agents").exists(), "Plugin agents/ directory must remain retired to avoid 4x custom-agent quota billing")
+        personas = (ROOT_DIR / "skills" / "rp" / "references" / "personas.md").read_text(encoding="utf-8")
+        self.assertIn("char_mes=", personas)
+        for name in ("Kertoja", "Kartoittaja", "Seppä", "Toimittaja", "Dramaturgi"):
+            self.assertIn(name, personas)
 
         acceptance_path = ROOT_DIR / "ACCEPTANCE.md"
         self.assertTrue(acceptance_path.is_file(), "ACCEPTANCE.md must exist at repository root")
